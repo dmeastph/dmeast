@@ -322,21 +322,41 @@ const PRODUCTS = [
     price: 2850, cta: "buy", imageSrc: null, featured: false, tag: "OB Gyne & Pediatrics" },
 
   // ── PHARMACEUTICALS ──
+  // requiresPrescription based on Philippine FDA / DOH / R.A. 10918 (Pharmacy Law)
+  // Prescription Required: all antibiotics, antivirals, maintenance meds, controlled substances
+  // OTC: paracetamol, ibuprofen (low dose), antacids, vitamins, antihistamines, ORS
   { id: "rx-01", category: "pharma", name: "Amoxicillin 500mg",
-    desc: "Broad-spectrum antibiotic. Branded and generic variants. Per box of 100 capsules. Prescription required.",
-    price: 850, cta: "buy", imageSrc: null, featured: false, tag: "Pharmaceuticals" },
+    desc: "Broad-spectrum penicillin antibiotic. Per box of 100 capsules. ⚠️ Valid doctor's prescription required per Philippine FDA regulation.",
+    price: 850, cta: "buy", imageSrc: null, featured: false, tag: "Pharmaceuticals",
+    requiresPrescription: true, rxCategory: "Antibiotic" },
   { id: "rx-02", category: "pharma", name: "Paracetamol 500mg",
-    desc: "Analgesic and antipyretic. OTC product. Available in tablet and suspension. Fast nationwide delivery.",
-    price: 320, cta: "buy", imageSrc: null, featured: false, tag: "Pharmaceuticals" },
+    desc: "Analgesic and antipyretic. Over-the-counter (OTC). Available in tablet and suspension forms.",
+    price: 320, cta: "buy", imageSrc: null, featured: false, tag: "Pharmaceuticals",
+    requiresPrescription: false, rxCategory: null },
   { id: "rx-03", category: "pharma", name: "Vitamin C 500mg",
-    desc: "High-dose ascorbic acid supplement. OTC. Branded and generic. Box of 100 tablets.",
-    price: 420, cta: "buy", imageSrc: null, featured: false, tag: "Pharmaceuticals" },
-  { id: "rx-04", category: "pharma", name: "Antibiotics — Institutional Supply",
-    desc: "Bulk antibiotic supply for government hospitals, RHUs, and LGU health programs. Volume pricing via quotation.",
-    price: null, cta: "quote", imageSrc: null, featured: false, tag: "Pharmaceuticals" },
-  { id: "rx-05", category: "pharma", name: "Vaccine Supply (Government Programs)",
-    desc: "Government-grade vaccine supply through accredited distributors for LGU immunization programs.",
-    price: null, cta: "sales", imageSrc: null, featured: false, tag: "Pharmaceuticals" },
+    desc: "High-dose ascorbic acid supplement. Over-the-counter (OTC). Branded and generic. Box of 100 tablets.",
+    price: 420, cta: "buy", imageSrc: null, featured: false, tag: "Pharmaceuticals",
+    requiresPrescription: false, rxCategory: null },
+  { id: "rx-04", category: "pharma", name: "Mefenamic Acid 500mg",
+    desc: "NSAID analgesic for pain and dysmenorrhea. Per box of 100 capsules. ⚠️ Prescription required.",
+    price: 680, cta: "buy", imageSrc: null, featured: false, tag: "Pharmaceuticals",
+    requiresPrescription: true, rxCategory: "NSAID / Analgesic" },
+  { id: "rx-05", category: "pharma", name: "Metformin 500mg",
+    desc: "Oral antidiabetic for Type 2 diabetes. Per box of 100 tablets. ⚠️ Valid prescription required.",
+    price: 520, cta: "buy", imageSrc: null, featured: false, tag: "Pharmaceuticals",
+    requiresPrescription: true, rxCategory: "Antidiabetic / Maintenance" },
+  { id: "rx-06", category: "pharma", name: "Amlodipine 5mg",
+    desc: "Calcium channel blocker for hypertension. Per box of 100 tablets. ⚠️ Valid prescription required.",
+    price: 480, cta: "buy", imageSrc: null, featured: false, tag: "Pharmaceuticals",
+    requiresPrescription: true, rxCategory: "Antihypertensive / Maintenance" },
+  { id: "rx-07", category: "pharma", name: "Antibiotics — Institutional Bulk Supply",
+    desc: "Bulk antibiotic formulary for hospitals, RHUs, and LGU health programs. Volume pricing via quotation. Authorization required.",
+    price: null, cta: "quote", imageSrc: null, featured: false, tag: "Pharmaceuticals",
+    requiresPrescription: true, rxCategory: "Antibiotic" },
+  { id: "rx-08", category: "pharma", name: "Vaccine Supply (Government / Institutional)",
+    desc: "Government-grade vaccines through accredited distributors for LGU immunization programs.",
+    price: null, cta: "sales", imageSrc: null, featured: false, tag: "Pharmaceuticals",
+    requiresPrescription: true, rxCategory: "Vaccine / Immunobiological" },
 
   // ── SPECIALIZED ──
   { id: "sp-01", category: "specialized", name: "Hemodialysis Machine",
@@ -602,6 +622,13 @@ function ProductCard({ product, addToCart, setPage }) {
           <h3 style={{ fontSize: 14, fontWeight: 600, color: ds.color.textDark, lineHeight: 1.35, flex: 1 }}>{product.name}</h3>
           <CtaBadge type={product.cta} />
         </div>
+        {/* Rx badge */}
+        {product.requiresPrescription && (
+          <div style={{ display: "inline-flex", alignItems: "center", gap: 5, background: "#FFF3CD", border: "1px solid #FBBF24", borderRadius: ds.radius.pill, padding: "3px 10px", marginBottom: 8 }}>
+            <span style={{ fontSize: 11 }}>💊</span>
+            <span style={{ fontSize: 10, fontWeight: 700, color: "#92400E", letterSpacing: "0.05em", textTransform: "uppercase" }}>Rx — Prescription Required</span>
+          </div>
+        )}
         <p style={{ fontSize: 12.5, color: ds.color.textMuted, lineHeight: 1.6, marginBottom: 16 }}>{product.desc}</p>
         {product.price && <div style={{ fontSize: 18, fontWeight: 700, color: ds.color.textDark, marginBottom: 14 }}>{formatPHP(product.price)}</div>}
         {product.cta === "buy"   && <Btn variant={feedback === "added" ? "success" : "primary"} size="sm" fullWidth onClick={handleBuy}>{feedback === "added" ? "✓ Added to Cart" : "Add to Cart"}</Btn>}
@@ -1513,97 +1540,204 @@ function ContactPage() {
   );
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// LEAFLET INTERACTIVE MAP — draggable pin, click to place, reverse geocode
+// Uses OpenStreetMap + Nominatim (100% free, no API key required)
+// ─────────────────────────────────────────────────────────────────────────────
+function LeafletMap({ onLocationSelect, externalCoords }) {
+  const containerRef = useRef(null);
+  const mapRef       = useRef(null);
+  const markerRef    = useRef(null);
+  const [loaded, setLoaded] = useState(!!window.L);
+
+  // Load Leaflet CSS + JS from CDN once
+  useEffect(() => {
+    if (window.L) { setLoaded(true); return; }
+    const link = document.createElement("link");
+    link.rel = "stylesheet";
+    link.href = "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css";
+    document.head.appendChild(link);
+    const script = document.createElement("script");
+    script.src = "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js";
+    script.onload = () => setLoaded(true);
+    document.head.appendChild(script);
+  }, []);
+
+  // Reverse geocode helper using Nominatim (free)
+  const reverseGeocode = useCallback(async (lat, lng) => {
+    try {
+      const res  = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`, { headers: { "Accept-Language": "en" } });
+      const data = await res.json();
+      if (data?.address) {
+        const a     = data.address;
+        const parts = [a.house_number, a.road || a.pedestrian || a.footway, a.suburb || a.neighbourhood, a.city || a.town || a.municipality, a.state, a.postcode, a.country].filter(Boolean);
+        onLocationSelect(lat, lng, parts.join(", ") || data.display_name);
+      }
+    } catch {
+      onLocationSelect(lat, lng, `Near: ${lat.toFixed(6)}, ${lng.toFixed(6)}`);
+    }
+  }, [onLocationSelect]);
+
+  // Initialise map after Leaflet loads
+  useEffect(() => {
+    if (!loaded || !containerRef.current || mapRef.current) return;
+    const L           = window.L;
+    const startCoords = externalCoords || [14.5995, 120.9842]; // Default: Manila
+
+    const map = L.map(containerRef.current, { zoomControl: true }).setView(startCoords, 15);
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      attribution: "© <a href='https://openstreetmap.org'>OpenStreetMap</a>",
+      maxZoom: 19,
+    }).addTo(map);
+
+    // Custom branded teardrop pin
+    const icon = L.divIcon({
+      html: `<div style="position:relative;width:30px;height:42px">
+        <div style="width:28px;height:28px;background:#CC2F3C;border-radius:50% 50% 50% 0;
+          transform:rotate(-45deg);position:absolute;top:0;left:1px;
+          border:3px solid white;box-shadow:0 2px 10px rgba(0,0,0,0.35)"></div>
+        <div style="width:7px;height:7px;background:white;border-radius:50%;
+          position:absolute;top:8px;left:11px;z-index:1"></div>
+      </div>`,
+      iconSize: [30, 42],
+      iconAnchor: [15, 42],
+      className: "",
+    });
+
+    const marker = L.marker(startCoords, { draggable: true, icon }).addTo(map);
+    marker.bindTooltip("Drag me to fine-tune your location", { permanent: false, direction: "top" });
+
+    marker.on("dragend", () => {
+      const { lat, lng } = marker.getLatLng();
+      reverseGeocode(lat, lng);
+    });
+
+    map.on("click", (e) => {
+      marker.setLatLng(e.latlng);
+      map.panTo(e.latlng);
+      reverseGeocode(e.latlng.lat, e.latlng.lng);
+    });
+
+    mapRef.current    = map;
+    markerRef.current = marker;
+    setTimeout(() => map.invalidateSize(), 150);
+  }, [loaded, reverseGeocode]);
+
+  // Sync external coords → move map + marker (from GPS button)
+  useEffect(() => {
+    if (!mapRef.current || !markerRef.current || !externalCoords) return;
+    const L     = window.L;
+    const latlng = L.latLng(externalCoords[0], externalCoords[1]);
+    markerRef.current.setLatLng(latlng);
+    mapRef.current.setView(latlng, 17);
+  }, [externalCoords]);
+
+  if (!loaded) return (
+    <div style={{ height: 300, background: ds.color.canvas, borderRadius: ds.radius.lg, border: `1px solid ${ds.color.border}`, display: "flex", alignItems: "center", justifyContent: "center", gap: 10 }}>
+      <div style={{ width: 20, height: 20, border: `2.5px solid ${ds.color.border}`, borderTopColor: ds.color.red, borderRadius: "50%", animation: "spin 0.7s linear infinite" }} />
+      <span style={{ fontSize: 14, color: ds.color.textMuted }}>Loading map…</span>
+    </div>
+  );
+
+  return (
+    <div>
+      <div ref={containerRef} style={{ height: 300, borderRadius: ds.radius.lg, overflow: "hidden", border: `1px solid ${ds.color.border}`, boxShadow: ds.shadow.xs }} />
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 6 }}>
+        <span style={{ fontSize: 11, color: ds.color.textMuted }}>
+          📍 Click map to drop pin · Drag pin to fine-tune
+        </span>
+        <a href="https://openstreetmap.org" target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: ds.color.textLight }}>© OpenStreetMap</a>
+      </div>
+    </div>
+  );
+}
+
 function CartPage({ cart, removeFromCart, updateQty, setPage }) {
-  const total     = cart.reduce((s, i) => s + (i.price || 0) * i.qty, 0);
-  const [step,    setStep]    = useState(1); // 1=cart, 2=details, 3=payment, 4=confirm
+  const total = cart.reduce((s, i) => s + (i.price || 0) * i.qty, 0);
+
+  // Detect if any cart item requires a prescription
+  const rxItems = cart.filter(i => i.requiresPrescription);
+  const hasRx   = rxItems.length > 0;
+
+  // Steps: 1=Cart  2=Details  3=Prescription(conditional)  4=Payment  5=Done
+  const [step,    setStep]    = useState(1);
   const [method,  setMethod]  = useState("");
   const [sending, setSending] = useState(false);
   const [errMsg,  setErrMsg]  = useState("");
 
-  const EMPTY_DETAILS = { name: "", email: "", phone: "", address: "" };
-  const [details, setDetails] = useState(EMPTY_DETAILS);
+  // Customer details
+  const EMPTY = { name: "", email: "", phone: "", address: "", instructions: "" };
+  const [details, setDetails] = useState(EMPTY);
   const setD = (k) => (e) => setDetails(d => ({ ...d, [k]: e.target.value }));
 
-  // ── Geolocation state ────────────────────────────────────────────────────
-  const [geoStatus, setGeoStatus] = useState("idle"); // idle | asking | loading | success | denied | error
-  const [geoCoords, setGeoCoords] = useState(null);   // { lat, lng } when obtained
+  // Map coords for Leaflet
+  const [mapCoords, setMapCoords] = useState(null); // [lat, lng]
+  const [geoStatus, setGeoStatus] = useState("idle");
 
+  // Prescription upload
+  const [prescription, setPrescription] = useState(null); // { preview, base64, name }
+  const prescriptionRef = useRef(null);
+
+  const detailsFilled = details.name && details.email && details.phone && details.address;
+
+  // Build order summary string
+  const orderSummary = cart.map(i => `${i.name} x${i.qty} — ${formatPHP(i.price * i.qty)}`).join("\n");
+
+  // GPS geolocation
   const handleUseMyLocation = () => {
-    if (!navigator.geolocation) {
-      setGeoStatus("error");
-      return;
-    }
+    if (!navigator.geolocation) { setGeoStatus("error"); return; }
     setGeoStatus("asking");
     navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        const { latitude: lat, longitude: lng } = position.coords;
-        setGeoCoords({ lat, lng });
-        setGeoStatus("loading");
-        try {
-          // OpenStreetMap Nominatim — free, no API key required
-          const res = await fetch(
-            `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`,
-            { headers: { "Accept-Language": "en" } }
-          );
-          const data = await res.json();
-          if (data && data.display_name) {
-            // Build a clean address from the structured response
-            const a = data.address || {};
-            const parts = [
-              a.house_number,
-              a.road || a.pedestrian || a.footway,
-              a.suburb || a.neighbourhood || a.quarter,
-              a.city || a.town || a.municipality || a.village,
-              a.state || a.region,
-              a.postcode,
-              a.country,
-            ].filter(Boolean);
-            const cleanAddress = parts.length > 0 ? parts.join(", ") : data.display_name;
-            setDetails(d => ({ ...d, address: cleanAddress }));
-            setGeoStatus("success");
-          } else {
-            setGeoStatus("error");
-          }
-        } catch {
-          // If reverse geocoding fails, show raw coordinates as fallback
-          setDetails(d => ({ ...d, address: `Near: ${lat.toFixed(5)}, ${lng.toFixed(5)}` }));
-          setGeoStatus("success");
-        }
+      (pos) => {
+        const { latitude: lat, longitude: lng } = pos.coords;
+        setMapCoords([lat, lng]);
+        setGeoStatus("success");
       },
-      (err) => {
-        if (err.code === err.PERMISSION_DENIED) setGeoStatus("denied");
-        else setGeoStatus("error");
-      },
+      (err) => setGeoStatus(err.code === err.PERMISSION_DENIED ? "denied" : "error"),
       { enableHighAccuracy: true, timeout: 10000 }
     );
   };
 
-  const geoLabel = {
-    idle:    "📍 Use My Location",
-    asking:  "⏳ Waiting for permission…",
-    loading: "🔍 Getting your address…",
-    success: "✓ Location detected",
-    denied:  "❌ Permission denied",
-    error:   "❌ Could not get location",
+  // Called by LeafletMap when pin is placed/dragged
+  const handleLocationSelect = useCallback((lat, lng, address) => {
+    setMapCoords([lat, lng]);
+    setDetails(d => ({ ...d, address }));
+  }, []);
+
+  // Prescription file handler
+  const handlePrescriptionUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      setPrescription({ preview: ev.target.result, base64: ev.target.result, name: file.name });
+    };
+    reader.readAsDataURL(file);
   };
 
-  const detailsFilled = details.name && details.email && details.phone && details.address;
+  // Navigate steps — skip Prescription step if no Rx items
+  const goNext = () => {
+    if (step === 2 && !hasRx) setStep(4);
+    else setStep(s => s + 1);
+  };
+  const goBack = () => {
+    if (step === 4 && !hasRx) setStep(2);
+    else setStep(s => s - 1);
+  };
 
-  // Build a readable order summary string for the emails
-  const orderSummary = cart.map(i => `${i.name} x${i.qty} — ${formatPHP(i.price * i.qty)}`).join("\n");
-
+  // Place order — send two emails
   const handlePlaceOrder = async () => {
     if (!method) return;
     setSending(true);
     setErrMsg("");
     try {
-      // Email 1 — Notify DMEAST of the new order
+      // Email 1 — Notify DMEAST
       await emailjs.send(
         EMAILJS_CONFIG.serviceId,
         EMAILJS_CONFIG.templateId,
         {
           from_name:    details.name,
-          company:      "N/A",
+          company:      "Direct Order",
           from_email:   details.email,
           phone:        details.phone,
           product:      orderSummary,
@@ -1611,13 +1745,13 @@ function CartPage({ cart, removeFromCart, updateQty, setPage }) {
           budget:       formatPHP(total),
           location:     details.address,
           timeline:     "Direct Order",
-          details:      `Payment Method: ${method}\n\nOrder Items:\n${orderSummary}\n\nTotal: ${formatPHP(total)}`,
+          details:      `Payment Method: ${method}\n\nDelivery Address:\n${details.address}\n\nSpecial Instructions:\n${details.instructions || "None"}\n\nOrder Items:\n${orderSummary}\n\nTotal: ${formatPHP(total)}${hasRx ? "\n\n⚠️ PRESCRIPTION ITEMS — prescription document submitted with order." : ""}`,
           reply_to:     details.email,
+          prescription_note: hasRx ? `Prescription attached: ${prescription?.name || "uploaded"}` : "No prescription required",
         },
         EMAILJS_CONFIG.publicKey
       );
-
-      // Email 2 — Send receipt to customer
+      // Email 2 — Customer receipt
       await emailjs.send(
         EMAILJS_CONFIG.serviceId,
         EMAILJS_CONFIG.receiptTemplateId,
@@ -1633,10 +1767,9 @@ function CartPage({ cart, removeFromCart, updateQty, setPage }) {
         },
         EMAILJS_CONFIG.publicKey
       );
-
-      setStep(4);
+      setStep(5);
     } catch (err) {
-      setErrMsg("Something went wrong sending your order. Please email us directly at " + CONTACT.email);
+      setErrMsg("Something went wrong. Please email us at " + CONTACT.email);
     } finally {
       setSending(false);
     }
@@ -1651,69 +1784,69 @@ function CartPage({ cart, removeFromCart, updateQty, setPage }) {
   };
   const labelS = { fontSize: 12.5, fontWeight: 600, color: ds.color.textDark, display: "block", marginBottom: 6 };
 
-  // ── Step 4: Order Confirmed ───────────────────────────────────────────────
-  if (step === 4) return (
+  // ── Step 5: Order Confirmed ──────────────────────────────────────────────
+  if (step === 5) return (
     <div style={{ paddingTop: 67, minHeight: "80vh", display: "flex", alignItems: "center", justifyContent: "center", background: ds.color.canvas }}>
-      <div style={{ textAlign: "center", maxWidth: 460, padding: "0 24px" }}>
+      <div style={{ textAlign: "center", maxWidth: 480, padding: "0 24px" }}>
         <div style={{ width: 76, height: 76, borderRadius: "50%", background: ds.color.successBg, border: `2px solid ${ds.color.successBorder}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 30, margin: "0 auto 24px" }}>✓</div>
         <div style={{ fontFamily: ds.font.display, fontSize: 28, color: ds.color.textDark, marginBottom: 12 }}>Order Received!</div>
         <p style={{ fontSize: 15, color: ds.color.textMuted, lineHeight: 1.7, marginBottom: 8 }}>
-          Thank you, <strong>{details.name}</strong>! Your order has been submitted successfully.
+          Thank you, <strong>{details.name}</strong>! Your order has been submitted.
         </p>
-        <p style={{ fontSize: 14, color: ds.color.textMuted, lineHeight: 1.7, marginBottom: 8 }}>
-          A confirmation has been sent to <strong>{details.email}</strong>.
+        <p style={{ fontSize: 14, color: ds.color.textMuted, lineHeight: 1.7, marginBottom: 28 }}>
+          A confirmation was sent to <strong>{details.email}</strong>. Our team will contact you within <strong>24 hours</strong>.
         </p>
-        <p style={{ fontSize: 14, color: ds.color.textMuted, lineHeight: 1.7, marginBottom: 32 }}>
-          Our team will contact you within <strong>24 hours</strong> to confirm your order and provide payment instructions.
-        </p>
-
-        {/* Order summary box */}
-        <div style={{ background: ds.color.white, border: `1px solid ${ds.color.border}`, borderRadius: ds.radius.lg, padding: "20px 24px", marginBottom: 28, textAlign: "left" }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: ds.color.textMuted, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 12 }}>Your Order Summary</div>
+        <div style={{ background: ds.color.white, border: `1px solid ${ds.color.border}`, borderRadius: ds.radius.lg, padding: "20px 24px", marginBottom: 24, textAlign: "left" }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: ds.color.textMuted, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 12 }}>Your Order</div>
           {cart.map(item => (
-            <div key={item.id} style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: ds.color.textBody, marginBottom: 6 }}>
-              <span>{item.name} × {item.qty}</span>
-              <span style={{ fontWeight: 600 }}>{formatPHP(item.price * item.qty)}</span>
+            <div key={item.id} style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: ds.color.textBody, marginBottom: 5 }}>
+              <span>{item.name} × {item.qty}</span><span style={{ fontWeight: 600 }}>{formatPHP(item.price * item.qty)}</span>
             </div>
           ))}
-          <div style={{ borderTop: `1px solid ${ds.color.borderLight}`, marginTop: 10, paddingTop: 10, display: "flex", justifyContent: "space-between", fontSize: 15, fontWeight: 700, color: ds.color.textDark }}>
+          <div style={{ borderTop: `1px solid ${ds.color.borderLight}`, marginTop: 8, paddingTop: 8, display: "flex", justifyContent: "space-between", fontWeight: 700, fontSize: 15, color: ds.color.textDark }}>
             <span>Total</span><span>{formatPHP(total)}</span>
           </div>
-          <div style={{ marginTop: 8, fontSize: 13, color: ds.color.textMuted }}>Payment via: <strong>{method}</strong></div>
+          <div style={{ marginTop: 8, fontSize: 13, color: ds.color.textMuted }}>Payment: <strong>{method}</strong></div>
         </div>
-
         <div style={{ display: "flex", gap: 12, justifyContent: "center" }}>
-          <Btn variant="primary" size="md" onClick={() => { setStep(1); setDetails(EMPTY_DETAILS); setMethod(""); setPage("home"); }}>Back to Home</Btn>
+          <Btn variant="primary" size="md" onClick={() => { setStep(1); setDetails(EMPTY); setMethod(""); setPrescription(null); setPage("home"); }}>Back to Home</Btn>
           <Btn variant="secondary" size="md" onClick={() => setPage("contact")}>Contact Us</Btn>
         </div>
       </div>
     </div>
   );
 
+  // Step labels — adjust based on whether prescription is needed
+  const stepLabels = hasRx
+    ? [["Cart",1],["Your Details",2],["Prescription",3],["Payment",4]]
+    : [["Cart",1],["Your Details",2],["Payment",4]];
+  const displayStep = (step === 4 && !hasRx) ? 3 : step; // visual step number
+
   return (
     <div style={{ paddingTop: 67, background: ds.color.canvas, minHeight: "80vh" }}>
-      <div style={{ maxWidth: 860, margin: "0 auto", padding: "48px 28px" }}>
+      <div style={{ maxWidth: 900, margin: "0 auto", padding: "44px 28px" }}>
 
-        {/* Step indicator — 4 steps */}
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 36, flexWrap: "wrap" }}>
-          {[["Cart", 1], ["Your Details", 2], ["Payment", 3], ["Confirm", 4]].map(([lbl, n], i) => (
-            <div key={lbl} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
-                <div style={{
-                  width: 28, height: 28, borderRadius: "50%",
-                  background: step >= n ? ds.color.red : ds.color.borderLight,
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  fontSize: 12, fontWeight: 700,
-                  color: step >= n ? "#fff" : ds.color.textMuted,
-                }}>{n}</div>
-                <span style={{ fontSize: 13, fontWeight: 500, color: step >= n ? ds.color.textDark : ds.color.textMuted }}>{lbl}</span>
+        {/* Step indicator */}
+        <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 32, flexWrap: "wrap" }}>
+          {stepLabels.map(([lbl, n], i) => {
+            const visualN = hasRx ? n : (n === 4 ? 3 : n);
+            const active  = step === n || (step === 4 && n === 4);
+            const done    = step > n;
+            return (
+              <div key={lbl} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <div style={{ width: 28, height: 28, borderRadius: "50%", background: done ? ds.color.success : active ? ds.color.red : ds.color.borderLight, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700, color: (done || active) ? "#fff" : ds.color.textMuted, transition: "all 0.2s" }}>
+                    {done ? "✓" : visualN}
+                  </div>
+                  <span style={{ fontSize: 13, fontWeight: 500, color: (done || active) ? ds.color.textDark : ds.color.textMuted }}>{lbl}</span>
+                </div>
+                {i < stepLabels.length - 1 && <div style={{ height: 1, width: 20, background: ds.color.border }} />}
               </div>
-              {i < 3 && <div style={{ height: 1, width: 20, background: ds.color.border, marginLeft: 4 }} />}
-            </div>
-          ))}
+            );
+          })}
         </div>
 
-        {/* ── STEP 1: Cart ─────────────────────────────────────────────────── */}
+        {/* ── STEP 1: Cart ──────────────────────────────────────────────── */}
         {cart.length === 0 ? (
           <div style={{ textAlign: "center", padding: "64px 0" }}>
             <div style={{ fontFamily: ds.font.display, fontSize: 24, color: ds.color.textDark, marginBottom: 10 }}>Your cart is empty</div>
@@ -1725,14 +1858,29 @@ function CartPage({ cart, removeFromCart, updateQty, setPage }) {
           </div>
         ) : step === 1 ? (
           <>
+            {/* Rx warning banner */}
+            {hasRx && (
+              <div style={{ background: "#FFFBEB", border: "1px solid #F5C518", borderRadius: ds.radius.lg, padding: "14px 18px", marginBottom: 18, display: "flex", gap: 12, alignItems: "flex-start" }}>
+                <span style={{ fontSize: 20, flexShrink: 0 }}>⚠️</span>
+                <div>
+                  <div style={{ fontSize: 13.5, fontWeight: 700, color: "#92400E", marginBottom: 4 }}>Prescription Required</div>
+                  <div style={{ fontSize: 13, color: "#78350F", lineHeight: 1.6 }}>
+                    Your cart contains prescription medicine(s): <strong>{rxItems.map(i => i.name).join(", ")}</strong>.<br />
+                    You will be asked to upload a valid doctor's prescription before completing your order.
+                  </div>
+                </div>
+              </div>
+            )}
+
             {cart.map(item => (
-              <div key={item.id} style={{ background: ds.color.white, border: `1px solid ${ds.color.border}`, borderRadius: ds.radius.lg, padding: "18px 22px", marginBottom: 10, display: "flex", alignItems: "center", gap: 18, boxShadow: ds.shadow.xs }}>
-                <ProductImg imageSrc={item.imageSrc} category={item.category} name={item.name} height={64} />
+              <div key={item.id} style={{ background: ds.color.white, border: `1px solid ${ds.color.border}`, borderRadius: ds.radius.lg, padding: "16px 20px", marginBottom: 10, display: "flex", alignItems: "center", gap: 16, boxShadow: ds.shadow.xs }}>
+                <ProductImg imageSrc={item.imageSrc} category={item.category} name={item.name} height={60} />
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 14, fontWeight: 600, color: ds.color.textDark }}>{item.name}</div>
                   <div style={{ fontSize: 12, color: ds.color.textMuted }}>{item.tag}</div>
+                  {item.requiresPrescription && <div style={{ fontSize: 11, color: "#92400E", fontWeight: 600, marginTop: 2 }}>💊 Rx Required</div>}
                 </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <button onClick={() => updateQty(item.id, item.qty - 1)} style={{ width: 28, height: 28, borderRadius: "50%", border: `1px solid ${ds.color.border}`, background: ds.color.canvas, cursor: "pointer", fontSize: 15, display: "flex", alignItems: "center", justifyContent: "center" }}>−</button>
                   <span style={{ fontSize: 14, fontWeight: 600, minWidth: 22, textAlign: "center" }}>{item.qty}</span>
                   <button onClick={() => updateQty(item.id, item.qty + 1)} style={{ width: 28, height: 28, borderRadius: "50%", border: `1px solid ${ds.color.border}`, background: ds.color.canvas, cursor: "pointer", fontSize: 15, display: "flex", alignItems: "center", justifyContent: "center" }}>+</button>
@@ -1741,8 +1889,9 @@ function CartPage({ cart, removeFromCart, updateQty, setPage }) {
                 <button onClick={() => removeFromCart(item.id)} style={{ background: "none", border: "none", cursor: "pointer", color: ds.color.textLight, fontSize: 18, padding: 4 }}>✕</button>
               </div>
             ))}
-            <div style={{ background: ds.color.white, border: `1px solid ${ds.color.border}`, borderRadius: ds.radius.lg, padding: "22px 24px", marginTop: 8 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 17, fontWeight: 700, color: ds.color.textDark, marginBottom: 18 }}>
+
+            <div style={{ background: ds.color.white, border: `1px solid ${ds.color.border}`, borderRadius: ds.radius.lg, padding: "20px 24px", marginTop: 8 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 17, fontWeight: 700, color: ds.color.textDark, marginBottom: 16 }}>
                 <span>Order Total</span><span>{formatPHP(total)}</span>
               </div>
               <Btn variant="primary" size="lg" fullWidth onClick={() => setStep(2)}>Continue to Your Details →</Btn>
@@ -1750,121 +1899,70 @@ function CartPage({ cart, removeFromCart, updateQty, setPage }) {
           </>
 
         ) : step === 2 ? (
-          /* ── STEP 2: Customer Details ──────────────────────────────────── */
+          /* ── STEP 2: Details + Map ──────────────────────────────────── */
           <div style={{ background: ds.color.white, border: `1px solid ${ds.color.border}`, borderRadius: ds.radius.xl, padding: "36px 40px", boxShadow: ds.shadow.sm }}>
             <div style={{ fontFamily: ds.font.display, fontSize: 22, color: ds.color.textDark, marginBottom: 6 }}>Your Contact Details</div>
             <p style={{ fontSize: 14, color: ds.color.textMuted, marginBottom: 28 }}>We need these to confirm your order and send your receipt.</p>
 
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "18px 22px", marginBottom: 18 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px 20px", marginBottom: 16 }}>
               <div>
                 <label style={labelS}>Full Name *</label>
-                <input value={details.name} onChange={setD("name")} placeholder="Juan dela Cruz" style={inputS}
-                  onFocus={e => e.target.style.borderColor = ds.color.red} onBlur={e => e.target.style.borderColor = ds.color.border} />
+                <input value={details.name} onChange={setD("name")} placeholder="Juan dela Cruz" style={inputS} onFocus={e => e.target.style.borderColor=ds.color.red} onBlur={e => e.target.style.borderColor=ds.color.border} />
               </div>
               <div>
                 <label style={labelS}>Phone / Mobile *</label>
-                <input value={details.phone} onChange={setD("phone")} placeholder="+63 9XX XXX XXXX" style={inputS}
-                  onFocus={e => e.target.style.borderColor = ds.color.red} onBlur={e => e.target.style.borderColor = ds.color.border} />
+                <input value={details.phone} onChange={setD("phone")} placeholder="+63 9XX XXX XXXX" style={inputS} onFocus={e => e.target.style.borderColor=ds.color.red} onBlur={e => e.target.style.borderColor=ds.color.border} />
               </div>
             </div>
 
-            <div style={{ marginBottom: 18 }}>
+            <div style={{ marginBottom: 20 }}>
               <label style={labelS}>Email Address *</label>
-              <input type="email" value={details.email} onChange={setD("email")} placeholder="juan@email.com" style={inputS}
-                onFocus={e => e.target.style.borderColor = ds.color.red} onBlur={e => e.target.style.borderColor = ds.color.border} />
-              <div style={{ fontSize: 12, color: ds.color.textMuted, marginTop: 6 }}>📧 Your order confirmation will be sent to this email</div>
+              <input type="email" value={details.email} onChange={setD("email")} placeholder="juan@email.com" style={inputS} onFocus={e => e.target.style.borderColor=ds.color.red} onBlur={e => e.target.style.borderColor=ds.color.border} />
+              <div style={{ fontSize: 11.5, color: ds.color.textMuted, marginTop: 5 }}>📧 Order confirmation will be sent here</div>
             </div>
 
-            <div style={{ marginBottom: 28 }}>
-              {/* Label row with drop pin button */}
+            {/* Delivery address with map */}
+            <div style={{ marginBottom: 20 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-                <label style={labelS}>Delivery Address *</label>
-                <button
-                  type="button"
-                  onClick={handleUseMyLocation}
-                  disabled={geoStatus === "asking" || geoStatus === "loading"}
-                  style={{
-                    display: "flex", alignItems: "center", gap: 6,
-                    padding: "5px 12px", borderRadius: ds.radius.pill,
-                    border: `1.5px solid ${
-                      geoStatus === "success" ? ds.color.successBorder :
-                      geoStatus === "denied" || geoStatus === "error" ? ds.color.redBorder :
-                      ds.color.border
-                    }`,
-                    background: geoStatus === "success" ? ds.color.successBg :
-                                geoStatus === "denied" || geoStatus === "error" ? ds.color.redLight :
-                                ds.color.canvas,
-                    color: geoStatus === "success" ? ds.color.success :
-                           geoStatus === "denied" || geoStatus === "error" ? ds.color.red :
-                           ds.color.textBody,
-                    fontSize: 12, fontWeight: 600, cursor:
-                      geoStatus === "asking" || geoStatus === "loading" ? "not-allowed" : "pointer",
-                    fontFamily: ds.font.body, transition: "all 0.2s",
-                    opacity: geoStatus === "asking" || geoStatus === "loading" ? 0.7 : 1,
-                  }}
-                >
-                  {geoStatus === "loading" && (
-                    <span style={{ display: "inline-block", width: 10, height: 10, border: `2px solid ${ds.color.textMuted}`, borderTopColor: "transparent", borderRadius: "50%", animation: "spin 0.6s linear infinite" }} />
-                  )}
-                  {geoLabel[geoStatus]}
+                <label style={{ ...labelS, marginBottom: 0 }}>Delivery Address *</label>
+                <button type="button" onClick={handleUseMyLocation}
+                  disabled={geoStatus === "asking"}
+                  style={{ display: "flex", alignItems: "center", gap: 5, padding: "4px 12px", borderRadius: ds.radius.pill, border: `1.5px solid ${geoStatus === "success" ? ds.color.successBorder : geoStatus === "denied" || geoStatus === "error" ? ds.color.redBorder : ds.color.border}`, background: geoStatus === "success" ? ds.color.successBg : geoStatus === "denied" || geoStatus === "error" ? ds.color.redLight : ds.color.canvas, color: geoStatus === "success" ? ds.color.success : geoStatus === "denied" || geoStatus === "error" ? ds.color.red : ds.color.textBody, fontSize: 12, fontWeight: 600, cursor: geoStatus === "asking" ? "not-allowed" : "pointer", fontFamily: ds.font.body, transition: "all 0.2s" }}>
+                  {geoStatus === "asking" && <div style={{ width: 10, height: 10, border: `2px solid currentColor`, borderTopColor: "transparent", borderRadius: "50%", animation: "spin 0.6s linear infinite" }} />}
+                  {geoStatus === "success" ? "✓ Location set" : geoStatus === "denied" ? "❌ Denied" : geoStatus === "error" ? "❌ Error" : "📍 Use My Location"}
                 </button>
               </div>
 
-              {/* Textarea */}
-              <textarea
-                value={details.address}
-                onChange={setD("address")}
-                rows={3}
-                placeholder="House/Unit No., Street, Barangay, City, Province, Country"
-                style={{ ...inputS, resize: "vertical", lineHeight: 1.6 }}
-                onFocus={e => e.target.style.borderColor = ds.color.red}
-                onBlur={e => e.target.style.borderColor = ds.color.border}
-              />
-
-              {/* Permission denied / error hint */}
-              {geoStatus === "denied" && (
-                <div style={{ marginTop: 8, fontSize: 12, color: ds.color.red, lineHeight: 1.5 }}>
-                  Location access was denied. Please type your address manually, or enable location permission in your browser settings and try again.
-                </div>
-              )}
-              {geoStatus === "error" && (
-                <div style={{ marginTop: 8, fontSize: 12, color: ds.color.red }}>
-                  Could not detect location. Please type your address manually.
-                </div>
-              )}
-
-              {/* Mini map preview using OpenStreetMap iframe — shows when coordinates are obtained */}
-              {geoCoords && geoStatus === "success" && (
-                <div style={{ marginTop: 12, borderRadius: ds.radius.md, overflow: "hidden", border: `1px solid ${ds.color.border}`, boxShadow: ds.shadow.xs }}>
-                  <div style={{ background: ds.color.successBg, padding: "6px 12px", fontSize: 11, fontWeight: 700, color: ds.color.success, letterSpacing: "0.06em", textTransform: "uppercase" }}>
-                    📍 Location Detected — verify your pin below
-                  </div>
-                  <iframe
-                    title="Your Location"
-                    width="100%"
-                    height="200"
-                    frameBorder="0"
-                    style={{ display: "block" }}
-                    src={`https://www.openstreetmap.org/export/embed.html?bbox=${geoCoords.lng - 0.005},${geoCoords.lat - 0.005},${geoCoords.lng + 0.005},${geoCoords.lat + 0.005}&layer=mapnik&marker=${geoCoords.lat},${geoCoords.lng}`}
-                  />
-                  <div style={{ background: ds.color.canvas, padding: "6px 12px", fontSize: 11, color: ds.color.textMuted }}>
-                    Powered by © OpenStreetMap contributors · <a href={`https://www.openstreetmap.org/?mlat=${geoCoords.lat}&mlon=${geoCoords.lng}#map=16/${geoCoords.lat}/${geoCoords.lng}`} target="_blank" rel="noopener noreferrer" style={{ color: ds.color.red }}>View larger map</a>
-                  </div>
-                </div>
-              )}
-
-              <div style={{ fontSize: 12, color: ds.color.textMuted, marginTop: 6 }}>
-                You can edit the detected address above if needed.
+              {/* Interactive Leaflet map */}
+              <div style={{ marginBottom: 10 }}>
+                <LeafletMap onLocationSelect={handleLocationSelect} externalCoords={mapCoords} />
               </div>
+
+              {geoStatus === "denied" && <div style={{ fontSize: 12, color: ds.color.red, marginBottom: 8 }}>Location permission denied. Please type your address or click on the map to drop a pin.</div>}
+
+              <textarea value={details.address} onChange={setD("address")} rows={2}
+                placeholder="Detected from map or type manually — House/Unit No., Street, City, Province, Country"
+                style={{ ...inputS, resize: "vertical", lineHeight: 1.6 }}
+                onFocus={e => e.target.style.borderColor=ds.color.red} onBlur={e => e.target.style.borderColor=ds.color.border} />
+              <div style={{ fontSize: 11.5, color: ds.color.textMuted, marginTop: 4 }}>Address auto-fills when you click or drag the map pin. You can also type it manually above.</div>
             </div>
 
-            {/* Order mini-summary */}
-            <div style={{ background: ds.color.canvas, border: `1px solid ${ds.color.borderLight}`, borderRadius: ds.radius.md, padding: "14px 18px", marginBottom: 24 }}>
+            {/* Special instructions */}
+            <div style={{ marginBottom: 28 }}>
+              <label style={labelS}>Special Instructions / Landmark <span style={{ fontWeight: 400, color: ds.color.textMuted }}>(Optional)</span></label>
+              <textarea value={details.instructions} onChange={setD("instructions")} rows={2}
+                placeholder="e.g. Near SM Sta. Mesa, beside the blue gate, call upon arrival, deliver to reception desk…"
+                style={{ ...inputS, resize: "vertical", lineHeight: 1.6 }}
+                onFocus={e => e.target.style.borderColor=ds.color.red} onBlur={e => e.target.style.borderColor=ds.color.border} />
+              <div style={{ fontSize: 11.5, color: ds.color.textMuted, marginTop: 4 }}>Help our rider find you easily. Landmarks and delivery notes go a long way!</div>
+            </div>
+
+            {/* Mini order summary */}
+            <div style={{ background: ds.color.canvas, border: `1px solid ${ds.color.borderLight}`, borderRadius: ds.radius.md, padding: "12px 16px", marginBottom: 24 }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: ds.color.textMuted, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 8 }}>Order Summary</div>
               {cart.map(item => (
                 <div key={item.id} style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: ds.color.textBody, marginBottom: 4 }}>
-                  <span>{item.name} × {item.qty}</span>
-                  <span style={{ fontWeight: 600 }}>{formatPHP(item.price * item.qty)}</span>
+                  <span>{item.name} × {item.qty}</span><span style={{ fontWeight: 600 }}>{formatPHP(item.price * item.qty)}</span>
                 </div>
               ))}
               <div style={{ borderTop: `1px solid ${ds.color.border}`, marginTop: 8, paddingTop: 8, display: "flex", justifyContent: "space-between", fontWeight: 700, fontSize: 15, color: ds.color.textDark }}>
@@ -1875,28 +1973,115 @@ function CartPage({ cart, removeFromCart, updateQty, setPage }) {
             <div style={{ display: "flex", gap: 12 }}>
               <Btn variant="outline" size="lg" onClick={() => setStep(1)}>← Back</Btn>
               <div style={{ flex: 1 }}>
-                <Btn variant={detailsFilled ? "primary" : "outline"} size="lg" fullWidth disabled={!detailsFilled} onClick={() => setStep(3)}>
-                  Continue to Payment →
+                <Btn variant={detailsFilled ? "primary" : "outline"} size="lg" fullWidth disabled={!detailsFilled} onClick={goNext}>
+                  {hasRx ? "Continue to Prescription →" : "Continue to Payment →"}
+                </Btn>
+              </div>
+            </div>
+          </div>
+
+        ) : step === 3 ? (
+          /* ── STEP 3: Prescription Upload ────────────────────────────── */
+          <div style={{ background: ds.color.white, border: `1px solid ${ds.color.border}`, borderRadius: ds.radius.xl, padding: "36px 40px", boxShadow: ds.shadow.sm }}>
+            <div style={{ fontFamily: ds.font.display, fontSize: 22, color: ds.color.textDark, marginBottom: 8 }}>Upload Your Prescription</div>
+            <p style={{ fontSize: 14, color: ds.color.textMuted, lineHeight: 1.7, marginBottom: 24 }}>
+              Your order contains prescription medicine(s) that require a valid doctor's prescription under Philippine FDA / R.A. 10918. Please upload a clear photo or scan of your prescription.
+            </p>
+
+            {/* Which items need Rx */}
+            <div style={{ background: "#FFFBEB", border: "1px solid #F5C518", borderRadius: ds.radius.lg, padding: "14px 18px", marginBottom: 24 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: "#92400E", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.06em" }}>Prescription Required For:</div>
+              {rxItems.map(item => (
+                <div key={item.id} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#78350F", marginBottom: 4 }}>
+                  <span>💊</span>
+                  <span><strong>{item.name}</strong> — {item.rxCategory}</span>
+                </div>
+              ))}
+            </div>
+
+            {/* Upload area */}
+            <div
+              onClick={() => prescriptionRef.current?.click()}
+              style={{
+                border: `2px dashed ${prescription ? ds.color.successBorder : ds.color.border}`,
+                background: prescription ? ds.color.successBg : ds.color.canvas,
+                borderRadius: ds.radius.lg, padding: "32px 24px", textAlign: "center",
+                cursor: "pointer", marginBottom: 16, transition: "all 0.2s",
+              }}
+              onMouseEnter={e => { if (!prescription) e.currentTarget.style.borderColor = ds.color.red; }}
+              onMouseLeave={e => { if (!prescription) e.currentTarget.style.borderColor = ds.color.border; }}
+            >
+              {prescription ? (
+                <>
+                  <div style={{ fontSize: 32, marginBottom: 8 }}>✅</div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: ds.color.success, marginBottom: 4 }}>Prescription uploaded!</div>
+                  <div style={{ fontSize: 13, color: ds.color.textMuted, marginBottom: 12 }}>{prescription.name}</div>
+                  {/* Preview */}
+                  {prescription.preview.startsWith("data:image") && (
+                    <img src={prescription.preview} alt="Prescription preview" style={{ maxWidth: "100%", maxHeight: 240, borderRadius: ds.radius.md, border: `1px solid ${ds.color.border}`, marginBottom: 8, objectFit: "contain" }} />
+                  )}
+                  <div style={{ fontSize: 12, color: ds.color.textMuted }}>Click to upload a different file</div>
+                </>
+              ) : (
+                <>
+                  <div style={{ fontSize: 40, marginBottom: 10 }}>📋</div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: ds.color.textDark, marginBottom: 6 }}>Click to upload prescription</div>
+                  <div style={{ fontSize: 13, color: ds.color.textMuted, marginBottom: 8 }}>Photo, scan, or PDF of your doctor's prescription</div>
+                  <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap" }}>
+                    <Tag color={ds.color.redLight} textColor={ds.color.red}>📷 Camera</Tag>
+                    <Tag color={ds.color.canvas} textColor={ds.color.textMuted}>🖼️ Image file</Tag>
+                    <Tag color={ds.color.canvas} textColor={ds.color.textMuted}>📄 PDF</Tag>
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Hidden file input — accepts images and PDFs, camera capture on mobile */}
+            <input
+              ref={prescriptionRef}
+              type="file"
+              accept="image/*,application/pdf"
+              capture="environment"
+              onChange={handlePrescriptionUpload}
+              style={{ display: "none" }}
+            />
+
+            <div style={{ fontSize: 12, color: ds.color.textMuted, lineHeight: 1.7, marginBottom: 24, padding: "12px 14px", background: ds.color.canvas, borderRadius: ds.radius.md, border: `1px solid ${ds.color.borderLight}` }}>
+              <strong style={{ color: ds.color.textDark }}>What makes a valid prescription?</strong><br />
+              ✓ Doctor's name and PRC license number clearly visible<br />
+              ✓ Patient's name and date of consultation<br />
+              ✓ Medicine name, dosage, and quantity prescribed<br />
+              ✓ Doctor's signature<br />
+              ✓ Not more than 1 year old
+            </div>
+
+            <div style={{ display: "flex", gap: 12 }}>
+              <Btn variant="outline" size="lg" onClick={goBack}>← Back</Btn>
+              <div style={{ flex: 1 }}>
+                <Btn variant={prescription ? "primary" : "outline"} size="lg" fullWidth disabled={!prescription} onClick={goNext}>
+                  {prescription ? "Continue to Payment →" : "Please upload prescription to continue"}
                 </Btn>
               </div>
             </div>
           </div>
 
         ) : (
-          /* ── STEP 3: Payment ───────────────────────────────────────────── */
+          /* ── STEP 4: Payment ─────────────────────────────────────────── */
           <>
-            <div style={{ background: ds.color.white, border: `1px solid ${ds.color.border}`, borderRadius: ds.radius.xl, padding: "32px 36px", marginBottom: 18, boxShadow: ds.shadow.sm }}>
+            <div style={{ background: ds.color.white, border: `1px solid ${ds.color.border}`, borderRadius: ds.radius.xl, padding: "32px 36px", marginBottom: 16, boxShadow: ds.shadow.sm }}>
               <div style={{ fontFamily: ds.font.display, fontSize: 22, color: ds.color.textDark, marginBottom: 6 }}>Select Payment Method</div>
-              <p style={{ fontSize: 14, color: ds.color.textMuted, marginBottom: 24 }}>Choose how you will pay. Payment instructions will be sent to <strong>{details.email}</strong> after you place your order.</p>
+              <p style={{ fontSize: 14, color: ds.color.textMuted, marginBottom: 22 }}>
+                Payment instructions will be sent to <strong>{details.email}</strong> after placing your order.
+              </p>
 
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 12, marginBottom: 24 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 12, marginBottom: 22 }}>
                 {PAYMENT_METHODS.map(m => (
                   <button key={m.label} onClick={() => setMethod(m.label)} style={{
                     padding: "16px 10px", borderRadius: ds.radius.lg,
                     border: `2px solid ${method === m.label ? ds.color.red : ds.color.border}`,
                     background: method === m.label ? ds.color.redLight : ds.color.canvas,
                     cursor: "pointer", fontFamily: ds.font.body,
-                    display: "flex", flexDirection: "column", alignItems: "center", gap: 8,
+                    display: "flex", flexDirection: "column", alignItems: "center", gap: 7,
                     transition: "all 0.15s",
                   }}>
                     <span style={{ fontSize: 26 }}>{m.icon}</span>
@@ -1905,21 +2090,21 @@ function CartPage({ cart, removeFromCart, updateQty, setPage }) {
                 ))}
               </div>
 
-              {/* Final order summary */}
-              <div style={{ background: ds.color.canvas, border: `1px solid ${ds.color.borderLight}`, borderRadius: ds.radius.md, padding: "16px 20px" }}>
+              {/* Final summary */}
+              <div style={{ background: ds.color.canvas, border: `1px solid ${ds.color.borderLight}`, borderRadius: ds.radius.md, padding: "14px 18px" }}>
                 <div style={{ fontSize: 11, fontWeight: 700, color: ds.color.textMuted, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 10 }}>Order Summary</div>
                 {cart.map(item => (
-                  <div key={item.id} style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: ds.color.textBody, marginBottom: 5 }}>
-                    <span>{item.name} × {item.qty}</span>
+                  <div key={item.id} style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: ds.color.textBody, marginBottom: 4 }}>
+                    <span>{item.name} × {item.qty}{item.requiresPrescription ? " 💊" : ""}</span>
                     <span style={{ fontWeight: 600 }}>{formatPHP(item.price * item.qty)}</span>
                   </div>
                 ))}
-                <div style={{ borderTop: `1px solid ${ds.color.border}`, marginTop: 10, paddingTop: 10, display: "flex", justifyContent: "space-between", fontWeight: 700, fontSize: 15, color: ds.color.textDark }}>
+                <div style={{ borderTop: `1px solid ${ds.color.border}`, marginTop: 8, paddingTop: 8, display: "flex", justifyContent: "space-between", fontWeight: 700, fontSize: 15, color: ds.color.textDark }}>
                   <span>Total</span><span>{formatPHP(total)}</span>
                 </div>
-                <div style={{ marginTop: 8, fontSize: 13, color: ds.color.textMuted }}>
-                  <span>📦 Deliver to: </span><strong>{details.address}</strong>
-                </div>
+                <div style={{ marginTop: 8, fontSize: 13, color: ds.color.textMuted }}>📦 Deliver to: <strong>{details.address}</strong></div>
+                {details.instructions && <div style={{ marginTop: 4, fontSize: 13, color: ds.color.textMuted }}>📝 Note: {details.instructions}</div>}
+                {hasRx && prescription && <div style={{ marginTop: 4, fontSize: 13, color: ds.color.success }}>✓ Prescription attached: {prescription.name}</div>}
               </div>
             </div>
 
@@ -1928,18 +2113,14 @@ function CartPage({ cart, removeFromCart, updateQty, setPage }) {
             )}
 
             <div style={{ display: "flex", gap: 12 }}>
-              <Btn variant="outline" size="lg" onClick={() => setStep(2)}>← Back</Btn>
+              <Btn variant="outline" size="lg" onClick={goBack}>← Back</Btn>
               <div style={{ flex: 1 }}>
-                <Btn
-                  variant={method ? "primary" : "outline"} size="lg" fullWidth
-                  disabled={!method || sending}
-                  onClick={handlePlaceOrder}>
+                <Btn variant={method ? "primary" : "outline"} size="lg" fullWidth disabled={!method || sending} onClick={handlePlaceOrder}>
                   {sending ? "Placing Order…" : method ? `Place Order — ${formatPHP(total)} →` : "Select a payment method"}
                 </Btn>
               </div>
             </div>
-
-            <p style={{ textAlign: "center", fontSize: 12, color: ds.color.textMuted, marginTop: 14, lineHeight: 1.6 }}>
+            <p style={{ textAlign: "center", fontSize: 12, color: ds.color.textMuted, marginTop: 12, lineHeight: 1.6 }}>
               By placing your order you agree to be contacted by our team for payment and delivery confirmation.
             </p>
           </>
@@ -1948,6 +2129,7 @@ function CartPage({ cart, removeFromCart, updateQty, setPage }) {
     </div>
   );
 }
+
 
 function PrivacyPage() {
   const sections = [
