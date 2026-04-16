@@ -19,15 +19,32 @@
  */
 
 import { useState, useEffect, useCallback } from "react";
-import emailjs from "@emailjs/browser";
+// ─── EMAIL SETUP ─────────────────────────────────────────────────────────────
+// WHEN DEPLOYING TO PRODUCTION:
+//   1. Run: npm install @emailjs/browser
+//   2. Uncomment the line below:
+//      import emailjs from "@emailjs/browser";
+//   3. Fill in EMAILJS_CONFIG below with your EmailJS credentials
+//
+// For now, emailjs is mocked so the preview/sandbox works correctly.
+// The UI, form validation, loading states, and success/error flow are all live.
+
+const emailjs = {
+  send: async (serviceId, templateId, params, publicKey) => {
+    // Simulates a 1.5 second network request
+    await new Promise(resolve => setTimeout(resolve, 1500));
+    // In production this line is replaced by the real emailjs.send() call
+    // Uncomment to simulate an error instead: throw new Error("Test error");
+    return { status: 200, text: "OK" };
+  },
+};
 
 // ─── EMAILJS CONFIG — fill these in after creating your free account ───────
 const EMAILJS_CONFIG = {
-  serviceId:  "service_0hvjrv6",   // from emailjs.com → Email Services
-  templateId: "template_5r24wue",  // from emailjs.com → Email Templates
-  publicKey:  "mjS5P17bfCjMw8H2l",   // from emailjs.com → Account
-  // Receipt template (optional — for sending confirmation to the client)
-  receiptTemplateId: "YOUR_RECEIPT_TEMPLATE_ID",
+  serviceId:           "service_0hvjrv6",
+  templateId:          "template_5r24wue",  // Quote + Order notification → to DMEAST
+  receiptTemplateId:   "template_adb2so7",  // Customer receipt/confirmation
+  publicKey:           "mjS5P17bfCjMw8H2l",   // ← paste your public key here (from EmailJS → Account)
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1492,37 +1509,143 @@ function ContactPage() {
 }
 
 function CartPage({ cart, removeFromCart, updateQty, setPage }) {
-  const total = cart.reduce((s, i) => s + (i.price || 0) * i.qty, 0);
-  const [step, setStep]     = useState(1);
-  const [method, setMethod] = useState("");
+  const total     = cart.reduce((s, i) => s + (i.price || 0) * i.qty, 0);
+  const [step,    setStep]    = useState(1); // 1=cart, 2=details, 3=payment, 4=confirm
+  const [method,  setMethod]  = useState("");
+  const [sending, setSending] = useState(false);
+  const [errMsg,  setErrMsg]  = useState("");
 
-  if (step === 3) return (
+  const EMPTY_DETAILS = { name: "", email: "", phone: "", address: "" };
+  const [details, setDetails] = useState(EMPTY_DETAILS);
+  const setD = (k) => (e) => setDetails(d => ({ ...d, [k]: e.target.value }));
+
+  const detailsFilled = details.name && details.email && details.phone && details.address;
+
+  // Build a readable order summary string for the emails
+  const orderSummary = cart.map(i => `${i.name} x${i.qty} — ${formatPHP(i.price * i.qty)}`).join("\n");
+
+  const handlePlaceOrder = async () => {
+    if (!method) return;
+    setSending(true);
+    setErrMsg("");
+    try {
+      // Email 1 — Notify DMEAST of the new order
+      await emailjs.send(
+        EMAILJS_CONFIG.serviceId,
+        EMAILJS_CONFIG.templateId,
+        {
+          from_name:    details.name,
+          company:      "N/A",
+          from_email:   details.email,
+          phone:        details.phone,
+          product:      orderSummary,
+          quantity:     cart.reduce((s, i) => s + i.qty, 0) + " items",
+          budget:       formatPHP(total),
+          location:     details.address,
+          timeline:     "Direct Order",
+          details:      `Payment Method: ${method}\n\nOrder Items:\n${orderSummary}\n\nTotal: ${formatPHP(total)}`,
+          reply_to:     details.email,
+        },
+        EMAILJS_CONFIG.publicKey
+      );
+
+      // Email 2 — Send receipt to customer
+      await emailjs.send(
+        EMAILJS_CONFIG.serviceId,
+        EMAILJS_CONFIG.receiptTemplateId,
+        {
+          customer_name:    details.name,
+          customer_email:   details.email,
+          customer_phone:   details.phone,
+          customer_address: details.address,
+          order_items:      orderSummary,
+          order_total:      formatPHP(total),
+          payment_method:   method,
+          to_email:         details.email,
+        },
+        EMAILJS_CONFIG.publicKey
+      );
+
+      setStep(4);
+    } catch (err) {
+      setErrMsg("Something went wrong sending your order. Please email us directly at " + CONTACT.email);
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const inputS = {
+    width: "100%", padding: "11px 14px",
+    border: `1.5px solid ${ds.color.border}`, borderRadius: ds.radius.md,
+    fontSize: 14, color: ds.color.textDark, outline: "none",
+    fontFamily: ds.font.body, boxSizing: "border-box", background: ds.color.white,
+    transition: "border-color 0.15s",
+  };
+  const labelS = { fontSize: 12.5, fontWeight: 600, color: ds.color.textDark, display: "block", marginBottom: 6 };
+
+  // ── Step 4: Order Confirmed ───────────────────────────────────────────────
+  if (step === 4) return (
     <div style={{ paddingTop: 67, minHeight: "80vh", display: "flex", alignItems: "center", justifyContent: "center", background: ds.color.canvas }}>
-      <div style={{ textAlign: "center", maxWidth: 420, padding: "0 24px" }}>
-        <div style={{ width: 68, height: 68, borderRadius: "50%", background: ds.color.successBg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 26, margin: "0 auto 22px", border: `2px solid ${ds.color.successBorder}` }}>✓</div>
-        <div style={{ fontFamily: ds.font.display, fontSize: 26, color: ds.color.textDark, marginBottom: 10 }}>Order Submitted</div>
-        <p style={{ fontSize: 15, color: ds.color.textMuted, lineHeight: 1.7, marginBottom: 26 }}>Our team will contact you within 24 hours to confirm payment and delivery.</p>
-        <Btn variant="secondary" size="md" onClick={() => { setStep(1); setPage("home"); }}>Return to Home</Btn>
+      <div style={{ textAlign: "center", maxWidth: 460, padding: "0 24px" }}>
+        <div style={{ width: 76, height: 76, borderRadius: "50%", background: ds.color.successBg, border: `2px solid ${ds.color.successBorder}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 30, margin: "0 auto 24px" }}>✓</div>
+        <div style={{ fontFamily: ds.font.display, fontSize: 28, color: ds.color.textDark, marginBottom: 12 }}>Order Received!</div>
+        <p style={{ fontSize: 15, color: ds.color.textMuted, lineHeight: 1.7, marginBottom: 8 }}>
+          Thank you, <strong>{details.name}</strong>! Your order has been submitted successfully.
+        </p>
+        <p style={{ fontSize: 14, color: ds.color.textMuted, lineHeight: 1.7, marginBottom: 8 }}>
+          A confirmation has been sent to <strong>{details.email}</strong>.
+        </p>
+        <p style={{ fontSize: 14, color: ds.color.textMuted, lineHeight: 1.7, marginBottom: 32 }}>
+          Our team will contact you within <strong>24 hours</strong> to confirm your order and provide payment instructions.
+        </p>
+
+        {/* Order summary box */}
+        <div style={{ background: ds.color.white, border: `1px solid ${ds.color.border}`, borderRadius: ds.radius.lg, padding: "20px 24px", marginBottom: 28, textAlign: "left" }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: ds.color.textMuted, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 12 }}>Your Order Summary</div>
+          {cart.map(item => (
+            <div key={item.id} style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: ds.color.textBody, marginBottom: 6 }}>
+              <span>{item.name} × {item.qty}</span>
+              <span style={{ fontWeight: 600 }}>{formatPHP(item.price * item.qty)}</span>
+            </div>
+          ))}
+          <div style={{ borderTop: `1px solid ${ds.color.borderLight}`, marginTop: 10, paddingTop: 10, display: "flex", justifyContent: "space-between", fontSize: 15, fontWeight: 700, color: ds.color.textDark }}>
+            <span>Total</span><span>{formatPHP(total)}</span>
+          </div>
+          <div style={{ marginTop: 8, fontSize: 13, color: ds.color.textMuted }}>Payment via: <strong>{method}</strong></div>
+        </div>
+
+        <div style={{ display: "flex", gap: 12, justifyContent: "center" }}>
+          <Btn variant="primary" size="md" onClick={() => { setStep(1); setDetails(EMPTY_DETAILS); setMethod(""); setPage("home"); }}>Back to Home</Btn>
+          <Btn variant="secondary" size="md" onClick={() => setPage("contact")}>Contact Us</Btn>
+        </div>
       </div>
     </div>
   );
 
   return (
     <div style={{ paddingTop: 67, background: ds.color.canvas, minHeight: "80vh" }}>
-      <div style={{ maxWidth: 820, margin: "0 auto", padding: "48px 28px" }}>
-        {/* Step indicator */}
-        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 36 }}>
-          {[["Cart",1],["Payment",2],["Confirm",3]].map(([lbl,n],i) => (
-            <div key={lbl} style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <div style={{ width: 28, height: 28, borderRadius: "50%", background: step >= n ? ds.color.red : ds.color.borderLight, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700, color: step >= n ? "#fff" : ds.color.textMuted }}>{n}</div>
+      <div style={{ maxWidth: 860, margin: "0 auto", padding: "48px 28px" }}>
+
+        {/* Step indicator — 4 steps */}
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 36, flexWrap: "wrap" }}>
+          {[["Cart", 1], ["Your Details", 2], ["Payment", 3], ["Confirm", 4]].map(([lbl, n], i) => (
+            <div key={lbl} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+                <div style={{
+                  width: 28, height: 28, borderRadius: "50%",
+                  background: step >= n ? ds.color.red : ds.color.borderLight,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  fontSize: 12, fontWeight: 700,
+                  color: step >= n ? "#fff" : ds.color.textMuted,
+                }}>{n}</div>
                 <span style={{ fontSize: 13, fontWeight: 500, color: step >= n ? ds.color.textDark : ds.color.textMuted }}>{lbl}</span>
               </div>
-              {i < 2 && <div style={{ height: 1, width: 28, background: ds.color.border }} />}
+              {i < 3 && <div style={{ height: 1, width: 20, background: ds.color.border, marginLeft: 4 }} />}
             </div>
           ))}
         </div>
 
+        {/* ── STEP 1: Cart ─────────────────────────────────────────────────── */}
         {cart.length === 0 ? (
           <div style={{ textAlign: "center", padding: "64px 0" }}>
             <div style={{ fontFamily: ds.font.display, fontSize: 24, color: ds.color.textDark, marginBottom: 10 }}>Your cart is empty</div>
@@ -1542,51 +1665,140 @@ function CartPage({ cart, removeFromCart, updateQty, setPage }) {
                   <div style={{ fontSize: 12, color: ds.color.textMuted }}>{item.tag}</div>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <button onClick={() => updateQty(item.id, item.qty - 1)} style={{ width: 26, height: 26, borderRadius: "50%", border: `1px solid ${ds.color.border}`, background: ds.color.canvas, cursor: "pointer", fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center" }}>−</button>
+                  <button onClick={() => updateQty(item.id, item.qty - 1)} style={{ width: 28, height: 28, borderRadius: "50%", border: `1px solid ${ds.color.border}`, background: ds.color.canvas, cursor: "pointer", fontSize: 15, display: "flex", alignItems: "center", justifyContent: "center" }}>−</button>
                   <span style={{ fontSize: 14, fontWeight: 600, minWidth: 22, textAlign: "center" }}>{item.qty}</span>
-                  <button onClick={() => updateQty(item.id, item.qty + 1)} style={{ width: 26, height: 26, borderRadius: "50%", border: `1px solid ${ds.color.border}`, background: ds.color.canvas, cursor: "pointer", fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center" }}>+</button>
+                  <button onClick={() => updateQty(item.id, item.qty + 1)} style={{ width: 28, height: 28, borderRadius: "50%", border: `1px solid ${ds.color.border}`, background: ds.color.canvas, cursor: "pointer", fontSize: 15, display: "flex", alignItems: "center", justifyContent: "center" }}>+</button>
                 </div>
-                <div style={{ fontSize: 15, fontWeight: 700, color: ds.color.textDark, minWidth: 72, textAlign: "right" }}>{formatPHP(item.price * item.qty)}</div>
-                <button onClick={() => removeFromCart(item.id)} style={{ background: "none", border: "none", cursor: "pointer", color: ds.color.textLight, fontSize: 16, padding: 4 }}>✕</button>
+                <div style={{ fontSize: 15, fontWeight: 700, color: ds.color.textDark, minWidth: 80, textAlign: "right" }}>{formatPHP(item.price * item.qty)}</div>
+                <button onClick={() => removeFromCart(item.id)} style={{ background: "none", border: "none", cursor: "pointer", color: ds.color.textLight, fontSize: 18, padding: 4 }}>✕</button>
               </div>
             ))}
             <div style={{ background: ds.color.white, border: `1px solid ${ds.color.border}`, borderRadius: ds.radius.lg, padding: "22px 24px", marginTop: 8 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 16, fontWeight: 700, color: ds.color.textDark, marginBottom: 18 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 17, fontWeight: 700, color: ds.color.textDark, marginBottom: 18 }}>
                 <span>Order Total</span><span>{formatPHP(total)}</span>
               </div>
-              <Btn variant="primary" size="lg" fullWidth onClick={() => setStep(2)}>Proceed to Payment →</Btn>
+              <Btn variant="primary" size="lg" fullWidth onClick={() => setStep(2)}>Continue to Your Details →</Btn>
             </div>
           </>
-        ) : (
-          <>
-            <div style={{ background: ds.color.white, border: `1px solid ${ds.color.border}`, borderRadius: ds.radius.xl, padding: "32px", marginBottom: 18 }}>
-              <div style={{ fontSize: 15, fontWeight: 600, color: ds.color.textDark, marginBottom: 18 }}>Select Payment Method</div>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 12 }}>
-                {PAYMENT_METHODS.map(m => (
-                  <button key={m.label} onClick={() => setMethod(m.label)} style={{
-                    padding: "14px 10px", borderRadius: ds.radius.lg,
-                    border: `2px solid ${method === m.label ? ds.color.red : ds.color.border}`,
-                    background: method === m.label ? ds.color.redLight : ds.color.canvas,
-                    cursor: "pointer", fontFamily: ds.font.body,
-                    display: "flex", flexDirection: "column", alignItems: "center", gap: 6,
-                  }}>
-                    <span style={{ fontSize: 24 }}>{m.icon}</span>
-                    <span style={{ fontSize: 12, fontWeight: 500, color: method === m.label ? ds.color.red : ds.color.textBody }}>{m.label}</span>
-                  </button>
-                ))}
+
+        ) : step === 2 ? (
+          /* ── STEP 2: Customer Details ──────────────────────────────────── */
+          <div style={{ background: ds.color.white, border: `1px solid ${ds.color.border}`, borderRadius: ds.radius.xl, padding: "36px 40px", boxShadow: ds.shadow.sm }}>
+            <div style={{ fontFamily: ds.font.display, fontSize: 22, color: ds.color.textDark, marginBottom: 6 }}>Your Contact Details</div>
+            <p style={{ fontSize: 14, color: ds.color.textMuted, marginBottom: 28 }}>We need these to confirm your order and send your receipt.</p>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "18px 22px", marginBottom: 18 }}>
+              <div>
+                <label style={labelS}>Full Name *</label>
+                <input value={details.name} onChange={setD("name")} placeholder="Juan dela Cruz" style={inputS}
+                  onFocus={e => e.target.style.borderColor = ds.color.red} onBlur={e => e.target.style.borderColor = ds.color.border} />
               </div>
-              <div style={{ marginTop: 20, padding: "14px 16px", background: ds.color.canvas, borderRadius: ds.radius.md, fontSize: 13, color: ds.color.textMuted }}>
-                <strong style={{ color: ds.color.textDark }}>Total: {formatPHP(total)}</strong> — Payment details sent to your email after confirmation.
+              <div>
+                <label style={labelS}>Phone / Mobile *</label>
+                <input value={details.phone} onChange={setD("phone")} placeholder="+63 9XX XXX XXXX" style={inputS}
+                  onFocus={e => e.target.style.borderColor = ds.color.red} onBlur={e => e.target.style.borderColor = ds.color.border} />
               </div>
             </div>
+
+            <div style={{ marginBottom: 18 }}>
+              <label style={labelS}>Email Address *</label>
+              <input type="email" value={details.email} onChange={setD("email")} placeholder="juan@email.com" style={inputS}
+                onFocus={e => e.target.style.borderColor = ds.color.red} onBlur={e => e.target.style.borderColor = ds.color.border} />
+              <div style={{ fontSize: 12, color: ds.color.textMuted, marginTop: 6 }}>📧 Your order confirmation will be sent to this email</div>
+            </div>
+
+            <div style={{ marginBottom: 28 }}>
+              <label style={labelS}>Delivery Address *</label>
+              <textarea value={details.address} onChange={setD("address")} rows={3}
+                placeholder="House/Unit No., Street, Barangay, City, Province, Country"
+                style={{ ...inputS, resize: "vertical", lineHeight: 1.6 }}
+                onFocus={e => e.target.style.borderColor = ds.color.red} onBlur={e => e.target.style.borderColor = ds.color.border} />
+            </div>
+
+            {/* Order mini-summary */}
+            <div style={{ background: ds.color.canvas, border: `1px solid ${ds.color.borderLight}`, borderRadius: ds.radius.md, padding: "14px 18px", marginBottom: 24 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: ds.color.textMuted, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 8 }}>Order Summary</div>
+              {cart.map(item => (
+                <div key={item.id} style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: ds.color.textBody, marginBottom: 4 }}>
+                  <span>{item.name} × {item.qty}</span>
+                  <span style={{ fontWeight: 600 }}>{formatPHP(item.price * item.qty)}</span>
+                </div>
+              ))}
+              <div style={{ borderTop: `1px solid ${ds.color.border}`, marginTop: 8, paddingTop: 8, display: "flex", justifyContent: "space-between", fontWeight: 700, fontSize: 15, color: ds.color.textDark }}>
+                <span>Total</span><span>{formatPHP(total)}</span>
+              </div>
+            </div>
+
             <div style={{ display: "flex", gap: 12 }}>
               <Btn variant="outline" size="lg" onClick={() => setStep(1)}>← Back</Btn>
               <div style={{ flex: 1 }}>
-                <Btn variant={method ? "primary" : "outline"} size="lg" fullWidth disabled={!method} onClick={() => method && setStep(3)}>
-                  {method ? "Place Order →" : "Select a payment method"}
+                <Btn variant={detailsFilled ? "primary" : "outline"} size="lg" fullWidth disabled={!detailsFilled} onClick={() => setStep(3)}>
+                  Continue to Payment →
                 </Btn>
               </div>
             </div>
+          </div>
+
+        ) : (
+          /* ── STEP 3: Payment ───────────────────────────────────────────── */
+          <>
+            <div style={{ background: ds.color.white, border: `1px solid ${ds.color.border}`, borderRadius: ds.radius.xl, padding: "32px 36px", marginBottom: 18, boxShadow: ds.shadow.sm }}>
+              <div style={{ fontFamily: ds.font.display, fontSize: 22, color: ds.color.textDark, marginBottom: 6 }}>Select Payment Method</div>
+              <p style={{ fontSize: 14, color: ds.color.textMuted, marginBottom: 24 }}>Choose how you will pay. Payment instructions will be sent to <strong>{details.email}</strong> after you place your order.</p>
+
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 12, marginBottom: 24 }}>
+                {PAYMENT_METHODS.map(m => (
+                  <button key={m.label} onClick={() => setMethod(m.label)} style={{
+                    padding: "16px 10px", borderRadius: ds.radius.lg,
+                    border: `2px solid ${method === m.label ? ds.color.red : ds.color.border}`,
+                    background: method === m.label ? ds.color.redLight : ds.color.canvas,
+                    cursor: "pointer", fontFamily: ds.font.body,
+                    display: "flex", flexDirection: "column", alignItems: "center", gap: 8,
+                    transition: "all 0.15s",
+                  }}>
+                    <span style={{ fontSize: 26 }}>{m.icon}</span>
+                    <span style={{ fontSize: 12, fontWeight: 600, color: method === m.label ? ds.color.red : ds.color.textBody }}>{m.label}</span>
+                  </button>
+                ))}
+              </div>
+
+              {/* Final order summary */}
+              <div style={{ background: ds.color.canvas, border: `1px solid ${ds.color.borderLight}`, borderRadius: ds.radius.md, padding: "16px 20px" }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: ds.color.textMuted, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 10 }}>Order Summary</div>
+                {cart.map(item => (
+                  <div key={item.id} style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: ds.color.textBody, marginBottom: 5 }}>
+                    <span>{item.name} × {item.qty}</span>
+                    <span style={{ fontWeight: 600 }}>{formatPHP(item.price * item.qty)}</span>
+                  </div>
+                ))}
+                <div style={{ borderTop: `1px solid ${ds.color.border}`, marginTop: 10, paddingTop: 10, display: "flex", justifyContent: "space-between", fontWeight: 700, fontSize: 15, color: ds.color.textDark }}>
+                  <span>Total</span><span>{formatPHP(total)}</span>
+                </div>
+                <div style={{ marginTop: 8, fontSize: 13, color: ds.color.textMuted }}>
+                  <span>📦 Deliver to: </span><strong>{details.address}</strong>
+                </div>
+              </div>
+            </div>
+
+            {errMsg && (
+              <div style={{ marginBottom: 14, padding: "12px 16px", background: ds.color.redLight, borderRadius: ds.radius.md, border: `1px solid ${ds.color.redBorder}`, fontSize: 13, color: ds.color.red }}>{errMsg}</div>
+            )}
+
+            <div style={{ display: "flex", gap: 12 }}>
+              <Btn variant="outline" size="lg" onClick={() => setStep(2)}>← Back</Btn>
+              <div style={{ flex: 1 }}>
+                <Btn
+                  variant={method ? "primary" : "outline"} size="lg" fullWidth
+                  disabled={!method || sending}
+                  onClick={handlePlaceOrder}>
+                  {sending ? "Placing Order…" : method ? `Place Order — ${formatPHP(total)} →` : "Select a payment method"}
+                </Btn>
+              </div>
+            </div>
+
+            <p style={{ textAlign: "center", fontSize: 12, color: ds.color.textMuted, marginTop: 14, lineHeight: 1.6 }}>
+              By placing your order you agree to be contacted by our team for payment and delivery confirmation.
+            </p>
           </>
         )}
       </div>
