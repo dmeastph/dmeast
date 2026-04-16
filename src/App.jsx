@@ -44,7 +44,7 @@ const EMAILJS_CONFIG = {
   serviceId:           "service_0hvjrv6",
   templateId:          "template_5r24wue",  // Quote + Order notification → to DMEAST
   receiptTemplateId:   "template_adb2so7",  // Customer receipt/confirmation
-  publicKey:           "mjS5P17bfCjMw8H2l",   // ← paste your public key here (from EmailJS → Account)
+  publicKey:           "h1dZWsMYpN1YvMM3p",   // ← paste your public key here (from EmailJS → Account)
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -213,6 +213,11 @@ const GLOBAL_CSS = `
   .dm-dot-bg {
     background-image: radial-gradient(circle, #E8E0DA 1px, transparent 1px);
     background-size: 24px 24px;
+  }
+
+  /* Spinner for geolocation loading */
+  @keyframes spin {
+    to { transform: rotate(360deg); }
   }
 
   ::-webkit-scrollbar { width: 5px; }
@@ -1519,6 +1524,69 @@ function CartPage({ cart, removeFromCart, updateQty, setPage }) {
   const [details, setDetails] = useState(EMPTY_DETAILS);
   const setD = (k) => (e) => setDetails(d => ({ ...d, [k]: e.target.value }));
 
+  // ── Geolocation state ────────────────────────────────────────────────────
+  const [geoStatus, setGeoStatus] = useState("idle"); // idle | asking | loading | success | denied | error
+  const [geoCoords, setGeoCoords] = useState(null);   // { lat, lng } when obtained
+
+  const handleUseMyLocation = () => {
+    if (!navigator.geolocation) {
+      setGeoStatus("error");
+      return;
+    }
+    setGeoStatus("asking");
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const { latitude: lat, longitude: lng } = position.coords;
+        setGeoCoords({ lat, lng });
+        setGeoStatus("loading");
+        try {
+          // OpenStreetMap Nominatim — free, no API key required
+          const res = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`,
+            { headers: { "Accept-Language": "en" } }
+          );
+          const data = await res.json();
+          if (data && data.display_name) {
+            // Build a clean address from the structured response
+            const a = data.address || {};
+            const parts = [
+              a.house_number,
+              a.road || a.pedestrian || a.footway,
+              a.suburb || a.neighbourhood || a.quarter,
+              a.city || a.town || a.municipality || a.village,
+              a.state || a.region,
+              a.postcode,
+              a.country,
+            ].filter(Boolean);
+            const cleanAddress = parts.length > 0 ? parts.join(", ") : data.display_name;
+            setDetails(d => ({ ...d, address: cleanAddress }));
+            setGeoStatus("success");
+          } else {
+            setGeoStatus("error");
+          }
+        } catch {
+          // If reverse geocoding fails, show raw coordinates as fallback
+          setDetails(d => ({ ...d, address: `Near: ${lat.toFixed(5)}, ${lng.toFixed(5)}` }));
+          setGeoStatus("success");
+        }
+      },
+      (err) => {
+        if (err.code === err.PERMISSION_DENIED) setGeoStatus("denied");
+        else setGeoStatus("error");
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  };
+
+  const geoLabel = {
+    idle:    "📍 Use My Location",
+    asking:  "⏳ Waiting for permission…",
+    loading: "🔍 Getting your address…",
+    success: "✓ Location detected",
+    denied:  "❌ Permission denied",
+    error:   "❌ Could not get location",
+  };
+
   const detailsFilled = details.name && details.email && details.phone && details.address;
 
   // Build a readable order summary string for the emails
@@ -1708,11 +1776,86 @@ function CartPage({ cart, removeFromCart, updateQty, setPage }) {
             </div>
 
             <div style={{ marginBottom: 28 }}>
-              <label style={labelS}>Delivery Address *</label>
-              <textarea value={details.address} onChange={setD("address")} rows={3}
+              {/* Label row with drop pin button */}
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                <label style={labelS}>Delivery Address *</label>
+                <button
+                  type="button"
+                  onClick={handleUseMyLocation}
+                  disabled={geoStatus === "asking" || geoStatus === "loading"}
+                  style={{
+                    display: "flex", alignItems: "center", gap: 6,
+                    padding: "5px 12px", borderRadius: ds.radius.pill,
+                    border: `1.5px solid ${
+                      geoStatus === "success" ? ds.color.successBorder :
+                      geoStatus === "denied" || geoStatus === "error" ? ds.color.redBorder :
+                      ds.color.border
+                    }`,
+                    background: geoStatus === "success" ? ds.color.successBg :
+                                geoStatus === "denied" || geoStatus === "error" ? ds.color.redLight :
+                                ds.color.canvas,
+                    color: geoStatus === "success" ? ds.color.success :
+                           geoStatus === "denied" || geoStatus === "error" ? ds.color.red :
+                           ds.color.textBody,
+                    fontSize: 12, fontWeight: 600, cursor:
+                      geoStatus === "asking" || geoStatus === "loading" ? "not-allowed" : "pointer",
+                    fontFamily: ds.font.body, transition: "all 0.2s",
+                    opacity: geoStatus === "asking" || geoStatus === "loading" ? 0.7 : 1,
+                  }}
+                >
+                  {geoStatus === "loading" && (
+                    <span style={{ display: "inline-block", width: 10, height: 10, border: `2px solid ${ds.color.textMuted}`, borderTopColor: "transparent", borderRadius: "50%", animation: "spin 0.6s linear infinite" }} />
+                  )}
+                  {geoLabel[geoStatus]}
+                </button>
+              </div>
+
+              {/* Textarea */}
+              <textarea
+                value={details.address}
+                onChange={setD("address")}
+                rows={3}
                 placeholder="House/Unit No., Street, Barangay, City, Province, Country"
                 style={{ ...inputS, resize: "vertical", lineHeight: 1.6 }}
-                onFocus={e => e.target.style.borderColor = ds.color.red} onBlur={e => e.target.style.borderColor = ds.color.border} />
+                onFocus={e => e.target.style.borderColor = ds.color.red}
+                onBlur={e => e.target.style.borderColor = ds.color.border}
+              />
+
+              {/* Permission denied / error hint */}
+              {geoStatus === "denied" && (
+                <div style={{ marginTop: 8, fontSize: 12, color: ds.color.red, lineHeight: 1.5 }}>
+                  Location access was denied. Please type your address manually, or enable location permission in your browser settings and try again.
+                </div>
+              )}
+              {geoStatus === "error" && (
+                <div style={{ marginTop: 8, fontSize: 12, color: ds.color.red }}>
+                  Could not detect location. Please type your address manually.
+                </div>
+              )}
+
+              {/* Mini map preview using OpenStreetMap iframe — shows when coordinates are obtained */}
+              {geoCoords && geoStatus === "success" && (
+                <div style={{ marginTop: 12, borderRadius: ds.radius.md, overflow: "hidden", border: `1px solid ${ds.color.border}`, boxShadow: ds.shadow.xs }}>
+                  <div style={{ background: ds.color.successBg, padding: "6px 12px", fontSize: 11, fontWeight: 700, color: ds.color.success, letterSpacing: "0.06em", textTransform: "uppercase" }}>
+                    📍 Location Detected — verify your pin below
+                  </div>
+                  <iframe
+                    title="Your Location"
+                    width="100%"
+                    height="200"
+                    frameBorder="0"
+                    style={{ display: "block" }}
+                    src={`https://www.openstreetmap.org/export/embed.html?bbox=${geoCoords.lng - 0.005},${geoCoords.lat - 0.005},${geoCoords.lng + 0.005},${geoCoords.lat + 0.005}&layer=mapnik&marker=${geoCoords.lat},${geoCoords.lng}`}
+                  />
+                  <div style={{ background: ds.color.canvas, padding: "6px 12px", fontSize: 11, color: ds.color.textMuted }}>
+                    Powered by © OpenStreetMap contributors · <a href={`https://www.openstreetmap.org/?mlat=${geoCoords.lat}&mlon=${geoCoords.lng}#map=16/${geoCoords.lat}/${geoCoords.lng}`} target="_blank" rel="noopener noreferrer" style={{ color: ds.color.red }}>View larger map</a>
+                  </div>
+                </div>
+              )}
+
+              <div style={{ fontSize: 12, color: ds.color.textMuted, marginTop: 6 }}>
+                You can edit the detected address above if needed.
+              </div>
             </div>
 
             {/* Order mini-summary */}
