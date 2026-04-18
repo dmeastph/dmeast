@@ -2171,7 +2171,189 @@ function PrivacyPage() {
 // ─────────────────────────────────────────────────────────────────────────────
 // FOOTER
 // ─────────────────────────────────────────────────────────────────────────────
-function Footer({ setPage }) {
+function TermsPage() {
+  const today = new Date().toLocaleDateString("en-PH", { year: "numeric", month: "long", day: "numeric" });
+  const sections = [
+    {
+      title: "Acceptance of Terms",
+      body: "By accessing or using the DM EAST website (dmeastph.com) and placing orders through our platform, you agree to be bound by these Terms and Conditions. If you do not agree to these terms, please do not use our services. DM EAST reserves the right to update these terms at any time without prior notice.",
+    },
+    {
+      title: "Company Information",
+      body: "DM EAST (Decon Medical Equipment and Supplies Trading) is a duly registered Philippine-based medical trading company. Registered address: 1146 M. Natividad Cor. Mayhaligue Sts., Sta. Cruz, Manila, Philippines. Contact: info@dmeastph.com | +63 951 040 1708 | +63 2 8805 2445.",
+    },
+    {
+      title: "Products and Pricing",
+      body: "DM EAST offers medical equipment, laboratory equipment, pharmaceuticals, and specialized healthcare solutions. Prices displayed on the website are in Philippine Peso (PHP) unless otherwise stated. Prices for direct-purchase items are fixed at checkout. For Request-a-Quote and Talk-to-Sales items, final pricing is confirmed through a formal quotation. All prices are subject to change without prior notice. For international orders, applicable shipping fees, customs duties, and taxes are not included in the listed price and will be advised separately.",
+    },
+    {
+      title: "Minimum Order",
+      body: "The minimum order value for direct purchase transactions on dmeastph.com is ₱500.00. Orders below this amount will not be processed. There is no minimum order value for quote-based and project-based inquiries.",
+    },
+    {
+      title: "Payment Terms",
+      body: "DM EAST requires full payment before any order is processed and dispatched. No goods will be released on credit or partial payment basis unless a separate written agreement has been executed. Accepted payment methods include credit card, debit card, bank transfer, GCash, Maya, and QR payment. Payment instructions will be provided after order confirmation. For large institutional orders, a formal Purchase Order (PO) and payment arrangement may be negotiated on a case-by-case basis.",
+    },
+    {
+      title: "Order Processing",
+      body: "All orders are subject to availability. DM EAST operates on a procurement-based model and sources products from authorized local and international suppliers upon confirmed order and payment. Estimated processing and delivery timelines will be provided at the time of order confirmation. DM EAST reserves the right to cancel any order in the event of pricing errors, stock unavailability, or inability to fulfill the order due to circumstances beyond our control.",
+    },
+    {
+      title: "Out of Stock / Unavailable Items",
+      body: "In the event that an ordered item becomes unavailable after payment has been made, DM EAST will offer the customer one of the following options: (1) A full refund of the amount paid, credited as Store Credit to be used for future purchases; or (2) An alternative product of equal or lesser value — if the alternative is of lesser value, the price difference will be refunded as Store Credit; if the alternative is of higher value, the customer will be notified and given the option to pay the difference before dispatch. No alternative item will be sent without the customer's explicit approval.",
+    },
+    {
+      title: "Delivery and Shipping",
+      body: "DM EAST delivers nationwide across the Philippines via our logistics partners. International shipping is available via FedEx, air cargo, sea cargo, and courier services. Delivery timelines vary depending on the product, location, and shipping method. DM EAST will provide estimated delivery dates upon order confirmation. Delivery fees, customs duties, and import taxes for international shipments are the responsibility of the buyer unless otherwise agreed in writing. Risk of loss or damage passes to the buyer upon dispatch.",
+    },
+    {
+      title: "Warranty",
+      body: "Medical equipment sold by DM EAST carries the standard manufacturer's warranty, which is generally one (1) year from the date of delivery unless otherwise specified by the manufacturer. A 7-day replacement guarantee applies for items found to be defective or damaged upon delivery, subject to inspection and verification. Warranty coverage varies per item and per manufacturer — specific warranty terms will be provided in the product documentation. Warranty is void if the product has been misused, tampered with, improperly installed, or damaged due to negligence. Pharmaceuticals and consumables are not covered by warranty beyond their manufacturer expiry dates.",
+    },
+    {
+      title: "Prescription Medicines",
+      body: "The sale of prescription medicines through DM EAST is subject to Philippine FDA regulations and Republic Act No. 10918 (Philippine Pharmacy Act). Orders containing prescription-only medicines require submission of a valid doctor's prescription at the time of order. DM EAST reserves the right to cancel and refund any order for prescription medicines if a valid prescription is not provided or cannot be verified.",
+    },
+    {
+      title: "Limitation of Liability",
+      body: "DM EAST shall not be liable for any indirect, incidental, consequential, or punitive damages arising from the use of our products or services. Our maximum liability in connection with any order shall not exceed the total amount paid for that order. DM EAST is not responsible for delays caused by force majeure events including but not limited to natural disasters, government actions, strikes, or supplier failures.",
+    },
+    {
+      title: "Intellectual Property",
+      body: "All content on dmeastph.com — including text, images, logos, and design — is the property of DM EAST and is protected by applicable intellectual property laws. Unauthorized reproduction or use of any content is strictly prohibited.",
+    },
+    {
+      title: "Governing Law",
+      body: "These Terms and Conditions are governed by the laws of the Republic of the Philippines. Any disputes arising from the use of this website or from transactions with DM EAST shall be subject to the exclusive jurisdiction of the courts of Manila, Philippines.",
+    },
+    {
+      title: "Contact Us",
+      body: `For questions about these Terms and Conditions, please contact us at ${CONTACT.email}, call ${CONTACT.phone1} or ${CONTACT.phone2}, or visit our office at ${CONTACT.address}, ${CONTACT.address2}.`,
+    },
+  ];
+
+  return (
+    <div style={{ paddingTop: 67 }}>
+      <PageHero eyebrow="Legal" title="Terms & Conditions" subtitle={`Last updated: ${today}`} />
+      <div style={{ maxWidth: 820, margin: "0 auto", padding: "60px 28px" }}>
+        <div style={{ background: ds.color.redLight, border: `1px solid ${ds.color.redBorder}`, borderRadius: ds.radius.lg, padding: "16px 20px", marginBottom: 40, fontSize: 14, color: ds.color.red, lineHeight: 1.7 }}>
+          Please read these Terms and Conditions carefully before using dmeastph.com or placing any order with DM EAST.
+        </div>
+        {sections.map((s, i) => (
+          <div key={i} style={{ marginBottom: 36, paddingBottom: 36, borderBottom: i < sections.length - 1 ? `1px solid ${ds.color.borderLight}` : "none" }}>
+            <h3 style={{ fontSize: 16.5, fontWeight: 600, color: ds.color.textDark, marginBottom: 10, fontFamily: ds.font.display }}>
+              {i + 1}. {s.title}
+            </h3>
+            <p style={{ fontSize: 14.5, color: ds.color.textBody, lineHeight: 1.85 }}>{s.body}</p>
+          </div>
+        ))}
+        <div style={{ marginTop: 40, padding: "20px 24px", background: ds.color.canvas, borderRadius: ds.radius.lg, border: `1px solid ${ds.color.border}` }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: ds.color.textDark, marginBottom: 6 }}>DM EAST — Decon Medical Equipment and Supplies Trading</div>
+          <div style={{ fontSize: 13, color: ds.color.textMuted, lineHeight: 1.8 }}>
+            {CONTACT.address}, {CONTACT.address2}<br />
+            {CONTACT.email} · {CONTACT.phone1} · {CONTACT.phone2}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function RefundPage() {
+  const today = new Date().toLocaleDateString("en-PH", { year: "numeric", month: "long", day: "numeric" });
+  const sections = [
+    {
+      title: "Overview",
+      body: "DM EAST is committed to ensuring your satisfaction with every purchase. This Return and Refund Policy outlines the conditions, process, and timeline for returns, replacements, and refunds. By placing an order with DM EAST, you agree to the terms stated in this policy.",
+    },
+    {
+      title: "Return Eligibility — General Items",
+      body: "Items may be returned within 7 calendar days from the date of delivery, subject to the following conditions: (1) The item must be in its original, unused, and unopened condition; (2) The item must be in its original packaging with all accessories, manuals, and documentation included; (3) Proof of purchase (order confirmation or receipt) must be presented; (4) The item must not fall under the non-returnable categories listed below. Returns requested after 7 days from delivery will not be accepted.",
+    },
+    {
+      title: "Non-Returnable Items",
+      body: "The following items are strictly non-returnable and non-refundable for health, safety, and regulatory reasons:\n• All pharmaceutical products (medicines, vitamins, supplements)\n• Vaccines and immunobiological products\n• Opened or used medical consumables\n• Custom-ordered or specially sourced items\n• Items that have been installed, assembled, or used\n• Items damaged due to misuse, negligence, or improper handling by the customer",
+    },
+    {
+      title: "Defective or Damaged Items — 7-Day Replacement Guarantee",
+      body: "If you receive an item that is defective, damaged upon delivery, or does not match your order, you must report it within 7 calendar days of delivery. DM EAST will arrange for inspection and, upon verification, provide a replacement unit at no additional cost. Items reported as defective after 7 days will be handled under the applicable manufacturer's warranty.",
+    },
+    {
+      title: "Return Shipping",
+      body: "The customer is responsible for all return shipping costs unless the return is due to a verified error by DM EAST (wrong item shipped, item arrived damaged through our fault). In cases where DM EAST is at fault, return shipping will be arranged and covered by DM EAST or as mutually agreed with our logistics partner. DM EAST recommends using a trackable shipping method for returns as we cannot be held responsible for items lost in transit.",
+    },
+    {
+      title: "Refund Method and Timeline",
+      body: "All approved refunds will be issued as Store Credit to your DM EAST account. Store Credit can be applied to any future purchase on dmeastph.com and does not expire. Refunds will be processed within 7 to 45 banking days from the date the returned item is received and inspected by our team. You will be notified via email once the refund has been processed. Note: DM EAST does not issue refunds to original payment methods (credit card, GCash, bank transfer) — all refunds are in the form of Store Credit only.",
+    },
+    {
+      title: "Out of Stock Refunds",
+      body: "If an item becomes unavailable after your payment has been received, DM EAST will contact you within 48 hours to offer: (1) Store Credit refund for the full amount paid; or (2) An alternative item of equal or lesser value — the price difference for a cheaper alternative will be refunded as Store Credit; if the alternative costs more, you will be asked to pay the difference before the item is dispatched. No alternative will be shipped without your explicit written approval.",
+    },
+    {
+      title: "How to Request a Return",
+      body: `To initiate a return, please follow these steps:\n1. Email us at ${CONTACT.email} with the subject line: "Return Request — [Your Order Number]"\n2. Include your full name, order number, item name, and reason for return\n3. Attach photos of the item clearly showing the issue (required for defective/damaged claims)\n4. Our team will review and respond within 2–3 business days\n5. If approved, we will provide return instructions and a return authorization number\n6. Ship the item back within 3 days of receiving return approval\n\nYou may also call us at ${CONTACT.phone1} or ${CONTACT.phone2} during business hours (Monday–Friday, 8:00 AM–6:00 PM).`,
+    },
+    {
+      title: "Warranty Claims",
+      body: "For items under manufacturer's warranty (generally 1 year from delivery), warranty claims are handled directly through the manufacturer or their authorized service center in the Philippines. DM EAST will assist in facilitating warranty claims where possible. Items under warranty that develop defects through normal use (not caused by misuse or negligence) will be repaired or replaced in accordance with the manufacturer's warranty terms.",
+    },
+    {
+      title: "Policy Updates",
+      body: "DM EAST reserves the right to update or modify this Return and Refund Policy at any time. Changes will be posted on this page with an updated date. Continued use of our website after any changes constitutes acceptance of the revised policy.",
+    },
+    {
+      title: "Contact Us",
+      body: `For all return and refund inquiries, please contact us:\nEmail: ${CONTACT.email}\nPhone: ${CONTACT.phone1} | ${CONTACT.phone2}\nAddress: ${CONTACT.address}, ${CONTACT.address2}\nBusiness Hours: Monday – Friday, 8:00 AM – 6:00 PM`,
+    },
+  ];
+
+  return (
+    <div style={{ paddingTop: 67 }}>
+      <PageHero eyebrow="Legal" title="Return & Refund Policy" subtitle={`Last updated: ${today}`} />
+      <div style={{ maxWidth: 820, margin: "0 auto", padding: "60px 28px" }}>
+
+        {/* Key policy summary cards */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 16, marginBottom: 44 }}>
+          {[
+            { icon: "📅", label: "Return Window",    value: "7 Days",               sub: "from date of delivery" },
+            { icon: "🚚", label: "Return Shipping",  value: "Customer Pays",         sub: "unless our error" },
+            { icon: "💊", label: "Medicines",        value: "Non-Returnable",        sub: "health & safety regulation" },
+            { icon: "💳", label: "Refund Method",    value: "Store Credit",          sub: "7–45 banking days" },
+          ].map(c => (
+            <div key={c.label} style={{ background: ds.color.white, border: `1px solid ${ds.color.border}`, borderRadius: ds.radius.lg, padding: "20px 18px", textAlign: "center", boxShadow: ds.shadow.xs, borderTop: `3px solid ${ds.color.red}` }}>
+              <div style={{ fontSize: 28, marginBottom: 8 }}>{c.icon}</div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: ds.color.textMuted, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 4 }}>{c.label}</div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: ds.color.textDark, marginBottom: 3 }}>{c.value}</div>
+              <div style={{ fontSize: 11, color: ds.color.textLight }}>{c.sub}</div>
+            </div>
+          ))}
+        </div>
+
+        <div style={{ background: "#FFFBEB", border: "1px solid #F5C518", borderRadius: ds.radius.lg, padding: "14px 18px", marginBottom: 40, fontSize: 13.5, color: "#78350F", lineHeight: 1.7 }}>
+          ⚠️ <strong>Important:</strong> Medicines, vaccines, and opened consumables are strictly non-returnable and non-refundable under Philippine FDA health and safety regulations.
+        </div>
+
+        {sections.map((s, i) => (
+          <div key={i} style={{ marginBottom: 36, paddingBottom: 36, borderBottom: i < sections.length - 1 ? `1px solid ${ds.color.borderLight}` : "none" }}>
+            <h3 style={{ fontSize: 16.5, fontWeight: 600, color: ds.color.textDark, marginBottom: 10, fontFamily: ds.font.display }}>
+              {i + 1}. {s.title}
+            </h3>
+            <p style={{ fontSize: 14.5, color: ds.color.textBody, lineHeight: 1.85, whiteSpace: "pre-line" }}>{s.body}</p>
+          </div>
+        ))}
+
+        <div style={{ marginTop: 40, padding: "20px 24px", background: ds.color.canvas, borderRadius: ds.radius.lg, border: `1px solid ${ds.color.border}` }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: ds.color.textDark, marginBottom: 6 }}>DM EAST — Decon Medical Equipment and Supplies Trading</div>
+          <div style={{ fontSize: 13, color: ds.color.textMuted, lineHeight: 1.8 }}>
+            {CONTACT.address}, {CONTACT.address2}<br />
+            {CONTACT.email} · {CONTACT.phone1} · {CONTACT.phone2}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
   return (
     <footer style={{ background: ds.color.textDark, padding: "64px 28px 28px" }}>
       <div style={{ maxWidth: 1280, margin: "0 auto" }}>
@@ -2200,6 +2382,12 @@ function Footer({ setPage }) {
               <button key={id} onClick={() => setPage(id)} style={{ display: "block", background: "none", border: "none", cursor: "pointer", color: "rgba(255,255,255,0.5)", fontSize: 13, padding: "4px 0", textAlign: "left", fontFamily: ds.font.body, transition: "color 0.15s" }}
                 onMouseEnter={e => e.target.style.color="#F0A81C"} onMouseLeave={e => e.target.style.color="rgba(255,255,255,0.5)"}>{lbl}</button>
             ))}
+            <div style={{ marginTop: 10, borderTop: "1px solid rgba(255,255,255,0.08)", paddingTop: 10 }}>
+              {[["terms","Terms & Conditions"],["refunds","Return & Refund Policy"],["privacy","Privacy Policy"]].map(([id,lbl]) => (
+                <button key={id} onClick={() => setPage(id)} style={{ display: "block", background: "none", border: "none", cursor: "pointer", color: "rgba(255,255,255,0.35)", fontSize: 12, padding: "3px 0", textAlign: "left", fontFamily: ds.font.body, transition: "color 0.15s" }}
+                  onMouseEnter={e => e.target.style.color="#F0A81C"} onMouseLeave={e => e.target.style.color="rgba(255,255,255,0.35)"}>{lbl}</button>
+              ))}
+            </div>
           </div>
 
           {/* Products */}
@@ -2228,9 +2416,15 @@ function Footer({ setPage }) {
         <Divider />
         <div style={{ paddingTop: 20, display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 12, alignItems: "center" }}>
           <div style={{ fontSize: 12, color: "rgba(255,255,255,0.25)" }}>© {new Date().getFullYear()} DM EAST. All rights reserved. dmeastph.com</div>
-          <div style={{ display: "flex", gap: 20 }}>
-            <button onClick={() => setPage("privacy")} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 12, color: "rgba(255,255,255,0.25)", fontFamily: ds.font.body }}
-              onMouseEnter={e => e.target.style.color="#F0A81C"} onMouseLeave={e => e.target.style.color="rgba(255,255,255,0.25)"}>Privacy Policy</button>
+          <div style={{ display: "flex", gap: 20, flexWrap: "wrap" }}>
+            {[
+              ["privacy",  "Privacy Policy"],
+              ["terms",    "Terms & Conditions"],
+              ["refunds",  "Return & Refund Policy"],
+            ].map(([id, label]) => (
+              <button key={id} onClick={() => setPage(id)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 12, color: "rgba(255,255,255,0.25)", fontFamily: ds.font.body }}
+                onMouseEnter={e => e.target.style.color="#F0A81C"} onMouseLeave={e => e.target.style.color="rgba(255,255,255,0.25)"}>{label}</button>
+            ))}
           </div>
         </div>
       </div>
@@ -2318,6 +2512,8 @@ export default function App() {
         {page === "contact"  && <ContactPage />}
         {page === "cart"     && <CartPage cart={cart} removeFromCart={removeFromCart} updateQty={updateQty} setPage={setPage} />}
         {page === "privacy"  && <PrivacyPage />}
+        {page === "terms"    && <TermsPage />}
+        {page === "refunds"  && <RefundPage />}
       </main>
       <Footer setPage={setPage} />
       <FloatingChat />
