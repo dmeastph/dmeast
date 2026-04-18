@@ -1,6 +1,6 @@
 /**
  * DMEAST — Medical Solutions Platform
- * Version 4.0 — Light Minimalist Edition
+ * Version 4.1 — Terms, Refund Policy, Prescription, Map
  *
  * SETUP INSTRUCTIONS:
  * 1. Save your logo file as:  public/logo.png  in your Vite project
@@ -2168,9 +2168,6 @@ function PrivacyPage() {
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// FOOTER
-// ─────────────────────────────────────────────────────────────────────────────
 function TermsPage() {
   const today = new Date().toLocaleDateString("en-PH", { year: "numeric", month: "long", day: "numeric" });
   const sections = [
@@ -2354,6 +2351,11 @@ function RefundPage() {
     </div>
   );
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// FOOTER
+// ─────────────────────────────────────────────────────────────────────────────
+function Footer({ setPage }) {
   return (
     <footer style={{ background: ds.color.textDark, padding: "64px 28px 28px" }}>
       <div style={{ maxWidth: 1280, margin: "0 auto" }}>
