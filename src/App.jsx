@@ -388,6 +388,146 @@ const PRODUCTS = [
   { id: "veh-05", category: "vehicles", name: "Fire-Trike",
     desc: "Compact fire-response trike for barangay brigades. Lightweight and easily deployed in dense areas.",
     price: null, cta: "sales", imageSrc: null, featured: false, tag: "Specialized Vehicles" },
+
+  // ── BEAUTY & WELLNESS ──
+  // Prices sourced from updated 2025 pricelist
+  // Numbing Creams / Topical Anesthesia
+  { id: "bw-01", category: "beauty", name: "Nexcain Numbing Cream (500g)",
+    desc: "Lidocaine 10.56% topical anesthesia. 500g jar. Fast-acting numbing cream for aesthetic procedures. OTC.",
+    price: 2160, cta: "buy", imageSrc: null, featured: true, tag: "Beauty & Wellness",
+    requiresPrescription: false, rxCategory: null },
+  { id: "bw-02", category: "beauty", name: "P-Cain Numbing Cream (500g)",
+    desc: "Lidocaine 25mg + Prilocaine 25mg. 500g jar. Enhanced numbing with booster effect. OTC.",
+    price: 2400, cta: "buy", imageSrc: null, featured: false, tag: "Beauty & Wellness",
+    requiresPrescription: false, rxCategory: null },
+  { id: "bw-03", category: "beauty", name: "Scain Numbing Cream (30g tube)",
+    desc: "Lidocaine 10.56% + Hyaluronic Acid 24mg/ml. 30g tube. Numbing cream with booster effect.",
+    price: 1080, cta: "buy", imageSrc: null, featured: false, tag: "Beauty & Wellness",
+    requiresPrescription: false, rxCategory: null },
+
+  // Botox
+  { id: "bw-04", category: "beauty", name: "Botulax 100 Units",
+    desc: "Botulinum toxin for smoothing wrinkles and muscle relaxation. 100 units/vial. For licensed practitioners only. ⚠️ Prescription required.",
+    price: 2880, cta: "buy", imageSrc: null, featured: true, tag: "Beauty & Wellness",
+    requiresPrescription: true, rxCategory: "Botulinum Toxin / Aesthetic" },
+  { id: "bw-05", category: "beauty", name: "Nabota 100 Units",
+    desc: "Botulinum toxin type A. 100 units/vial. Korean brand. For aesthetic practitioners. ⚠️ Prescription required.",
+    price: 2880, cta: "buy", imageSrc: null, featured: false, tag: "Beauty & Wellness",
+    requiresPrescription: true, rxCategory: "Botulinum Toxin / Aesthetic" },
+  { id: "bw-06", category: "beauty", name: "Wondertox 100 Units",
+    desc: "Botulinum toxin type A. 100 units/vial. For wrinkle treatment and muscle relaxation. ⚠️ Prescription required.",
+    price: 2040, cta: "buy", imageSrc: null, featured: false, tag: "Beauty & Wellness",
+    requiresPrescription: true, rxCategory: "Botulinum Toxin / Aesthetic" },
+  { id: "bw-07", category: "beauty", name: "Rentox 100 Units",
+    desc: "Botulinum toxin for aesthetic use. 100 units/vial. ⚠️ Prescription required.",
+    price: 2880, cta: "buy", imageSrc: null, featured: false, tag: "Beauty & Wellness",
+    requiresPrescription: true, rxCategory: "Botulinum Toxin / Aesthetic" },
+
+  // Fillers
+  { id: "bw-08", category: "beauty", name: "Neuramis Volume (HA Filler)",
+    desc: "Cross-linked hyaluronic acid 24mg/ml + Lidocaine 3mg/ml. For volume restoration. ⚠️ Prescription required.",
+    price: 1800, cta: "buy", imageSrc: null, featured: true, tag: "Beauty & Wellness",
+    requiresPrescription: true, rxCategory: "Dermal Filler / Aesthetic" },
+  { id: "bw-09", category: "beauty", name: "Neuramis Deep (HA Filler)",
+    desc: "Cross-linked hyaluronic acid 20mg/ml + Lidocaine 3mg/ml. Deep dermal filler for nasolabial folds. ⚠️ Prescription required.",
+    price: 1800, cta: "buy", imageSrc: null, featured: false, tag: "Beauty & Wellness",
+    requiresPrescription: true, rxCategory: "Dermal Filler / Aesthetic" },
+  { id: "bw-10", category: "beauty", name: "Neuramis Light (HA Filler)",
+    desc: "Cross-linked hyaluronic acid. Light formulation for fine lines and superficial wrinkles. ⚠️ Prescription required.",
+    price: 1800, cta: "buy", imageSrc: null, featured: false, tag: "Beauty & Wellness",
+    requiresPrescription: true, rxCategory: "Dermal Filler / Aesthetic" },
+  { id: "bw-11", category: "beauty", name: "Misfill Volume (HA Filler)",
+    desc: "Cross-linked hyaluronic acid 24mg/ml + Lidocaine 3mg/ml. Volume filler for facial contouring. ⚠️ Prescription required.",
+    price: 2040, cta: "buy", imageSrc: null, featured: false, tag: "Beauty & Wellness",
+    requiresPrescription: true, rxCategory: "Dermal Filler / Aesthetic" },
+
+  // Threads
+  { id: "bw-12", category: "beauty", name: "Minerva Threads PDO (19G x 60mm)",
+    desc: "PDO thread lifting. 19G x 60mm. 20 pcs/pack. For face and body lifting procedures. ⚠️ For licensed practitioners.",
+    price: 3240, cta: "buy", imageSrc: null, featured: false, tag: "Beauty & Wellness",
+    requiresPrescription: true, rxCategory: "Aesthetic / PDO Threads" },
+  { id: "bw-13", category: "beauty", name: "Minerva Threads PDO (Mono)",
+    desc: "PDO mono threads. 29G x 38mm. 20 pcs/pack. For skin tightening and collagen stimulation.",
+    price: 840, cta: "buy", imageSrc: null, featured: false, tag: "Beauty & Wellness",
+    requiresPrescription: true, rxCategory: "Aesthetic / PDO Threads" },
+
+  // Mesolipo / Fat Dissolving
+  { id: "bw-14", category: "beauty", name: "Lemon Bottle Fat Dissolving",
+    desc: "Mesolipo fat dissolving solution. 10ml/vial, 5 vials/box. For body contouring and facial slimming. ⚠️ For licensed practitioners.",
+    price: 9000, cta: "buy", imageSrc: null, featured: true, tag: "Beauty & Wellness",
+    requiresPrescription: true, rxCategory: "Lipolysis / Aesthetic" },
+  { id: "bw-15", category: "beauty", name: "Lipolab Plus (Brown Vials)",
+    desc: "Mesolipo solution. 10ml/vial, 10 vials/box. For fat dissolution and body contouring.",
+    price: 2760, cta: "buy", imageSrc: null, featured: false, tag: "Beauty & Wellness",
+    requiresPrescription: true, rxCategory: "Lipolysis / Aesthetic" },
+  { id: "bw-16", category: "beauty", name: "Lipo Advance Body",
+    desc: "Mesolipo contouring + whitening solution. 10ml/vial, 10 vials/box.",
+    price: 3720, cta: "buy", imageSrc: null, featured: false, tag: "Beauty & Wellness",
+    requiresPrescription: true, rxCategory: "Lipolysis / Aesthetic" },
+
+  // Skin Boosters / PDRN
+  { id: "bw-17", category: "beauty", name: "Misfill PDRN Skin Booster",
+    desc: "Regeneration and prevention of skin thinning. 2.2ml/syringe, 2 syringes/box. PDRN skin booster.",
+    price: 3840, cta: "buy", imageSrc: null, featured: true, tag: "Beauty & Wellness",
+    requiresPrescription: true, rxCategory: "PDRN / Skin Booster" },
+  { id: "bw-18", category: "beauty", name: "Ireju Aqua Skin Booster",
+    desc: "Non cross-linked HA. 2.5ml/syringe, 10 syringes/box. Deep skin hydration and rejuvenation.",
+    price: 4920, cta: "buy", imageSrc: null, featured: false, tag: "Beauty & Wellness",
+    requiresPrescription: true, rxCategory: "PDRN / Skin Booster" },
+  { id: "bw-19", category: "beauty", name: "Hyaron Pre-Filled Injection",
+    desc: "Sodium hyaluronate 25mg/2.5ml. Pre-filled syringe. 10 syringes/box. Skin booster.",
+    price: 3600, cta: "buy", imageSrc: null, featured: false, tag: "Beauty & Wellness",
+    requiresPrescription: true, rxCategory: "PDRN / Skin Booster" },
+  { id: "bw-20", category: "beauty", name: "Selastin Exo Plus (Exosome)",
+    desc: "Ultra nano particle exosome 1.3 billion/ml. PDRN + Growth Factor. Premium skin rejuvenation.",
+    price: 7320, cta: "buy", imageSrc: null, featured: false, tag: "Beauty & Wellness",
+    requiresPrescription: true, rxCategory: "Exosome / Aesthetic" },
+
+  // Glutathione — Whitening Injections
+  { id: "bw-21", category: "beauty", name: "Glutanex 1200mg (Korea)",
+    desc: "Reduced glutathione 1,200mg. 10 vials/box. Korean formulation. Whitening injection, anti-oxidant.",
+    price: 3960, cta: "buy", imageSrc: null, featured: true, tag: "Beauty & Wellness",
+    requiresPrescription: true, rxCategory: "Whitening Injection / Rx" },
+  { id: "bw-22", category: "beauty", name: "Salutha 1200mg Glutathione",
+    desc: "Reduced glutathione 1,200mg. 10 vials/box. Whitening injection and anti-oxidant.",
+    price: 3000, cta: "buy", imageSrc: null, featured: false, tag: "Beauty & Wellness",
+    requiresPrescription: true, rxCategory: "Whitening Injection / Rx" },
+  { id: "bw-23", category: "beauty", name: "Tatiomax Gold 1.2g",
+    desc: "Reduced glutathione with booster. Premium whitening injection, anti-oxidant, skin glow.",
+    price: 2880, cta: "buy", imageSrc: null, featured: false, tag: "Beauty & Wellness",
+    requiresPrescription: true, rxCategory: "Whitening Injection / Rx" },
+  { id: "bw-24", category: "beauty", name: "Cindella 1.2g (Hidden Tag Seal)",
+    desc: "Combo reduced glutathione 1,200mg + Ascorbic Acid 10,000mg + Lipoic Acid 25mg. Korea. Whitening + anti-oxidant.",
+    price: 7200, cta: "buy", imageSrc: null, featured: false, tag: "Beauty & Wellness",
+    requiresPrescription: true, rxCategory: "Whitening Injection / Rx" },
+
+  // Oral Supplements
+  { id: "bw-25", category: "beauty", name: "Lustrous Pro (60 Softgels)",
+    desc: "Reduced L-Glutathione, Hyaluronic Acid, Collagen, Polypodium Leucotomos, Vitamin E, Astaxanthin. Oral sunblock + glutathione.",
+    price: 3600, cta: "buy", imageSrc: null, featured: true, tag: "Beauty & Wellness",
+    requiresPrescription: false, rxCategory: null },
+  { id: "bw-26", category: "beauty", name: "Lustrous Glow (60 Softgels)",
+    desc: "Reduced L-Glutathione, Sodium Ascorbate, Collagen, Stem Cells, Lycopene, Grape Seed Extract. Oral glutathione supplement.",
+    price: 3600, cta: "buy", imageSrc: null, featured: false, tag: "Beauty & Wellness",
+    requiresPrescription: false, rxCategory: null },
+  { id: "bw-27", category: "beauty", name: "Accunex Capsule (Isotretinoin 10mg)",
+    desc: "Isotretinoin 10mg oral capsule. For severe acne treatment. ⚠️ Prescription required — teratogenic medication.",
+    price: 2160, cta: "buy", imageSrc: null, featured: false, tag: "Beauty & Wellness",
+    requiresPrescription: true, rxCategory: "Oral Acne Medication / Rx" },
+
+  // IV Drips / Whitening Boosters
+  { id: "bw-28", category: "beauty", name: "Snow White Whitening Drip Set",
+    desc: "Complete whitening IV drip set. Combo reduced glutathione 1,200mg + Ascorbic Acid 10,000mg + Lipoic Acid 300mg.",
+    price: 7800, cta: "buy", imageSrc: null, featured: false, tag: "Beauty & Wellness",
+    requiresPrescription: true, rxCategory: "IV Whitening / Rx" },
+  { id: "bw-29", category: "beauty", name: "Glutanex Trio Drip Set",
+    desc: "Premium whitening IV drip combo set. Anti-oxidant + appetite suppressant effect.",
+    price: 7800, cta: "buy", imageSrc: null, featured: false, tag: "Beauty & Wellness",
+    requiresPrescription: true, rxCategory: "IV Whitening / Rx" },
+  { id: "bw-30", category: "beauty", name: "Tationil 600mg",
+    desc: "Reduced glutathione 600mg IV. For whitening injection and anti-oxidant therapy.",
+    price: 3000, cta: "buy", imageSrc: null, featured: false, tag: "Beauty & Wellness",
+    requiresPrescription: true, rxCategory: "Whitening Injection / Rx" },
 ];
 
 const CATEGORIES = [
@@ -399,6 +539,7 @@ const CATEGORIES = [
   { id: "pharma",      label: "Pharmaceuticals",       shortLabel: "Pharma",      color: "#3B5A1A", accent: "#6AAB2E" },
   { id: "specialized", label: "Specialized Equipment", shortLabel: "Specialized", color: "#4A3A1A", accent: "#D4943A" },
   { id: "vehicles",    label: "Specialized Vehicles",  shortLabel: "Vehicles",    color: "#1A2B5A", accent: "#3A6FD4" },
+  { id: "beauty",      label: "Beauty & Wellness",     shortLabel: "Beauty",      color: "#7A2060", accent: "#C8509A" },
 ];
 
 const CLIENT_TYPES = [
@@ -608,8 +749,28 @@ function ProductImg({ imageSrc, category, name, height = 180 }) {
   const cat = CATEGORIES.find(c => c.id === category) || { color: "#8B2635", accent: "#CC2F3C" };
   if (imageSrc) {
     return (
-      <div style={{ height, overflow: "hidden", borderRadius: `${ds.radius.md}px ${ds.radius.md}px 0 0`, background: ds.color.canvas }}>
-        <img src={imageSrc} alt={name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+      <div style={{
+        height,
+        overflow: "hidden",
+        borderRadius: `${ds.radius.md}px ${ds.radius.md}px 0 0`,
+        background: "#F8F7F5",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "12px",
+        boxSizing: "border-box",
+      }}>
+        <img
+          src={imageSrc}
+          alt={name}
+          style={{
+            maxWidth: "100%",
+            maxHeight: "100%",
+            objectFit: "contain",
+            borderRadius: ds.radius.sm,
+            filter: "drop-shadow(0 2px 8px rgba(0,0,0,0.10))",
+          }}
+        />
       </div>
     );
   }
@@ -893,7 +1054,7 @@ function HeroSection({ setPage }) {
                 { v: "5+",   l: "Years in Operation", accent: ds.color.red },
                 { v: "3",    l: "Island Groups",       accent: ds.color.goldBright },
                 { v: "500+", l: "Global Clients", accent: ds.color.red },
-                { v: "8",    l: "Product Categories",  accent: ds.color.goldBright },
+                { v: "9",    l: "Product Categories",  accent: ds.color.goldBright },
               ].map((s, i) => (
                 <div key={i} style={{
                   background: ds.color.white, border: `1px solid ${ds.color.border}`,
