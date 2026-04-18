@@ -1765,138 +1765,340 @@ function LeafletMap({ onLocationSelect, externalCoords }) {
 }
 
 function CartPage({ cart, removeFromCart, updateQty, setPage }) {
-  const total = cart.reduce((s, i) => s + (i.price || 0) * i.qty, 0);
-
-  // Detect if any cart item requires a prescription
+  const total   = cart.reduce((s, i) => s + (i.price || 0) * i.qty, 0);
   const rxItems = cart.filter(i => i.requiresPrescription);
   const hasRx   = rxItems.length > 0;
 
-  // Steps: 1=Cart  2=Details  3=Prescription(conditional)  4=Payment  5=Done
+  // ── Ordering mode: null=not chosen, "local"=PH, "intl"=international
+  const [orderMode, setOrderMode] = useState(null);
+
+  // ── Local order steps: 1=Cart 2=Details 3=Prescription(if Rx) 4=Payment 5=Done
   const [step,    setStep]    = useState(1);
   const [method,  setMethod]  = useState("");
   const [sending, setSending] = useState(false);
   const [errMsg,  setErrMsg]  = useState("");
 
-  // Customer details
+  // Customer details (local)
   const EMPTY = { name: "", email: "", phone: "", address: "", instructions: "" };
   const [details, setDetails] = useState(EMPTY);
   const setD = (k) => (e) => setDetails(d => ({ ...d, [k]: e.target.value }));
 
-  // Map coords for Leaflet
-  const [mapCoords, setMapCoords] = useState(null); // [lat, lng]
+  // International inquiry form
+  const INTL_EMPTY = { name: "", company: "", email: "", phone: "", country: "", city: "", shippingMethod: "", importLicense: "", currency: "USD", details: "" };
+  const [intlForm,    setIntlForm]    = useState(INTL_EMPTY);
+  const setI = (k) => (e) => setIntlForm(f => ({ ...f, [k]: e.target.value }));
+  const [intlSending, setIntlSending] = useState(false);
+  const [intlDone,    setIntlDone]    = useState(false);
+  const [intlErr,     setIntlErr]     = useState("");
+  const intlFilled = intlForm.name && intlForm.email && intlForm.phone && intlForm.country;
+
+  // Map + geo
+  const [mapCoords, setMapCoords] = useState(null);
   const [geoStatus, setGeoStatus] = useState("idle");
 
-  // Prescription upload
-  const [prescription, setPrescription] = useState(null); // { preview, base64, name }
-  const prescriptionRef = useRef(null);
+  // Prescription — two separate refs: camera vs file upload
+  const [prescription,  setPrescription]  = useState(null);
+  const cameraRef  = useRef(null); // triggers hardware camera
+  const uploadRef  = useRef(null); // triggers file picker
 
   const detailsFilled = details.name && details.email && details.phone && details.address;
+  const orderSummary  = cart.map(i => `${i.name} x${i.qty} — ${formatPHP(i.price * i.qty)}`).join("\n");
 
-  // Build order summary string
-  const orderSummary = cart.map(i => `${i.name} x${i.qty} — ${formatPHP(i.price * i.qty)}`).join("\n");
-
-  // GPS geolocation
+  // GPS
   const handleUseMyLocation = () => {
     if (!navigator.geolocation) { setGeoStatus("error"); return; }
     setGeoStatus("asking");
     navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const { latitude: lat, longitude: lng } = pos.coords;
-        setMapCoords([lat, lng]);
-        setGeoStatus("success");
-      },
-      (err) => setGeoStatus(err.code === err.PERMISSION_DENIED ? "denied" : "error"),
+      (pos) => { setMapCoords([pos.coords.latitude, pos.coords.longitude]); setGeoStatus("success"); },
+      (err)  => setGeoStatus(err.code === err.PERMISSION_DENIED ? "denied" : "error"),
       { enableHighAccuracy: true, timeout: 10000 }
     );
   };
-
-  // Called by LeafletMap when pin is placed/dragged
   const handleLocationSelect = useCallback((lat, lng, address) => {
     setMapCoords([lat, lng]);
     setDetails(d => ({ ...d, address }));
   }, []);
 
-  // Prescription file handler
+  // Prescription upload handler (shared between camera and file input)
   const handlePrescriptionUpload = (e) => {
     const file = e.target.files[0];
     if (!file) return;
+    // Reset input so same file can be re-selected if needed
+    e.target.value = "";
     const reader = new FileReader();
-    reader.onload = (ev) => {
-      setPrescription({ preview: ev.target.result, base64: ev.target.result, name: file.name });
-    };
+    reader.onload = (ev) => setPrescription({ preview: ev.target.result, name: file.name });
     reader.readAsDataURL(file);
   };
 
-  // Navigate steps — skip Prescription step if no Rx items
-  const goNext = () => {
-    if (step === 2 && !hasRx) setStep(4);
-    else setStep(s => s + 1);
-  };
-  const goBack = () => {
-    if (step === 4 && !hasRx) setStep(2);
-    else setStep(s => s - 1);
-  };
+  // Step navigation
+  const goNext = () => { if (step === 2 && !hasRx) setStep(4); else setStep(s => s + 1); };
+  const goBack = () => { if (step === 4 && !hasRx) setStep(2); else setStep(s => s - 1); };
 
-  // Place order — send two emails
+  // ── Place local order
   const handlePlaceOrder = async () => {
     if (!method) return;
-    setSending(true);
-    setErrMsg("");
+    setSending(true); setErrMsg("");
     try {
-      // Email 1 — Notify DMEAST
-      await emailjs.send(
-        EMAILJS_CONFIG.serviceId,
-        EMAILJS_CONFIG.templateId,
-        {
-          from_name:    details.name,
-          company:      "Direct Order",
-          from_email:   details.email,
-          phone:        details.phone,
-          product:      orderSummary,
-          quantity:     cart.reduce((s, i) => s + i.qty, 0) + " items",
-          budget:       formatPHP(total),
-          location:     details.address,
-          timeline:     "Direct Order",
-          details:      `Payment Method: ${method}\n\nDelivery Address:\n${details.address}\n\nSpecial Instructions:\n${details.instructions || "None"}\n\nOrder Items:\n${orderSummary}\n\nTotal: ${formatPHP(total)}${hasRx ? "\n\n⚠️ PRESCRIPTION ITEMS — prescription document submitted with order." : ""}`,
-          reply_to:     details.email,
-          prescription_note: hasRx ? `Prescription attached: ${prescription?.name || "uploaded"}` : "No prescription required",
-        },
-        EMAILJS_CONFIG.publicKey
-      );
-      // Email 2 — Customer receipt
-      await emailjs.send(
-        EMAILJS_CONFIG.serviceId,
-        EMAILJS_CONFIG.receiptTemplateId,
-        {
-          customer_name:    details.name,
-          customer_email:   details.email,
-          customer_phone:   details.phone,
-          customer_address: details.address,
-          order_items:      orderSummary,
-          order_total:      formatPHP(total),
-          payment_method:   method,
-          to_email:         details.email,
-        },
-        EMAILJS_CONFIG.publicKey
-      );
+      await emailjs.send(EMAILJS_CONFIG.serviceId, EMAILJS_CONFIG.templateId, {
+        from_name: details.name, company: "Direct Order — Local (PH)",
+        from_email: details.email, phone: details.phone,
+        product: orderSummary,
+        quantity: cart.reduce((s, i) => s + i.qty, 0) + " items",
+        budget: formatPHP(total), location: details.address,
+        timeline: "Direct Order",
+        details: `Payment: ${method}\nAddress: ${details.address}\nInstructions: ${details.instructions || "None"}\n\nItems:\n${orderSummary}\n\nTotal: ${formatPHP(total)} ${formatUSD(total)}${hasRx ? "\n\n⚠️ PRESCRIPTION attached." : ""}`,
+        reply_to: details.email,
+      }, EMAILJS_CONFIG.publicKey);
+      await emailjs.send(EMAILJS_CONFIG.serviceId, EMAILJS_CONFIG.receiptTemplateId, {
+        customer_name: details.name, customer_email: details.email,
+        customer_phone: details.phone, customer_address: details.address,
+        order_items: orderSummary, order_total: formatPHP(total),
+        payment_method: method, to_email: details.email,
+      }, EMAILJS_CONFIG.publicKey);
       setStep(5);
-    } catch (err) {
-      setErrMsg("Something went wrong. Please email us at " + CONTACT.email);
-    } finally {
-      setSending(false);
-    }
+    } catch { setErrMsg("Something went wrong. Please email us at " + CONTACT.email); }
+    finally { setSending(false); }
   };
 
-  const inputS = {
-    width: "100%", padding: "11px 14px",
-    border: `1.5px solid ${ds.color.border}`, borderRadius: ds.radius.md,
-    fontSize: 14, color: ds.color.textDark, outline: "none",
-    fontFamily: ds.font.body, boxSizing: "border-box", background: ds.color.white,
-    transition: "border-color 0.15s",
+  // ── Submit international inquiry
+  const handleIntlSubmit = async () => {
+    if (!intlFilled) return;
+    setIntlSending(true); setIntlErr("");
+    try {
+      await emailjs.send(EMAILJS_CONFIG.serviceId, EMAILJS_CONFIG.templateId, {
+        from_name: intlForm.name, company: intlForm.company || "N/A",
+        from_email: intlForm.email, phone: intlForm.phone,
+        product: orderSummary,
+        quantity: cart.reduce((s, i) => s + i.qty, 0) + " items",
+        budget: `${formatPHP(total)} — INTERNATIONAL ORDER`,
+        location: `${intlForm.city}, ${intlForm.country}`,
+        timeline: "International Inquiry",
+        details: `🌍 INTERNATIONAL ORDER INQUIRY\n\nCountry: ${intlForm.country}\nCity: ${intlForm.city}\nPreferred Shipping: ${intlForm.shippingMethod || "Advise best option"}\nPreferred Currency: ${intlForm.currency}\nImport License No: ${intlForm.importLicense || "N/A"}\n\nItems:\n${orderSummary}\n\nEstimated Value: ${formatPHP(total)} (${formatUSD(total)} indicative)\n\nAdditional Notes:\n${intlForm.details || "None"}`,
+        reply_to: intlForm.email,
+      }, EMAILJS_CONFIG.publicKey);
+      setIntlDone(true);
+    } catch { setIntlErr("Something went wrong. Please email us at " + CONTACT.email); }
+    finally { setIntlSending(false); }
   };
+
+  const inputS = { width: "100%", padding: "11px 14px", border: `1.5px solid ${ds.color.border}`, borderRadius: ds.radius.md, fontSize: 14, color: ds.color.textDark, outline: "none", fontFamily: ds.font.body, boxSizing: "border-box", background: ds.color.white, transition: "border-color 0.15s" };
   const labelS = { fontSize: 12.5, fontWeight: 600, color: ds.color.textDark, display: "block", marginBottom: 6 };
+  const focus  = (e) => e.target.style.borderColor = ds.color.red;
+  const blur   = (e) => e.target.style.borderColor = ds.color.border;
 
-  // ── Step 5: Order Confirmed ──────────────────────────────────────────────
+  // ────────────────────────────────────────────────────────────────────────────
+  // STEP 0 — Choose Local or International
+  // ────────────────────────────────────────────────────────────────────────────
+  if (cart.length > 0 && orderMode === null) return (
+    <div style={{ paddingTop: 67, minHeight: "80vh", background: ds.color.canvas, display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <div style={{ maxWidth: 620, width: "100%", padding: "0 24px" }}>
+        <div style={{ textAlign: "center", marginBottom: 36 }}>
+          <div style={{ fontFamily: ds.font.display, fontSize: 26, color: ds.color.textDark, marginBottom: 10 }}>Where are you ordering from?</div>
+          <p style={{ fontSize: 14, color: ds.color.textMuted, lineHeight: 1.7 }}>This helps us give you the right checkout process and accurate shipping options.</p>
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+          {/* Local */}
+          <button onClick={() => setOrderMode("local")} style={{
+            background: ds.color.white, border: `2px solid ${ds.color.border}`,
+            borderRadius: ds.radius.xl, padding: "32px 24px", cursor: "pointer",
+            textAlign: "center", transition: "all 0.2s", fontFamily: ds.font.body,
+          }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = ds.color.red; e.currentTarget.style.boxShadow = ds.shadow.md; }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = ds.color.border; e.currentTarget.style.boxShadow = "none"; }}
+          >
+            <div style={{ fontSize: 48, marginBottom: 14 }}>🇵🇭</div>
+            <div style={{ fontSize: 17, fontWeight: 700, color: ds.color.textDark, marginBottom: 8 }}>Philippines</div>
+            <div style={{ fontSize: 13, color: ds.color.textMuted, lineHeight: 1.6, marginBottom: 16 }}>Local delivery nationwide. Standard checkout with payment selection.</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+              {["✓ Direct checkout", "✓ GCash / Maya / Bank", "✓ 1–7 day delivery"].map(f => (
+                <div key={f} style={{ fontSize: 12, color: ds.color.success, fontWeight: 500 }}>{f}</div>
+              ))}
+            </div>
+          </button>
+
+          {/* International */}
+          <button onClick={() => setOrderMode("intl")} style={{
+            background: ds.color.white, border: `2px solid ${ds.color.border}`,
+            borderRadius: ds.radius.xl, padding: "32px 24px", cursor: "pointer",
+            textAlign: "center", transition: "all 0.2s", fontFamily: ds.font.body,
+          }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = ds.color.goldBright; e.currentTarget.style.boxShadow = ds.shadow.md; }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = ds.color.border; e.currentTarget.style.boxShadow = "none"; }}
+          >
+            <div style={{ fontSize: 48, marginBottom: 14 }}>🌍</div>
+            <div style={{ fontSize: 17, fontWeight: 700, color: ds.color.textDark, marginBottom: 8 }}>International</div>
+            <div style={{ fontSize: 13, color: ds.color.textMuted, lineHeight: 1.6, marginBottom: 16 }}>Outside the Philippines. We'll send you a formal proforma invoice with shipping costs.</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+              {["✓ Proforma invoice", "✓ FedEx / Air / Sea Cargo", "✓ Full export docs"].map(f => (
+                <div key={f} style={{ fontSize: 12, color: ds.color.gold, fontWeight: 500 }}>{f}</div>
+              ))}
+            </div>
+          </button>
+        </div>
+
+        <div style={{ marginTop: 20, textAlign: "center" }}>
+          <button onClick={() => setPage("products")} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 13, color: ds.color.textMuted, fontFamily: ds.font.body }}>
+            ← Continue browsing
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
+  // ────────────────────────────────────────────────────────────────────────────
+  // INTERNATIONAL INQUIRY FLOW
+  // ────────────────────────────────────────────────────────────────────────────
+  if (orderMode === "intl") {
+    if (intlDone) return (
+      <div style={{ paddingTop: 67, minHeight: "80vh", display: "flex", alignItems: "center", justifyContent: "center", background: ds.color.canvas }}>
+        <div style={{ textAlign: "center", maxWidth: 460, padding: "0 24px" }}>
+          <div style={{ width: 76, height: 76, borderRadius: "50%", background: "#FEF6E0", border: `2px solid ${ds.color.goldBorder}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 30, margin: "0 auto 24px" }}>🌍</div>
+          <div style={{ fontFamily: ds.font.display, fontSize: 26, color: ds.color.textDark, marginBottom: 12 }}>International Inquiry Received!</div>
+          <p style={{ fontSize: 15, color: ds.color.textMuted, lineHeight: 1.7, marginBottom: 8 }}>
+            Thank you, <strong>{intlForm.name}</strong>! Our team will prepare a <strong>Proforma Invoice</strong> with complete pricing, international shipping costs, and export documentation details.
+          </p>
+          <p style={{ fontSize: 14, color: ds.color.textMuted, marginBottom: 28 }}>
+            We will respond to <strong>{intlForm.email}</strong> within <strong>24–48 hours</strong>.
+          </p>
+          <div style={{ background: ds.color.goldLight, border: `1px solid ${ds.color.goldBorder}`, borderRadius: ds.radius.lg, padding: "16px 20px", marginBottom: 24, textAlign: "left" }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: ds.color.gold, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>What happens next</div>
+            {["Our team reviews your inquiry and items", "We source and calculate landed cost to " + intlForm.country, "We send a Proforma Invoice to your email", "You confirm and arrange payment", "We dispatch with full export documentation"].map((s, i) => (
+              <div key={i} style={{ display: "flex", gap: 10, fontSize: 13, color: ds.color.textBody, marginBottom: 5 }}>
+                <span style={{ color: ds.color.gold, fontWeight: 700, flexShrink: 0 }}>{i+1}.</span><span>{s}</span>
+              </div>
+            ))}
+          </div>
+          <Btn variant="primary" size="md" onClick={() => { setOrderMode(null); setIntlDone(false); setIntlForm(INTL_EMPTY); setPage("home"); }}>Back to Home</Btn>
+        </div>
+      </div>
+    );
+
+    return (
+      <div style={{ paddingTop: 67, background: ds.color.canvas, minHeight: "80vh" }}>
+        <div style={{ maxWidth: 860, margin: "0 auto", padding: "44px 28px" }}>
+
+          {/* Header */}
+          <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 28 }}>
+            <button onClick={() => setOrderMode(null)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 20, color: ds.color.textMuted }}>←</button>
+            <div>
+              <div style={{ fontFamily: ds.font.display, fontSize: 22, color: ds.color.textDark }}>🌍 International Order Inquiry</div>
+              <div style={{ fontSize: 13, color: ds.color.textMuted, marginTop: 2 }}>We'll prepare a Proforma Invoice with full landed cost to your country.</div>
+            </div>
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 340px", gap: 24, alignItems: "start" }}>
+
+            {/* Form */}
+            <div style={{ background: ds.color.white, borderRadius: ds.radius.xl, padding: "36px 40px", boxShadow: ds.shadow.sm, border: `1px solid ${ds.color.borderLight}` }}>
+
+              <div style={{ fontSize: 13, fontWeight: 700, color: ds.color.textDark, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 20 }}>Your Details</div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px 20px", marginBottom: 16 }}>
+                <div><label style={labelS}>Full Name *</label><input value={intlForm.name} onChange={setI("name")} placeholder="Your full name" style={inputS} onFocus={focus} onBlur={blur} /></div>
+                <div><label style={labelS}>Company / Organization</label><input value={intlForm.company} onChange={setI("company")} placeholder="Hospital, clinic, distributor…" style={inputS} onFocus={focus} onBlur={blur} /></div>
+                <div><label style={labelS}>Email Address *</label><input type="email" value={intlForm.email} onChange={setI("email")} placeholder="you@email.com" style={inputS} onFocus={focus} onBlur={blur} /></div>
+                <div><label style={labelS}>Phone / WhatsApp *</label><input value={intlForm.phone} onChange={setI("phone")} placeholder="+1 / +65 / +971…" style={inputS} onFocus={focus} onBlur={blur} /></div>
+              </div>
+
+              <div style={{ fontSize: 13, fontWeight: 700, color: ds.color.textDark, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 16, marginTop: 8 }}>Shipping Destination</div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px 20px", marginBottom: 16 }}>
+                <div>
+                  <label style={labelS}>Country *</label>
+                  <input value={intlForm.country} onChange={setI("country")} placeholder="e.g. Singapore, UAE, PNG…" style={inputS} onFocus={focus} onBlur={blur} />
+                </div>
+                <div>
+                  <label style={labelS}>City / Port of Delivery</label>
+                  <input value={intlForm.city} onChange={setI("city")} placeholder="e.g. Dubai, Singapore City…" style={inputS} onFocus={focus} onBlur={blur} />
+                </div>
+                <div>
+                  <label style={labelS}>Preferred Shipping Method</label>
+                  <select value={intlForm.shippingMethod} onChange={setI("shippingMethod")} style={{ ...inputS, color: intlForm.shippingMethod ? ds.color.textDark : ds.color.textLight }}>
+                    <option value="">Let DMEAST advise best option</option>
+                    <option>FedEx / DHL Courier (3–7 days)</option>
+                    <option>Air Cargo (5–10 days)</option>
+                    <option>Sea Cargo LCL (15–45 days)</option>
+                    <option>Sea Cargo FCL (Full container)</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={labelS}>Preferred Invoice Currency</label>
+                  <select value={intlForm.currency} onChange={setI("currency")} style={inputS}>
+                    <option value="USD">USD — US Dollar</option>
+                    <option value="PHP">PHP — Philippine Peso</option>
+                    <option value="SGD">SGD — Singapore Dollar</option>
+                    <option value="AED">AED — UAE Dirham</option>
+                    <option value="MYR">MYR — Malaysian Ringgit</option>
+                    <option value="IDR">IDR — Indonesian Rupiah</option>
+                    <option value="SAR">SAR — Saudi Riyal</option>
+                    <option value="QAR">QAR — Qatari Riyal</option>
+                    <option value="Other">Other — advise in notes</option>
+                  </select>
+                </div>
+              </div>
+
+              <div style={{ marginBottom: 16 }}>
+                <label style={labelS}>Import License / Authority Number <span style={{ fontWeight: 400, color: ds.color.textMuted }}>(if applicable)</span></label>
+                <input value={intlForm.importLicense} onChange={setI("importLicense")} placeholder="Required for some countries for medical equipment imports" style={inputS} onFocus={focus} onBlur={blur} />
+              </div>
+
+              <div style={{ marginBottom: 28 }}>
+                <label style={labelS}>Additional Notes / Special Requirements</label>
+                <textarea value={intlForm.details} onChange={setI("details")} rows={4}
+                  placeholder="Delivery timeline, specific certifications needed, import restrictions in your country, cold chain requirements, etc."
+                  style={{ ...inputS, resize: "vertical", lineHeight: 1.65 }}
+                  onFocus={focus} onBlur={blur} />
+              </div>
+
+              {intlErr && <div style={{ marginBottom: 14, padding: "12px 16px", background: ds.color.redLight, borderRadius: ds.radius.md, fontSize: 13, color: ds.color.red }}>{intlErr}</div>}
+
+              <Btn variant={intlFilled ? "primary" : "outline"} size="lg" fullWidth
+                disabled={!intlFilled || intlSending}
+                onClick={handleIntlSubmit}>
+                {intlSending ? "Sending Inquiry…" : "Submit International Inquiry →"}
+              </Btn>
+
+              <p style={{ textAlign: "center", fontSize: 12, color: ds.color.textMuted, marginTop: 14, lineHeight: 1.6 }}>
+                We respond within <strong>24–48 hours</strong> with a complete Proforma Invoice.<br />
+                WhatsApp: <strong>{CONTACT.phone1}</strong>
+              </p>
+            </div>
+
+            {/* Order summary sidebar */}
+            <div>
+              <div style={{ background: ds.color.white, border: `1px solid ${ds.color.border}`, borderRadius: ds.radius.xl, padding: "24px", boxShadow: ds.shadow.xs, marginBottom: 16 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: ds.color.textMuted, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 14 }}>Your Items</div>
+                {cart.map(item => (
+                  <div key={item.id} style={{ marginBottom: 12, paddingBottom: 12, borderBottom: `1px solid ${ds.color.borderLight}` }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: ds.color.textDark }}>{item.name}</div>
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: ds.color.textMuted, marginTop: 3 }}>
+                      <span>Qty: {item.qty}</span>
+                      <span>{formatPHP(item.price * item.qty)}</span>
+                    </div>
+                  </div>
+                ))}
+                <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 700, fontSize: 15, color: ds.color.textDark, marginTop: 4 }}>
+                  <span>Subtotal</span><span>{formatPHP(total)}</span>
+                </div>
+                <div style={{ textAlign: "right", fontSize: 11, color: ds.color.textLight, marginTop: 2 }}>{formatUSD(total)} indicative</div>
+              </div>
+
+              <div style={{ background: ds.color.goldLight, border: `1px solid ${ds.color.goldBorder}`, borderRadius: ds.radius.lg, padding: "16px 18px", fontSize: 13, color: "#78350F", lineHeight: 1.7 }}>
+                <strong>Note:</strong> International orders include additional costs: international shipping, customs duties, and import taxes in your country. These will all be itemized in your Proforma Invoice.
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ────────────────────────────────────────────────────────────────────────────
+  // LOCAL (PHILIPPINES) ORDER FLOW
+  // ────────────────────────────────────────────────────────────────────────────
+
+  // Step 5: Confirmed
   if (step === 5) return (
     <div style={{ paddingTop: 67, minHeight: "80vh", display: "flex", alignItems: "center", justifyContent: "center", background: ds.color.canvas }}>
       <div style={{ textAlign: "center", maxWidth: 480, padding: "0 24px" }}>
@@ -1921,28 +2123,37 @@ function CartPage({ cart, removeFromCart, updateQty, setPage }) {
           <div style={{ marginTop: 8, fontSize: 13, color: ds.color.textMuted }}>Payment: <strong>{method}</strong></div>
         </div>
         <div style={{ display: "flex", gap: 12, justifyContent: "center" }}>
-          <Btn variant="primary" size="md" onClick={() => { setStep(1); setDetails(EMPTY); setMethod(""); setPrescription(null); setPage("home"); }}>Back to Home</Btn>
+          <Btn variant="primary" size="md" onClick={() => { setStep(1); setDetails(EMPTY); setMethod(""); setPrescription(null); setOrderMode(null); setPage("home"); }}>Back to Home</Btn>
           <Btn variant="secondary" size="md" onClick={() => setPage("contact")}>Contact Us</Btn>
         </div>
       </div>
     </div>
   );
 
-  // Step labels — adjust based on whether prescription is needed
   const stepLabels = hasRx
     ? [["Cart",1],["Your Details",2],["Prescription",3],["Payment",4]]
     : [["Cart",1],["Your Details",2],["Payment",4]];
-  const displayStep = (step === 4 && !hasRx) ? 3 : step; // visual step number
 
   return (
     <div style={{ paddingTop: 67, background: ds.color.canvas, minHeight: "80vh" }}>
       <div style={{ maxWidth: 900, margin: "0 auto", padding: "44px 28px" }}>
 
+        {/* Back to mode select */}
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 24 }}>
+          <button onClick={() => setOrderMode(null)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 13, color: ds.color.textMuted, fontFamily: ds.font.body, display: "flex", alignItems: "center", gap: 4 }}>
+            ← Change delivery type
+          </button>
+          <div style={{ display: "inline-flex", alignItems: "center", gap: 6, background: ds.color.successBg, border: `1px solid ${ds.color.successBorder}`, borderRadius: ds.radius.pill, padding: "3px 12px" }}>
+            <span style={{ fontSize: 14 }}>🇵🇭</span>
+            <span style={{ fontSize: 12, fontWeight: 600, color: ds.color.success }}>Local — Philippines Delivery</span>
+          </div>
+        </div>
+
         {/* Step indicator */}
         <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 32, flexWrap: "wrap" }}>
           {stepLabels.map(([lbl, n], i) => {
             const visualN = hasRx ? n : (n === 4 ? 3 : n);
-            const active  = step === n || (step === 4 && n === 4);
+            const active  = step === n;
             const done    = step > n;
             return (
               <div key={lbl} style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -1958,7 +2169,7 @@ function CartPage({ cart, removeFromCart, updateQty, setPage }) {
           })}
         </div>
 
-        {/* ── STEP 1: Cart ──────────────────────────────────────────────── */}
+        {/* Step 1 — Cart */}
         {cart.length === 0 ? (
           <div style={{ textAlign: "center", padding: "64px 0" }}>
             <div style={{ fontFamily: ds.font.display, fontSize: 24, color: ds.color.textDark, marginBottom: 10 }}>Your cart is empty</div>
@@ -1970,20 +2181,15 @@ function CartPage({ cart, removeFromCart, updateQty, setPage }) {
           </div>
         ) : step === 1 ? (
           <>
-            {/* Rx warning banner */}
             {hasRx && (
-              <div style={{ background: "#FFFBEB", border: "1px solid #F5C518", borderRadius: ds.radius.lg, padding: "14px 18px", marginBottom: 18, display: "flex", gap: 12, alignItems: "flex-start" }}>
+              <div style={{ background: "#FFFBEB", border: "1px solid #F5C518", borderRadius: ds.radius.lg, padding: "14px 18px", marginBottom: 18, display: "flex", gap: 12 }}>
                 <span style={{ fontSize: 20, flexShrink: 0 }}>⚠️</span>
                 <div>
                   <div style={{ fontSize: 13.5, fontWeight: 700, color: "#92400E", marginBottom: 4 }}>Prescription Required</div>
-                  <div style={{ fontSize: 13, color: "#78350F", lineHeight: 1.6 }}>
-                    Your cart contains prescription medicine(s): <strong>{rxItems.map(i => i.name).join(", ")}</strong>.<br />
-                    You will be asked to upload a valid doctor's prescription before completing your order.
-                  </div>
+                  <div style={{ fontSize: 13, color: "#78350F", lineHeight: 1.6 }}>Your cart contains: <strong>{rxItems.map(i => i.name).join(", ")}</strong>. You'll be asked to upload a valid prescription before completing your order.</div>
                 </div>
               </div>
             )}
-
             {cart.map(item => (
               <div key={item.id} style={{ background: ds.color.white, border: `1px solid ${ds.color.border}`, borderRadius: ds.radius.lg, padding: "16px 20px", marginBottom: 10, display: "flex", alignItems: "center", gap: 16, boxShadow: ds.shadow.xs }}>
                 <ProductImg imageSrc={item.imageSrc} category={item.category} name={item.name} height={60} />
@@ -2001,40 +2207,29 @@ function CartPage({ cart, removeFromCart, updateQty, setPage }) {
                 <button onClick={() => removeFromCart(item.id)} style={{ background: "none", border: "none", cursor: "pointer", color: ds.color.textLight, fontSize: 18, padding: 4 }}>✕</button>
               </div>
             ))}
-
             <div style={{ background: ds.color.white, border: `1px solid ${ds.color.border}`, borderRadius: ds.radius.lg, padding: "20px 24px", marginTop: 8 }}>
               <div style={{ display: "flex", justifyContent: "space-between", fontSize: 17, fontWeight: 700, color: ds.color.textDark, marginBottom: 4 }}>
                 <span>Order Total</span><span>{formatPHP(total)}</span>
               </div>
-              <div style={{ textAlign: "right", fontSize: 11, color: ds.color.textLight, marginBottom: 16 }}>{formatUSD(total)} · indicative rate</div>
+              <div style={{ textAlign: "right", fontSize: 11, color: ds.color.textLight, marginBottom: 16 }}>{formatUSD(total)} · indicative</div>
               <Btn variant="primary" size="lg" fullWidth onClick={() => setStep(2)}>Continue to Your Details →</Btn>
             </div>
           </>
 
         ) : step === 2 ? (
-          /* ── STEP 2: Details + Map ──────────────────────────────────── */
+          /* Step 2 — Details + Map */
           <div style={{ background: ds.color.white, border: `1px solid ${ds.color.border}`, borderRadius: ds.radius.xl, padding: "36px 40px", boxShadow: ds.shadow.sm }}>
             <div style={{ fontFamily: ds.font.display, fontSize: 22, color: ds.color.textDark, marginBottom: 6 }}>Your Contact Details</div>
             <p style={{ fontSize: 14, color: ds.color.textMuted, marginBottom: 28 }}>We need these to confirm your order and send your receipt.</p>
-
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px 20px", marginBottom: 16 }}>
-              <div>
-                <label style={labelS}>Full Name *</label>
-                <input value={details.name} onChange={setD("name")} placeholder="Juan dela Cruz" style={inputS} onFocus={e => e.target.style.borderColor=ds.color.red} onBlur={e => e.target.style.borderColor=ds.color.border} />
-              </div>
-              <div>
-                <label style={labelS}>Phone / Mobile *</label>
-                <input value={details.phone} onChange={setD("phone")} placeholder="+63 9XX XXX XXXX" style={inputS} onFocus={e => e.target.style.borderColor=ds.color.red} onBlur={e => e.target.style.borderColor=ds.color.border} />
-              </div>
+              <div><label style={labelS}>Full Name *</label><input value={details.name} onChange={setD("name")} placeholder="Juan dela Cruz" style={inputS} onFocus={focus} onBlur={blur} /></div>
+              <div><label style={labelS}>Phone / Mobile *</label><input value={details.phone} onChange={setD("phone")} placeholder="+63 9XX XXX XXXX" style={inputS} onFocus={focus} onBlur={blur} /></div>
             </div>
-
             <div style={{ marginBottom: 20 }}>
               <label style={labelS}>Email Address *</label>
-              <input type="email" value={details.email} onChange={setD("email")} placeholder="juan@email.com" style={inputS} onFocus={e => e.target.style.borderColor=ds.color.red} onBlur={e => e.target.style.borderColor=ds.color.border} />
+              <input type="email" value={details.email} onChange={setD("email")} placeholder="juan@email.com" style={inputS} onFocus={focus} onBlur={blur} />
               <div style={{ fontSize: 11.5, color: ds.color.textMuted, marginTop: 5 }}>📧 Order confirmation will be sent here</div>
             </div>
-
-            {/* Delivery address with map */}
             <div style={{ marginBottom: 20 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
                 <label style={{ ...labelS, marginBottom: 0 }}>Delivery Address *</label>
@@ -2045,32 +2240,23 @@ function CartPage({ cart, removeFromCart, updateQty, setPage }) {
                   {geoStatus === "success" ? "✓ Location set" : geoStatus === "denied" ? "❌ Denied" : geoStatus === "error" ? "❌ Error" : "📍 Use My Location"}
                 </button>
               </div>
-
-              {/* Interactive Leaflet map */}
               <div style={{ marginBottom: 10 }}>
                 <LeafletMap onLocationSelect={handleLocationSelect} externalCoords={mapCoords} />
               </div>
-
-              {geoStatus === "denied" && <div style={{ fontSize: 12, color: ds.color.red, marginBottom: 8 }}>Location permission denied. Please type your address or click on the map to drop a pin.</div>}
-
+              {geoStatus === "denied" && <div style={{ fontSize: 12, color: ds.color.red, marginBottom: 8 }}>Location permission denied. Type your address or click the map.</div>}
               <textarea value={details.address} onChange={setD("address")} rows={2}
-                placeholder="Detected from map or type manually — House/Unit No., Street, City, Province, Country"
+                placeholder="Detected from map or type manually — House/Unit No., Street, City, Province"
                 style={{ ...inputS, resize: "vertical", lineHeight: 1.6 }}
-                onFocus={e => e.target.style.borderColor=ds.color.red} onBlur={e => e.target.style.borderColor=ds.color.border} />
-              <div style={{ fontSize: 11.5, color: ds.color.textMuted, marginTop: 4 }}>Address auto-fills when you click or drag the map pin. You can also type it manually above.</div>
+                onFocus={focus} onBlur={blur} />
+              <div style={{ fontSize: 11.5, color: ds.color.textMuted, marginTop: 4 }}>Click or drag the map pin to set your location. Address auto-fills.</div>
             </div>
-
-            {/* Special instructions */}
             <div style={{ marginBottom: 28 }}>
               <label style={labelS}>Special Instructions / Landmark <span style={{ fontWeight: 400, color: ds.color.textMuted }}>(Optional)</span></label>
               <textarea value={details.instructions} onChange={setD("instructions")} rows={2}
-                placeholder="e.g. Near SM Sta. Mesa, beside the blue gate, call upon arrival, deliver to reception desk…"
+                placeholder="e.g. Near SM, beside blue gate, call upon arrival, deliver to reception desk…"
                 style={{ ...inputS, resize: "vertical", lineHeight: 1.6 }}
-                onFocus={e => e.target.style.borderColor=ds.color.red} onBlur={e => e.target.style.borderColor=ds.color.border} />
-              <div style={{ fontSize: 11.5, color: ds.color.textMuted, marginTop: 4 }}>Help our rider find you easily. Landmarks and delivery notes go a long way!</div>
+                onFocus={focus} onBlur={blur} />
             </div>
-
-            {/* Mini order summary */}
             <div style={{ background: ds.color.canvas, border: `1px solid ${ds.color.borderLight}`, borderRadius: ds.radius.md, padding: "12px 16px", marginBottom: 24 }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: ds.color.textMuted, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 8 }}>Order Summary</div>
               {cart.map(item => (
@@ -2082,7 +2268,6 @@ function CartPage({ cart, removeFromCart, updateQty, setPage }) {
                 <span>Total</span><span>{formatPHP(total)}</span>
               </div>
             </div>
-
             <div style={{ display: "flex", gap: 12 }}>
               <Btn variant="outline" size="lg" onClick={() => setStep(1)}>← Back</Btn>
               <div style={{ flex: 1 }}>
@@ -2094,80 +2279,71 @@ function CartPage({ cart, removeFromCart, updateQty, setPage }) {
           </div>
 
         ) : step === 3 ? (
-          /* ── STEP 3: Prescription Upload ────────────────────────────── */
+          /* Step 3 — Prescription */
           <div style={{ background: ds.color.white, border: `1px solid ${ds.color.border}`, borderRadius: ds.radius.xl, padding: "36px 40px", boxShadow: ds.shadow.sm }}>
             <div style={{ fontFamily: ds.font.display, fontSize: 22, color: ds.color.textDark, marginBottom: 8 }}>Upload Your Prescription</div>
             <p style={{ fontSize: 14, color: ds.color.textMuted, lineHeight: 1.7, marginBottom: 24 }}>
-              Your order contains prescription medicine(s) that require a valid doctor's prescription under Philippine FDA / R.A. 10918. Please upload a clear photo or scan of your prescription.
+              Your order contains prescription medicine(s) under Philippine FDA / R.A. 10918. Please upload a clear photo or scan.
             </p>
-
-            {/* Which items need Rx */}
             <div style={{ background: "#FFFBEB", border: "1px solid #F5C518", borderRadius: ds.radius.lg, padding: "14px 18px", marginBottom: 24 }}>
               <div style={{ fontSize: 12, fontWeight: 700, color: "#92400E", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.06em" }}>Prescription Required For:</div>
               {rxItems.map(item => (
                 <div key={item.id} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#78350F", marginBottom: 4 }}>
-                  <span>💊</span>
-                  <span><strong>{item.name}</strong> — {item.rxCategory}</span>
+                  <span>💊</span><span><strong>{item.name}</strong> — {item.rxCategory}</span>
                 </div>
               ))}
             </div>
 
             {/* Upload area */}
-            <div
-              onClick={() => prescriptionRef.current?.click()}
-              style={{
-                border: `2px dashed ${prescription ? ds.color.successBorder : ds.color.border}`,
-                background: prescription ? ds.color.successBg : ds.color.canvas,
-                borderRadius: ds.radius.lg, padding: "32px 24px", textAlign: "center",
-                cursor: "pointer", marginBottom: 16, transition: "all 0.2s",
-              }}
-              onMouseEnter={e => { if (!prescription) e.currentTarget.style.borderColor = ds.color.red; }}
-              onMouseLeave={e => { if (!prescription) e.currentTarget.style.borderColor = ds.color.border; }}
-            >
+            <div style={{
+              border: `2px dashed ${prescription ? ds.color.successBorder : ds.color.border}`,
+              background: prescription ? ds.color.successBg : ds.color.canvas,
+              borderRadius: ds.radius.lg, padding: "28px 24px", textAlign: "center",
+              marginBottom: 16, transition: "all 0.2s",
+            }}>
               {prescription ? (
                 <>
                   <div style={{ fontSize: 32, marginBottom: 8 }}>✅</div>
                   <div style={{ fontSize: 14, fontWeight: 600, color: ds.color.success, marginBottom: 4 }}>Prescription uploaded!</div>
                   <div style={{ fontSize: 13, color: ds.color.textMuted, marginBottom: 12 }}>{prescription.name}</div>
-                  {/* Preview */}
                   {prescription.preview.startsWith("data:image") && (
-                    <img src={prescription.preview} alt="Prescription preview" style={{ maxWidth: "100%", maxHeight: 240, borderRadius: ds.radius.md, border: `1px solid ${ds.color.border}`, marginBottom: 8, objectFit: "contain" }} />
+                    <img src={prescription.preview} alt="Prescription preview" style={{ maxWidth: "100%", maxHeight: 220, borderRadius: ds.radius.md, border: `1px solid ${ds.color.border}`, marginBottom: 8, objectFit: "contain", margin: "0 auto 8px" }} />
                   )}
-                  <div style={{ fontSize: 12, color: ds.color.textMuted }}>Click to upload a different file</div>
+                  <div style={{ display: "flex", gap: 10, justifyContent: "center", marginTop: 12 }}>
+                    <button onClick={() => cameraRef.current?.click()} style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: ds.radius.md, border: `1.5px solid ${ds.color.border}`, background: "#fff", cursor: "pointer", fontSize: 13, fontWeight: 600, color: ds.color.textBody, fontFamily: ds.font.body }}>📷 Retake Photo</button>
+                    <button onClick={() => uploadRef.current?.click()} style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: ds.radius.md, border: `1.5px solid ${ds.color.border}`, background: "#fff", cursor: "pointer", fontSize: 13, fontWeight: 600, color: ds.color.textBody, fontFamily: ds.font.body }}>📁 Upload Different File</button>
+                  </div>
                 </>
               ) : (
                 <>
                   <div style={{ fontSize: 40, marginBottom: 10 }}>📋</div>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: ds.color.textDark, marginBottom: 6 }}>Click to upload prescription</div>
-                  <div style={{ fontSize: 13, color: ds.color.textMuted, marginBottom: 8 }}>Photo, scan, or PDF of your doctor's prescription</div>
-                  <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap" }}>
-                    <Tag color={ds.color.redLight} textColor={ds.color.red}>📷 Camera</Tag>
-                    <Tag color={ds.color.canvas} textColor={ds.color.textMuted}>🖼️ Image file</Tag>
-                    <Tag color={ds.color.canvas} textColor={ds.color.textMuted}>📄 PDF</Tag>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: ds.color.textDark, marginBottom: 8 }}>Upload your doctor's prescription</div>
+                  {/* Two separate action buttons */}
+                  <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap", marginBottom: 12 }}>
+                    <button onClick={() => cameraRef.current?.click()} style={{ display: "flex", alignItems: "center", gap: 8, padding: "12px 20px", borderRadius: ds.radius.lg, border: `2px solid ${ds.color.red}`, background: ds.color.redLight, cursor: "pointer", fontSize: 14, fontWeight: 700, color: ds.color.red, fontFamily: ds.font.body, transition: "all 0.2s" }}
+                      onMouseEnter={e => e.currentTarget.style.background = ds.color.red + "22"}
+                      onMouseLeave={e => e.currentTarget.style.background = ds.color.redLight}>
+                      📷 Take a Photo
+                    </button>
+                    <button onClick={() => uploadRef.current?.click()} style={{ display: "flex", alignItems: "center", gap: 8, padding: "12px 20px", borderRadius: ds.radius.lg, border: `2px solid ${ds.color.border}`, background: "#fff", cursor: "pointer", fontSize: 14, fontWeight: 700, color: ds.color.textBody, fontFamily: ds.font.body }}>
+                      📁 Upload from Device
+                    </button>
                   </div>
+                  <div style={{ fontSize: 12, color: ds.color.textLight }}>Accepted: JPG, PNG, PDF · Max 10MB</div>
                 </>
               )}
             </div>
 
-            {/* Hidden file input — accepts images and PDFs, camera capture on mobile */}
-            <input
-              ref={prescriptionRef}
-              type="file"
-              accept="image/*,application/pdf"
-              capture="environment"
-              onChange={handlePrescriptionUpload}
-              style={{ display: "none" }}
-            />
+            {/* CAMERA input — capture="environment" triggers rear camera on mobile */}
+            <input ref={cameraRef} type="file" accept="image/*" capture="environment" onChange={handlePrescriptionUpload} style={{ display: "none" }} />
+            {/* FILE UPLOAD input — no capture attribute, opens file picker */}
+            <input ref={uploadRef} type="file" accept="image/*,application/pdf" onChange={handlePrescriptionUpload} style={{ display: "none" }} />
 
             <div style={{ fontSize: 12, color: ds.color.textMuted, lineHeight: 1.7, marginBottom: 24, padding: "12px 14px", background: ds.color.canvas, borderRadius: ds.radius.md, border: `1px solid ${ds.color.borderLight}` }}>
-              <strong style={{ color: ds.color.textDark }}>What makes a valid prescription?</strong><br />
-              ✓ Doctor's name and PRC license number clearly visible<br />
-              ✓ Patient's name and date of consultation<br />
-              ✓ Medicine name, dosage, and quantity prescribed<br />
-              ✓ Doctor's signature<br />
-              ✓ Not more than 1 year old
+              <strong style={{ color: ds.color.textDark }}>Valid prescription must show:</strong><br />
+              ✓ Doctor's name and PRC license number · ✓ Patient name and date<br />
+              ✓ Medicine name, dosage, quantity · ✓ Doctor's signature · ✓ Not more than 1 year old
             </div>
-
             <div style={{ display: "flex", gap: 12 }}>
               <Btn variant="outline" size="lg" onClick={goBack}>← Back</Btn>
               <div style={{ flex: 1 }}>
@@ -2179,14 +2355,13 @@ function CartPage({ cart, removeFromCart, updateQty, setPage }) {
           </div>
 
         ) : (
-          /* ── STEP 4: Payment ─────────────────────────────────────────── */
+          /* Step 4 — Payment */
           <>
             <div style={{ background: ds.color.white, border: `1px solid ${ds.color.border}`, borderRadius: ds.radius.xl, padding: "32px 36px", marginBottom: 16, boxShadow: ds.shadow.sm }}>
               <div style={{ fontFamily: ds.font.display, fontSize: 22, color: ds.color.textDark, marginBottom: 6 }}>Select Payment Method</div>
               <p style={{ fontSize: 14, color: ds.color.textMuted, marginBottom: 22 }}>
                 Payment instructions will be sent to <strong>{details.email}</strong> after placing your order.
               </p>
-
               <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 12, marginBottom: 22 }}>
                 {PAYMENT_METHODS.map(m => (
                   <button key={m.label} onClick={() => setMethod(m.label)} style={{
@@ -2194,16 +2369,13 @@ function CartPage({ cart, removeFromCart, updateQty, setPage }) {
                     border: `2px solid ${method === m.label ? ds.color.red : ds.color.border}`,
                     background: method === m.label ? ds.color.redLight : ds.color.canvas,
                     cursor: "pointer", fontFamily: ds.font.body,
-                    display: "flex", flexDirection: "column", alignItems: "center", gap: 7,
-                    transition: "all 0.15s",
+                    display: "flex", flexDirection: "column", alignItems: "center", gap: 7, transition: "all 0.15s",
                   }}>
                     <span style={{ fontSize: 26 }}>{m.icon}</span>
                     <span style={{ fontSize: 12, fontWeight: 600, color: method === m.label ? ds.color.red : ds.color.textBody }}>{m.label}</span>
                   </button>
                 ))}
               </div>
-
-              {/* Final summary */}
               <div style={{ background: ds.color.canvas, border: `1px solid ${ds.color.borderLight}`, borderRadius: ds.radius.md, padding: "14px 18px" }}>
                 <div style={{ fontSize: 11, fontWeight: 700, color: ds.color.textMuted, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 10 }}>Order Summary</div>
                 {cart.map(item => (
@@ -2216,15 +2388,11 @@ function CartPage({ cart, removeFromCart, updateQty, setPage }) {
                   <span>Total</span><span>{formatPHP(total)}</span>
                 </div>
                 <div style={{ marginTop: 8, fontSize: 13, color: ds.color.textMuted }}>📦 Deliver to: <strong>{details.address}</strong></div>
-                {details.instructions && <div style={{ marginTop: 4, fontSize: 13, color: ds.color.textMuted }}>📝 Note: {details.instructions}</div>}
-                {hasRx && prescription && <div style={{ marginTop: 4, fontSize: 13, color: ds.color.success }}>✓ Prescription attached: {prescription.name}</div>}
+                {details.instructions && <div style={{ marginTop: 4, fontSize: 13, color: ds.color.textMuted }}>📝 {details.instructions}</div>}
+                {hasRx && prescription && <div style={{ marginTop: 4, fontSize: 13, color: ds.color.success }}>✓ Prescription: {prescription.name}</div>}
               </div>
             </div>
-
-            {errMsg && (
-              <div style={{ marginBottom: 14, padding: "12px 16px", background: ds.color.redLight, borderRadius: ds.radius.md, border: `1px solid ${ds.color.redBorder}`, fontSize: 13, color: ds.color.red }}>{errMsg}</div>
-            )}
-
+            {errMsg && <div style={{ marginBottom: 14, padding: "12px 16px", background: ds.color.redLight, borderRadius: ds.radius.md, fontSize: 13, color: ds.color.red }}>{errMsg}</div>}
             <div style={{ display: "flex", gap: 12 }}>
               <Btn variant="outline" size="lg" onClick={goBack}>← Back</Btn>
               <div style={{ flex: 1 }}>
@@ -2234,7 +2402,7 @@ function CartPage({ cart, removeFromCart, updateQty, setPage }) {
               </div>
             </div>
             <p style={{ textAlign: "center", fontSize: 12, color: ds.color.textMuted, marginTop: 12, lineHeight: 1.6 }}>
-              By placing your order you agree to be contacted by our team for payment and delivery confirmation.
+              By placing your order you agree to be contacted for payment and delivery confirmation.
             </p>
           </>
         )}
@@ -2242,6 +2410,8 @@ function CartPage({ cart, removeFromCart, updateQty, setPage }) {
     </div>
   );
 }
+
+
 
 
 function PrivacyPage() {
