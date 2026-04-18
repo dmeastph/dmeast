@@ -402,17 +402,20 @@ const CATEGORIES = [
 ];
 
 const CLIENT_TYPES = [
-  { label: "Local Government Units (LGUs)",  icon: "🏛️" },
-  { label: "Rural Health Units (RHUs)",       icon: "🏥" },
-  { label: "Government Hospitals",            icon: "🏨" },
-  { label: "Private Hospitals",               icon: "🩺" },
-  { label: "Clinics & Diagnostic Centers",   icon: "🔬" },
-  { label: "Pharmaceutical Distributors",    icon: "💊" },
-  { label: "BPO Companies",                  icon: "🖥️" },
-  { label: "Construction Firms",             icon: "🏗️" },
-  { label: "Logistics Companies",            icon: "🚚" },
-  { label: "Semiconductor Plants",           icon: "⚙️" },
-  { label: "Private Individuals",            icon: "👤" },
+  { label: "Local Government Units (LGUs)",    icon: "🏛️" },
+  { label: "Rural Health Units (RHUs)",         icon: "🏥" },
+  { label: "Government Hospitals",              icon: "🏨" },
+  { label: "Private Hospitals",                 icon: "🩺" },
+  { label: "Clinics & Diagnostic Centers",     icon: "🔬" },
+  { label: "Pharmaceutical Distributors",      icon: "💊" },
+  { label: "BPO Companies",                    icon: "🖥️" },
+  { label: "Construction Firms",               icon: "🏗️" },
+  { label: "Logistics Companies",              icon: "🚚" },
+  { label: "Semiconductor Plants",             icon: "⚙️" },
+  { label: "International Hospitals & Clinics",icon: "🌍" },
+  { label: "Medical Distributors & Importers", icon: "📦" },
+  { label: "NGOs & Aid Organizations",         icon: "🤝" },
+  { label: "Private Individuals",              icon: "👤" },
 ];
 
 const COMPANY_MILESTONES = [
@@ -422,7 +425,7 @@ const COMPANY_MILESTONES = [
     body: "After months of groundwork, DM EAST was officially established as a registered online business. Without a physical store, we embraced the digital landscape and built a reliable delivery system for clients nationwide." },
   { period: "February 2022", title: "First Dedicated Office Space",
     body: "Our growth led to our first dedicated office space — a milestone that allowed us to expand our team, formalize operations, and deliver even better service to our growing client base." },
-  { period: "July 2022 — Present", title: "Fully Operational, Nationwide",
+  { period: "July 2022 — Present", title: "Fully Operational, Serving the World",
     body: "DMEAST is now fully operational, serving clients from Abra province to South Cotabato — across Luzon, Visayas, and Mindanao. Our clients include LGUs, government hospitals, private institutions, BPOs, and more." },
 ];
 
@@ -430,7 +433,7 @@ const HOW_IT_WORKS = [
   { step: "01", title: "Submit Your Request", body: "Fill out our quote form or contact us directly with your product list, quantity, and delivery location." },
   { step: "02", title: "We Source & Price",   body: "We verify with authorized local and international suppliers to get you the best price and availability." },
   { step: "03", title: "Review & Confirm",    body: "Receive a detailed quotation, review it, and confirm with your preferred payment method." },
-  { step: "04", title: "Delivered Nationwide", body: "DMEAST handles all logistics — from our Manila office to your facility, safely and on schedule." },
+  { step: "04", title: "Delivered Worldwide", body: "DMEAST handles all logistics — local delivery nationwide and international shipping via FedEx, air cargo, sea cargo, and courier to any country." },
 ];
 
 const PAYMENT_METHODS = [
@@ -451,7 +454,33 @@ const TURNKEY_SERVICES = [
   { title: "Specialized Systems",        body: "Hyperbaric chambers, air-to-water generators, and water purification systems for specialized care.", icon: "⚙️" },
 ];
 
-const formatPHP = (n) => `₱${Number(n).toLocaleString("en-PH")}`;
+const formatPHP  = (n) => `₱${Number(n).toLocaleString("en-PH")}`;
+// Approximate USD display (indicative only — actual rate confirmed at checkout)
+const PHP_TO_USD = 0.0175; // approx ₱57 = $1 USD
+const formatUSD  = (n) => `≈ $${(Number(n) * PHP_TO_USD).toFixed(2)} USD`;
+
+const SHIPPING_METHODS = [
+  { icon: "✈️", label: "Air Cargo",      desc: "Fast international air freight for urgent medical equipment shipments. 5–10 business days." },
+  { icon: "🚢", label: "Sea Cargo",      desc: "Cost-effective sea freight for large equipment, vehicles, and bulk orders. 15–45 days." },
+  { icon: "📦", label: "FedEx / DHL",    desc: "Door-to-door express courier for smaller items and pharmaceuticals. 3–7 business days." },
+  { icon: "🚚", label: "Local Delivery", desc: "Nationwide delivery across all Philippine regions via trusted logistics partners." },
+];
+
+const REGIONS_SERVED = [
+  { flag: "🇵🇭", region: "Philippines",      detail: "Nationwide — all regions" },
+  { flag: "🇸🇬", region: "Singapore",         detail: "Southeast Asia hub" },
+  { flag: "🇲🇾", region: "Malaysia",          detail: "Southeast Asia" },
+  { flag: "🇮🇩", region: "Indonesia",         detail: "Southeast Asia" },
+  { flag: "🇻🇳", region: "Vietnam",           detail: "Southeast Asia" },
+  { flag: "🇹🇭", region: "Thailand",          detail: "Southeast Asia" },
+  { flag: "🇦🇪", region: "UAE",               detail: "Middle East" },
+  { flag: "🇸🇦", region: "Saudi Arabia",      detail: "Middle East" },
+  { flag: "🇶🇦", region: "Qatar",             detail: "Middle East" },
+  { flag: "🇰🇼", region: "Kuwait",            detail: "Middle East" },
+  { flag: "🇵🇬", region: "Papua New Guinea",  detail: "Pacific" },
+  { flag: "🇹🇱", region: "Timor-Leste",       detail: "Pacific" },
+  { flag: "🌐", region: "& More",             detail: "Inquire for your country" },
+];
 
 // ─────────────────────────────────────────────────────────────────────────────
 // PRIMITIVE COMPONENTS
@@ -630,7 +659,12 @@ function ProductCard({ product, addToCart, setPage }) {
           </div>
         )}
         <p style={{ fontSize: 12.5, color: ds.color.textMuted, lineHeight: 1.6, marginBottom: 16 }}>{product.desc}</p>
-        {product.price && <div style={{ fontSize: 18, fontWeight: 700, color: ds.color.textDark, marginBottom: 14 }}>{formatPHP(product.price)}</div>}
+        {product.price && (
+          <div style={{ marginBottom: 14 }}>
+            <div style={{ fontSize: 19, fontWeight: 700, color: ds.color.textDark, lineHeight: 1 }}>{formatPHP(product.price)}</div>
+            <div style={{ fontSize: 11, color: ds.color.textLight, marginTop: 3 }}>{formatUSD(product.price)} · indicative rate</div>
+          </div>
+        )}
         {product.cta === "buy"   && <Btn variant={feedback === "added" ? "success" : "primary"} size="sm" fullWidth onClick={handleBuy}>{feedback === "added" ? "✓ Added to Cart" : "Add to Cart"}</Btn>}
         {product.cta === "quote" && <Btn variant="gold" size="sm" fullWidth onClick={() => setPage("quote")}>Request Quote</Btn>}
         {product.cta === "sales" && <Btn variant="secondary" size="sm" fullWidth onClick={() => setPage("contact")}>Talk to Sales</Btn>}
@@ -791,7 +825,7 @@ function HeroSection({ setPage }) {
             {/* Pill badge */}
             <div className="dm-fade-up" style={{ display: "inline-flex", alignItems: "center", gap: 8, background: ds.color.redLight, border: `1px solid ${ds.color.redBorder}`, borderRadius: ds.radius.pill, padding: "6px 16px 6px 8px", marginBottom: 28 }}>
               <span style={{ width: 22, height: 22, borderRadius: "50%", background: ds.color.red, display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 12 }}>🇵🇭</span>
-              <span style={{ fontSize: 12, color: ds.color.red, fontWeight: 600, letterSpacing: "0.04em" }}>Philippine-Based · Nationwide · Est. 2020</span>
+              <span style={{ fontSize: 12, color: ds.color.red, fontWeight: 600, letterSpacing: "0.04em" }}>Philippine-Based · Worldwide Delivery · Est. 2020</span>
             </div>
 
             <h1 className="dm-fade-up dm-fade-up-1" style={{ fontFamily: ds.font.display, fontSize: "clamp(2.4rem, 4.5vw, 3.6rem)", fontWeight: 400, color: ds.color.textDark, lineHeight: 1.12, marginBottom: 6 }}>
@@ -804,7 +838,7 @@ function HeroSection({ setPage }) {
             </h1>
 
             <p className="dm-fade-up dm-fade-up-3" style={{ fontSize: 16, color: ds.color.textMuted, lineHeight: 1.8, maxWidth: 500, marginBottom: 36 }}>
-              DMEAST supplies hospitals, LGUs, RHUs, and institutions across the Philippines with medical equipment, pharmaceuticals, laboratory systems, and specialized healthcare solutions.
+              DMEAST is a Philippine-based medical solutions provider supplying hospitals, LGUs, RHUs, institutions, and international buyers worldwide — with medical equipment, pharmaceuticals, laboratory systems, and specialized healthcare solutions shipped to any country.
             </p>
 
             <div className="dm-fade-up dm-fade-up-4" style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 44 }}>
@@ -815,8 +849,8 @@ function HeroSection({ setPage }) {
             {/* Trust signals */}
             <div className="dm-fade-up dm-fade-up-4" style={{ display: "flex", gap: 24, flexWrap: "wrap" }}>
               {[
-                ["🏛️", "Government & Private"],
-                ["🇵🇭", "Nationwide Coverage"],
+                ["🏛️", "Gov't & Private"],
+                ["🌍", "Worldwide Delivery"],
                 ["🌐", "Intl. Sourcing"],
                 ["📋", "Procurement-Based"],
               ].map(([icon, label]) => (
@@ -835,7 +869,7 @@ function HeroSection({ setPage }) {
               {[
                 { v: "5+",   l: "Years in Operation", accent: ds.color.red },
                 { v: "3",    l: "Island Groups",       accent: ds.color.goldBright },
-                { v: "500+", l: "Clients Nationwide",  accent: ds.color.red },
+                { v: "500+", l: "Global Clients", accent: ds.color.red },
                 { v: "8",    l: "Product Categories",  accent: ds.color.goldBright },
               ].map((s, i) => (
                 <div key={i} style={{
@@ -1040,6 +1074,83 @@ function PaymentSection() {
   );
 }
 
+function WorldwideShipping({ setPage }) {
+  return (
+    <section style={{ background: ds.color.textDark, padding: "88px 28px", position: "relative", overflow: "hidden" }}>
+      <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 4, background: `linear-gradient(90deg, ${ds.color.red}, ${ds.color.goldBright}, ${ds.color.red})` }} />
+      <div className="dm-dot-bg" style={{ position: "absolute", inset: 0, opacity: 0.12 }} />
+      <div style={{ maxWidth: 1280, margin: "0 auto", position: "relative" }}>
+
+        {/* Header */}
+        <div style={{ textAlign: "center", marginBottom: 56 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.16em", textTransform: "uppercase", color: ds.color.goldBright, marginBottom: 10 }}>Global Reach</div>
+          <h2 style={{ fontFamily: ds.font.display, fontSize: "clamp(1.75rem, 3vw, 2.4rem)", fontWeight: 400, color: "#fff", lineHeight: 1.2, marginBottom: 14 }}>
+            We Ship Anywhere in the World
+          </h2>
+          <p style={{ fontSize: 15, color: "rgba(255,255,255,0.6)", maxWidth: 600, margin: "0 auto", lineHeight: 1.8 }}>
+            DM EAST is a Philippine-based supplier with full international export capability. We handle all shipping, freight, and documentation — you just confirm the order.
+          </p>
+        </div>
+
+        {/* Shipping methods */}
+        <div className="dm-grid-4" style={{ marginBottom: 52 }}>
+          {SHIPPING_METHODS.map((s, i) => (
+            <div key={i} style={{
+              background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)",
+              borderRadius: ds.radius.lg, padding: "24px 20px",
+              borderTop: `3px solid ${i % 2 === 0 ? ds.color.red : ds.color.goldBright}`,
+            }}>
+              <div style={{ fontSize: 30, marginBottom: 12 }}>{s.icon}</div>
+              <div style={{ fontSize: 14, fontWeight: 600, color: "#fff", marginBottom: 6 }}>{s.label}</div>
+              <div style={{ fontSize: 13, color: "rgba(255,255,255,0.5)", lineHeight: 1.6 }}>{s.desc}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* Regions grid */}
+        <div style={{ marginBottom: 48 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "rgba(255,255,255,0.4)", marginBottom: 20, textAlign: "center" }}>Countries & Regions We Serve</div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 10, justifyContent: "center" }}>
+            {REGIONS_SERVED.map(r => (
+              <div key={r.region} style={{
+                display: "flex", alignItems: "center", gap: 8,
+                background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)",
+                borderRadius: ds.radius.pill, padding: "7px 16px",
+                transition: "all 0.2s",
+              }}
+                onMouseEnter={e => { e.currentTarget.style.background = "rgba(204,47,60,0.2)"; e.currentTarget.style.borderColor = "rgba(204,47,60,0.4)"; }}
+                onMouseLeave={e => { e.currentTarget.style.background = "rgba(255,255,255,0.06)"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.1)"; }}
+              >
+                <span style={{ fontSize: 16 }}>{r.flag}</span>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: "#fff", lineHeight: 1 }}>{r.region}</div>
+                  <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", lineHeight: 1.4 }}>{r.detail}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Export docs note */}
+        <div style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: ds.radius.lg, padding: "22px 28px", display: "flex", alignItems: "center", gap: 20, flexWrap: "wrap", marginBottom: 36 }}>
+          <div style={{ fontSize: 28 }}>📄</div>
+          <div style={{ flex: 1, minWidth: 200 }}>
+            <div style={{ fontSize: 14, fontWeight: 600, color: "#fff", marginBottom: 4 }}>Full Export Documentation Handled</div>
+            <div style={{ fontSize: 13, color: "rgba(255,255,255,0.5)", lineHeight: 1.6 }}>Commercial invoices, packing lists, certificates of origin, FDA clearances, and all required export paperwork — we handle it all for every international shipment.</div>
+          </div>
+          <div style={{ fontSize: 13, color: ds.color.goldBright, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }} onClick={() => setPage("quote")}>Get International Quote →</div>
+        </div>
+
+        {/* Currency note */}
+        <div style={{ textAlign: "center", fontSize: 12, color: "rgba(255,255,255,0.3)", lineHeight: 1.7 }}>
+          All prices on our site are in Philippine Peso (PHP) with indicative USD equivalent shown for reference.<br />
+          Final invoice prices for international orders are confirmed in your formal quotation.
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function CtaBanner({ setPage }) {
   return (
     <section style={{ background: ds.color.red, padding: "72px 28px", position: "relative", overflow: "hidden" }}>
@@ -1050,7 +1161,7 @@ function CtaBanner({ setPage }) {
           Need Medical Equipment or Supplies?
         </h2>
         <p style={{ fontSize: 16, color: "rgba(255,255,255,0.85)", marginBottom: 32, lineHeight: 1.7 }}>
-          From a single item to a full hospital setup — DMEAST sources it for you, nationwide.
+          From a single item to a full hospital setup — DMEAST sources and ships it anywhere in the world.
         </p>
         <div style={{ display: "flex", gap: 14, justifyContent: "center", flexWrap: "wrap" }}>
           <Btn variant="dark" size="xl" onClick={() => setPage("quote")}>Get a Free Quote</Btn>
@@ -1095,6 +1206,7 @@ function HomePage({ setPage, addToCart, setActiveCategory }) {
       <HowItWorksSection />
       <TurnkeySection setPage={setPage} />
       <PaymentSection />
+      <WorldwideShipping setPage={setPage} />
       <CtaBanner setPage={setPage} />
     </div>
   );
@@ -1103,7 +1215,7 @@ function HomePage({ setPage, addToCart, setActiveCategory }) {
 function AboutPage() {
   return (
     <div style={{ paddingTop: 67 }}>
-      <PageHero eyebrow="About DMEAST" title="From a Single Test Kit to a Nationwide Solution" subtitle="Founded in 2020 during the pandemic, DMEAST has grown into a trusted medical trading company serving all three Philippine island groups." />
+      <PageHero eyebrow="About DMEAST" title="Philippine-Based. Globally Trusted." subtitle="Founded in 2020, DMEAST has grown from a single test kit to a full-service medical solutions provider — supplying hospitals, institutions, and international buyers across the Philippines and worldwide." />
       <div style={{ maxWidth: 1100, margin: "0 auto", padding: "72px 28px" }}>
 
         {/* Timeline */}
@@ -1891,9 +2003,10 @@ function CartPage({ cart, removeFromCart, updateQty, setPage }) {
             ))}
 
             <div style={{ background: ds.color.white, border: `1px solid ${ds.color.border}`, borderRadius: ds.radius.lg, padding: "20px 24px", marginTop: 8 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 17, fontWeight: 700, color: ds.color.textDark, marginBottom: 16 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 17, fontWeight: 700, color: ds.color.textDark, marginBottom: 4 }}>
                 <span>Order Total</span><span>{formatPHP(total)}</span>
               </div>
+              <div style={{ textAlign: "right", fontSize: 11, color: ds.color.textLight, marginBottom: 16 }}>{formatUSD(total)} · indicative rate</div>
               <Btn variant="primary" size="lg" fullWidth onClick={() => setStep(2)}>Continue to Your Details →</Btn>
             </div>
           </>
@@ -2355,6 +2468,104 @@ function RefundPage() {
 // ─────────────────────────────────────────────────────────────────────────────
 // FOOTER
 // ─────────────────────────────────────────────────────────────────────────────
+function ShippingPage() {
+  const today = new Date().toLocaleDateString("en-PH", { year: "numeric", month: "long", day: "numeric" });
+
+  return (
+    <div style={{ paddingTop: 67 }}>
+      <PageHero eyebrow="Legal" title="Shipping & Delivery Policy" subtitle={`Last updated: ${today}`} />
+      <div style={{ maxWidth: 820, margin: "0 auto", padding: "60px 28px" }}>
+
+        {/* Summary cards */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 16, marginBottom: 44 }}>
+          {[
+            { icon: "🇵🇭", label: "Domestic",       value: "Nationwide",        sub: "All regions, PH" },
+            { icon: "🌍", label: "International",   value: "Worldwide",          sub: "Via air, sea, courier" },
+            { icon: "📦", label: "Processing Time", value: "1–5 Business Days",  sub: "After payment confirmed" },
+            { icon: "✈️", label: "Air Cargo",       value: "3–7 Days",           sub: "International express" },
+            { icon: "🚢", label: "Sea Cargo",       value: "15–45 Days",         sub: "International economy" },
+            { icon: "💳", label: "Shipping Cost",   value: "Buyer's Account",    sub: "Advised at quotation" },
+          ].map(c => (
+            <div key={c.label} style={{ background: ds.color.white, border: `1px solid ${ds.color.border}`, borderRadius: ds.radius.lg, padding: "18px 16px", textAlign: "center", boxShadow: ds.shadow.xs, borderTop: `3px solid ${ds.color.red}` }}>
+              <div style={{ fontSize: 26, marginBottom: 8 }}>{c.icon}</div>
+              <div style={{ fontSize: 10, fontWeight: 700, color: ds.color.textMuted, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 4 }}>{c.label}</div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: ds.color.textDark, marginBottom: 2 }}>{c.value}</div>
+              <div style={{ fontSize: 11, color: ds.color.textLight }}>{c.sub}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* Intro banner */}
+        <div style={{ background: ds.color.redLight, border: `1px solid ${ds.color.redBorder}`, borderRadius: ds.radius.lg, padding: "14px 18px", marginBottom: 40, fontSize: 14, color: ds.color.red, lineHeight: 1.7 }}>
+          DM EAST ships medical equipment, pharmaceuticals, and specialized healthcare solutions to clients across the Philippines and worldwide. Shipping timelines and costs depend on the product type, delivery location, and chosen shipping method.
+        </div>
+
+        {[
+          {
+            title: "Order Processing Time",
+            body: "All orders are processed within 1 to 5 business days after payment has been confirmed. DM EAST operates on a procurement-based model — products are sourced from authorized suppliers upon confirmed payment. Processing time may be longer for specialty items, large equipment, or items that require import from international suppliers. You will be notified of the estimated processing and delivery timeline upon order confirmation.",
+          },
+          {
+            title: "Domestic Shipping — Philippines",
+            body: "DM EAST delivers nationwide across all regions of the Philippines including Luzon, Visayas, and Mindanao. Domestic delivery is handled through our trusted logistics partners. Estimated delivery timelines after dispatch:\n\n• Metro Manila: 1–3 business days\n• Luzon (outside Metro Manila): 2–5 business days\n• Visayas: 3–7 business days\n• Mindanao: 3–7 business days\n• Remote areas and islands: 5–10 business days\n\nDelivery timelines are estimates and may vary due to courier delays, weather conditions, or force majeure events. DM EAST will provide tracking information once your order has been dispatched.",
+          },
+          {
+            title: "International Shipping — Worldwide",
+            body: "DM EAST ships to clients worldwide via our international freight and courier partners. Available international shipping methods:\n\n• FedEx / DHL Courier — 3 to 7 business days (door-to-door, for smaller items and pharmaceuticals)\n• Air Cargo — 5 to 10 business days (for larger equipment and bulk orders)\n• Sea Cargo / LCL — 15 to 45 days (cost-effective option for large, heavy equipment)\n• Sea Cargo / FCL — For full-container loads (large-scale hospital or facility setups)\n\nThe appropriate shipping method will be recommended based on your order size, urgency, and destination country. Final shipping method and timeline will be confirmed in your formal quotation.",
+          },
+          {
+            title: "Shipping Costs",
+            body: "Domestic shipping fees depend on the item's weight, dimensions, and delivery location. Shipping costs for direct-purchase orders will be calculated and displayed at checkout or advised prior to order confirmation.\n\nFor international orders, shipping fees, customs duties, import taxes, and any applicable surcharges are the responsibility of the buyer and are not included in the product price. All international shipping costs will be clearly itemized in your formal quotation before you confirm the order. DM EAST will not dispatch any international shipment without the buyer's written confirmation of the total landed cost.",
+          },
+          {
+            title: "Export Documentation",
+            body: "For international shipments, DM EAST will prepare and provide all required export documentation, including:\n\n• Commercial Invoice\n• Packing List\n• Bill of Lading or Airway Bill\n• Certificate of Origin (upon request)\n• FDA / DOH clearance documents where applicable\n• Any other documentation required by the destination country\n\nBuyers are responsible for ensuring that the imported products comply with the regulations of their country. DM EAST recommends buyers verify import requirements with their local customs authority before placing an order.",
+          },
+          {
+            title: "Handling of Medical Equipment",
+            body: "Large medical equipment such as imaging systems, dialysis machines, and specialized vehicles require special handling and freight arrangements. For these items, DM EAST works directly with specialized medical freight handlers to ensure safe and compliant transport. Installation, commissioning, and on-site setup services may be available for certain equipment — these will be specified in the product quotation.",
+          },
+          {
+            title: "Pharmaceutical Shipping",
+            body: "Pharmaceutical products including medicines and vaccines are shipped in compliance with Philippine FDA cold chain and storage requirements. Temperature-sensitive products (e.g. vaccines, biological products) will be shipped with appropriate cold packaging or via cold chain logistics. Buyers are advised to ensure proper storage facilities are in place prior to delivery. DM EAST will not be held liable for pharmaceutical product degradation caused by improper storage at the delivery address.",
+          },
+          {
+            title: "Tracking Your Order",
+            body: "Once your order has been dispatched, DM EAST will send you a shipping confirmation email containing your tracking number and the courier's tracking link. You can use this to monitor your shipment in real time. For international sea cargo shipments, a Bill of Lading number will be provided in place of a parcel tracking number.",
+          },
+          {
+            title: "Delivery Issues — Lost, Damaged, or Delayed Shipments",
+            body: "If your order has not arrived within the estimated delivery window, please contact us at info@dmeastph.com or call +63 951 040 1708. We will coordinate with the courier on your behalf to investigate and resolve the issue.\n\nIf your shipment arrives visibly damaged, please:\n1. Document the damage with photos before opening the package\n2. Note the damage on the courier's delivery receipt\n3. Contact DM EAST within 24 hours of delivery\n\nDM EAST will work to resolve damaged shipment claims in coordination with our logistics partners. Claims submitted more than 24 hours after delivery may not be honored.",
+          },
+          {
+            title: "Force Majeure",
+            body: "DM EAST shall not be held liable for shipping delays caused by events beyond our control, including but not limited to: natural disasters, typhoons, flooding, government-imposed restrictions, port congestion, airline disruptions, customs delays, or other force majeure events. In such cases, DM EAST will communicate the situation promptly and work to deliver your order as soon as circumstances allow.",
+          },
+          {
+            title: "Contact Us",
+            body: `For all shipping and delivery inquiries, please contact us:\nEmail: ${CONTACT.email}\nPhone: ${CONTACT.phone1} | ${CONTACT.phone2}\nAddress: ${CONTACT.address}, ${CONTACT.address2}\nBusiness Hours: Monday – Friday, 8:00 AM – 6:00 PM`,
+          },
+        ].map((s, i, arr) => (
+          <div key={i} style={{ marginBottom: 36, paddingBottom: 36, borderBottom: i < arr.length - 1 ? `1px solid ${ds.color.borderLight}` : "none" }}>
+            <h3 style={{ fontSize: 16.5, fontWeight: 600, color: ds.color.textDark, marginBottom: 10, fontFamily: ds.font.display }}>
+              {i + 1}. {s.title}
+            </h3>
+            <p style={{ fontSize: 14.5, color: ds.color.textBody, lineHeight: 1.85, whiteSpace: "pre-line" }}>{s.body}</p>
+          </div>
+        ))}
+
+        <div style={{ marginTop: 40, padding: "20px 24px", background: ds.color.canvas, borderRadius: ds.radius.lg, border: `1px solid ${ds.color.border}` }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: ds.color.textDark, marginBottom: 6 }}>DM EAST — Decon Medical Equipment and Supplies Trading</div>
+          <div style={{ fontSize: 13, color: ds.color.textMuted, lineHeight: 1.8 }}>
+            {CONTACT.address}, {CONTACT.address2}<br />
+            {CONTACT.email} · {CONTACT.phone1} · {CONTACT.phone2}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function Footer({ setPage }) {
   return (
     <footer style={{ background: ds.color.textDark, padding: "64px 28px 28px" }}>
@@ -2367,7 +2578,7 @@ function Footer({ setPage }) {
               <BrandLogo height={36} darkMode={true} />
             </div>
             <p style={{ fontSize: 13, color: "rgba(255,255,255,0.45)", lineHeight: 1.8, maxWidth: 270, marginBottom: 18 }}>
-              Your Source for Quality Medical Solutions — serving hospitals, LGUs, clinics, and institutions across the Philippines since 2020.
+              Your Source for Quality Medical Solutions — serving hospitals, LGUs, clinics, institutions, and international buyers worldwide since 2020.
             </p>
             <div style={{ fontSize: 13, color: "rgba(255,255,255,0.4)", lineHeight: 1.9 }}>
               <div>{CONTACT.address}</div>
@@ -2385,7 +2596,7 @@ function Footer({ setPage }) {
                 onMouseEnter={e => e.target.style.color="#F0A81C"} onMouseLeave={e => e.target.style.color="rgba(255,255,255,0.5)"}>{lbl}</button>
             ))}
             <div style={{ marginTop: 10, borderTop: "1px solid rgba(255,255,255,0.08)", paddingTop: 10 }}>
-              {[["terms","Terms & Conditions"],["refunds","Return & Refund Policy"],["privacy","Privacy Policy"]].map(([id,lbl]) => (
+              {[["terms","Terms & Conditions"],["refunds","Return & Refund Policy"],["shipping","Shipping Policy"],["privacy","Privacy Policy"]].map(([id,lbl]) => (
                 <button key={id} onClick={() => setPage(id)} style={{ display: "block", background: "none", border: "none", cursor: "pointer", color: "rgba(255,255,255,0.35)", fontSize: 12, padding: "3px 0", textAlign: "left", fontFamily: ds.font.body, transition: "color 0.15s" }}
                   onMouseEnter={e => e.target.style.color="#F0A81C"} onMouseLeave={e => e.target.style.color="rgba(255,255,255,0.35)"}>{lbl}</button>
               ))}
@@ -2408,9 +2619,11 @@ function Footer({ setPage }) {
               <Btn href={CONTACT.messenger} variant="ghost" size="sm">💬 Messenger</Btn>
             </div>
             <div style={{ marginTop: 20, fontSize: 12, color: "rgba(255,255,255,0.25)", lineHeight: 1.9 }}>
-              <div>🇵🇭 Philippine-Based</div>
+              <div>🇵🇭 Philippine-Based Supplier</div>
+              <div>🌍 Worldwide Shipping</div>
+              <div>✈️ Air · 🚢 Sea · 📦 FedEx / DHL</div>
               <div>🌐 Local & International Sourcing</div>
-              <div>📦 Procurement-Based Model</div>
+              <div>📋 Procurement-Based Model</div>
             </div>
           </div>
         </div>
@@ -2423,6 +2636,7 @@ function Footer({ setPage }) {
               ["privacy",  "Privacy Policy"],
               ["terms",    "Terms & Conditions"],
               ["refunds",  "Return & Refund Policy"],
+              ["shipping", "Shipping Policy"],
             ].map(([id, label]) => (
               <button key={id} onClick={() => setPage(id)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 12, color: "rgba(255,255,255,0.25)", fontFamily: ds.font.body }}
                 onMouseEnter={e => e.target.style.color="#F0A81C"} onMouseLeave={e => e.target.style.color="rgba(255,255,255,0.25)"}>{label}</button>
@@ -2516,6 +2730,7 @@ export default function App() {
         {page === "privacy"  && <PrivacyPage />}
         {page === "terms"    && <TermsPage />}
         {page === "refunds"  && <RefundPage />}
+        {page === "shipping" && <ShippingPage />}
       </main>
       <Footer setPage={setPage} />
       <FloatingChat />
