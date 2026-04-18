@@ -44,8 +44,7 @@ const EMAILJS_CONFIG = {
   serviceId:           "service_0hvjrv6",
   templateId:          "template_5r24wue",  // Quote + Order notification → to DMEAST
   receiptTemplateId:   "template_adb2so7",  // Customer receipt/confirmation
-  receiptTemplateId:   "template_adb2so7",  // Customer receipt/confirmation
-  publicKey:           "gV5OXqbN2PHond86B",   // ← paste your public key here (from EmailJS → Account)
+  publicKey:           "gV5OXqbN2PHond86B", // ✅ Live EmailJS Public Key
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
