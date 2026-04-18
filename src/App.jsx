@@ -44,6 +44,7 @@ const EMAILJS_CONFIG = {
   serviceId:           "service_0hvjrv6",
   templateId:          "template_5r24wue",  // Quote + Order notification → to DMEAST
   receiptTemplateId:   "template_adb2so7",  // Customer receipt/confirmation
+  receiptTemplateId:   "template_adb2so7",  // Customer receipt/confirmation
   publicKey:           "gV5OXqbN2PHond86B",   // ← paste your public key here (from EmailJS → Account)
 };
 
@@ -857,6 +858,29 @@ function HeroSection({ setPage }) {
                 <div key={label} style={{ display: "flex", alignItems: "center", gap: 6 }}>
                   <span style={{ fontSize: 14 }}>{icon}</span>
                   <span style={{ fontSize: 12, color: ds.color.textMuted, fontWeight: 500 }}>{label}</span>
+                </div>
+              ))}
+            </div>
+
+            {/* Payment trust badges */}
+            <div className="dm-fade-up dm-fade-up-4" style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginTop: 8, paddingTop: 16, borderTop: `1px solid ${ds.color.borderLight}` }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 5, marginRight: 4 }}>
+                <span style={{ fontSize: 13 }}>🔒</span>
+                <span style={{ fontSize: 11, fontWeight: 700, color: ds.color.success }}>SSL Secured</span>
+              </div>
+              <div style={{ width: 1, height: 14, background: ds.color.border }} />
+              <span style={{ fontSize: 11, color: ds.color.textLight, fontWeight: 500 }}>Accepted payments:</span>
+              {[
+                { icon: "💳", label: "Visa" },
+                { icon: "💳", label: "Mastercard" },
+                { icon: "📱", label: "GCash" },
+                { icon: "💜", label: "Maya" },
+                { icon: "🏦", label: "Bank" },
+                { icon: "📲", label: "QR Ph" },
+              ].map(b => (
+                <div key={b.label} style={{ display: "flex", alignItems: "center", gap: 4, background: ds.color.canvas, border: `1px solid ${ds.color.border}`, borderRadius: ds.radius.sm, padding: "3px 9px" }}>
+                  <span style={{ fontSize: 11 }}>{b.icon}</span>
+                  <span style={{ fontSize: 10, fontWeight: 600, color: ds.color.textMuted }}>{b.label}</span>
                 </div>
               ))}
             </div>
@@ -2362,6 +2386,29 @@ function CartPage({ cart, removeFromCart, updateQty, setPage }) {
               <p style={{ fontSize: 14, color: ds.color.textMuted, marginBottom: 22 }}>
                 Payment instructions will be sent to <strong>{details.email}</strong> after placing your order.
               </p>
+
+              {/* Trust badges row — checkout */}
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 22, padding: "12px 14px", background: ds.color.canvas, borderRadius: ds.radius.md, border: `1px solid ${ds.color.borderLight}`, alignItems: "center" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 5, marginRight: 4 }}>
+                  <span style={{ fontSize: 14 }}>🔒</span>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: ds.color.success }}>Secure Checkout</span>
+                </div>
+                <div style={{ width: 1, height: 16, background: ds.color.border }} />
+                {[
+                  { icon: "💳", label: "Visa" },
+                  { icon: "💳", label: "Mastercard" },
+                  { icon: "📱", label: "GCash" },
+                  { icon: "💜", label: "Maya" },
+                  { icon: "🏦", label: "Bank Transfer" },
+                  { icon: "📲", label: "QR Ph" },
+                ].map(b => (
+                  <div key={b.label} style={{ display: "flex", alignItems: "center", gap: 4, background: ds.color.white, border: `1px solid ${ds.color.border}`, borderRadius: ds.radius.sm, padding: "4px 10px" }}>
+                    <span style={{ fontSize: 12 }}>{b.icon}</span>
+                    <span style={{ fontSize: 11, fontWeight: 600, color: ds.color.textMuted }}>{b.label}</span>
+                  </div>
+                ))}
+              </div>
+
               <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 12, marginBottom: 22 }}>
                 {PAYMENT_METHODS.map(m => (
                   <button key={m.label} onClick={() => setMethod(m.label)} style={{
@@ -2795,6 +2842,47 @@ function Footer({ setPage }) {
               <div>🌐 Local & International Sourcing</div>
               <div>📋 Procurement-Based Model</div>
             </div>
+          </div>
+        </div>
+
+        {/* Trust Badges Row */}
+        <div style={{ margin: "32px 0 0", padding: "20px 0", borderTop: "1px solid rgba(255,255,255,0.08)", borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
+          <div style={{ fontSize: 10, fontWeight: 700, color: "rgba(255,255,255,0.25)", letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 16, textAlign: "center" }}>Secure Payments & Trusted Logistics</div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 10, justifyContent: "center", alignItems: "center" }}>
+
+            {/* SSL Secure */}
+            <div style={{ display: "flex", alignItems: "center", gap: 6, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: ds.radius.md, padding: "7px 14px" }}>
+              <span style={{ fontSize: 14 }}>🔒</span>
+              <span style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.6)" }}>SSL Secured</span>
+            </div>
+
+            {/* Payment methods */}
+            {[
+              { icon: "💳", label: "Visa" },
+              { icon: "💳", label: "Mastercard" },
+              { icon: "📱", label: "GCash" },
+              { icon: "💜", label: "Maya" },
+              { icon: "🏦", label: "Bank Transfer" },
+              { icon: "📲", label: "QR Ph" },
+            ].map(b => (
+              <div key={b.label} style={{ display: "flex", alignItems: "center", gap: 5, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: ds.radius.md, padding: "7px 14px" }}>
+                <span style={{ fontSize: 13 }}>{b.icon}</span>
+                <span style={{ fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.55)" }}>{b.label}</span>
+              </div>
+            ))}
+
+            {/* Shipping partners */}
+            {[
+              { icon: "📦", label: "FedEx" },
+              { icon: "📦", label: "DHL" },
+              { icon: "✈️", label: "Air Cargo" },
+              { icon: "🚢", label: "Sea Cargo" },
+            ].map(b => (
+              <div key={b.label} style={{ display: "flex", alignItems: "center", gap: 5, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: ds.radius.md, padding: "7px 14px" }}>
+                <span style={{ fontSize: 13 }}>{b.icon}</span>
+                <span style={{ fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.35)" }}>{b.label}</span>
+              </div>
+            ))}
           </div>
         </div>
 
