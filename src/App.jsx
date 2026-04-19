@@ -259,39 +259,39 @@ const PRODUCTS = [
   // ── LABORATORY ──
   { id: "lab-01", category: "laboratory", name: "Hematology Analyzer GH 580",
     desc: "Fully automated hematology analyzer with autoloader. Ideal for high-volume hospital labs requiring CBC and differential analysis.",
-    price: null, cta: "quote", imageSrc: null, featured: true, tag: "Laboratory Equipment" },
+    price: null, cta: "quote", imageSrc: "/images/lab-hematology-gh580.png", featured: true, tag: "Laboratory Equipment" },
   { id: "lab-02", category: "laboratory", name: "Chemistry Analyzer GH 527",
     desc: "Fully automated clinical chemistry analyzer. High throughput for biochemistry panels in hospital and stand-alone diagnostics.",
-    price: null, cta: "quote", imageSrc: null, featured: true, tag: "Laboratory Equipment" },
+    price: null, cta: "quote", imageSrc: "/images/lab-hematology-gh527.png", featured: true, tag: "Laboratory Equipment" },
   { id: "lab-03", category: "laboratory", name: "Coagulation Analyzer GA 200",
     desc: "Fully automated coagulation analyzer for hemostasis testing — PT, APTT, fibrinogen, and D-dimer.",
-    price: null, cta: "quote", imageSrc: null, featured: false, tag: "Laboratory Equipment" },
+    price: null, cta: "quote", imageSrc: "/images/lab-coagulation-ga200.png", featured: false, tag: "Laboratory Equipment" },
   { id: "lab-04", category: "laboratory", name: "Centrifuge (Benchtop)",
     desc: "High-speed benchtop centrifuge for routine clinical and research applications. Variable speed and rotor options available.",
-    price: null, cta: "quote", imageSrc: null, featured: false, tag: "Laboratory Equipment" },
+    price: null, cta: "quote", imageSrc: "/images/lab-centrifuge.png", featured: false, tag: "Laboratory Equipment" },
   { id: "lab-05", category: "laboratory", name: "Autoclave & Steam Sterilizer",
     desc: "Gravity and pre-vacuum cycle sterilizers for instruments and lab materials. Bench-top and floor-standing models available.",
-    price: null, cta: "quote", imageSrc: null, featured: false, tag: "Laboratory Equipment" },
+    price: null, cta: "quote", imageSrc: "/images/lab-autoclave.png", featured: false, tag: "Laboratory Equipment" },
   { id: "lab-06", category: "laboratory", name: "Bio-Medical Refrigerator",
     desc: "Precision temperature-controlled refrigerator for vaccines, reagents, and biological specimens. Cold-room systems also available.",
-    price: null, cta: "quote", imageSrc: null, featured: false, tag: "Laboratory Equipment" },
+    price: null, cta: "quote", imageSrc: "/images/lab-biofridge.png", featured: false, tag: "Laboratory Equipment" },
 
   // ── IMAGING ──
   { id: "img-01", category: "imaging", name: "Digital X-Ray System — OCTAVE Series",
     desc: "Digital radiography system with VIVIX-S flat panel detector. Curved design, wheel controller, LCD display, and gentle-sliding bucky.",
-    price: null, cta: "sales", imageSrc: null, featured: true, tag: "Imaging Equipment" },
+    price: null, cta: "sales", imageSrc: "/images/img-xray-octave.png", featured: true, tag: "Imaging Equipment" },
   { id: "img-02", category: "imaging", name: "Mobile / Portable X-Ray Unit",
     desc: "Compact mobile X-ray for bedside imaging in ICU, wards, and emergency departments. Battery-powered and maneuverable.",
-    price: null, cta: "sales", imageSrc: null, featured: false, tag: "Imaging Equipment" },
+    price: null, cta: "sales", imageSrc: "/images/img-xray-mobile.png", featured: false, tag: "Imaging Equipment" },
   { id: "img-03", category: "imaging", name: "Portable Color Doppler Ultrasound",
     desc: "Compact color Doppler ultrasound for OB, abdominal, cardiac, and vascular imaging. Ideal for RHUs and clinics.",
-    price: null, cta: "quote", imageSrc: null, featured: false, tag: "Imaging Equipment" },
+    price: null, cta: "quote", imageSrc: "/images/img-ultrasound.png", featured: false, tag: "Imaging Equipment" },
   { id: "img-04", category: "imaging", name: "CT Scan System",
     desc: "Multi-slice CT scanner for diagnostic imaging. Available in 16 to 128-slice configurations. Installation support included.",
-    price: null, cta: "sales", imageSrc: null, featured: false, tag: "Imaging Equipment" },
+    price: null, cta: "sales", imageSrc: "/images/img-ct-scan.png", featured: false, tag: "Imaging Equipment" },
   { id: "img-05", category: "imaging", name: "MRI System",
     desc: "High-field MRI for neurology, musculoskeletal, and full-body diagnostics. Site planning, installation, and training included.",
-    price: null, cta: "sales", imageSrc: null, featured: false, tag: "Imaging Equipment" },
+    price: null, cta: "sales", imageSrc: "/images/img-mri.png", featured: false, tag: "Imaging Equipment" },
   { id: "img-06", category: "imaging", name: "Mammography System",
     desc: "Digital mammography unit for breast cancer screening. Suitable for diagnostic centers and LGU health initiatives.",
     price: null, cta: "sales", imageSrc: null, featured: false, tag: "Imaging Equipment" },
@@ -299,10 +299,10 @@ const PRODUCTS = [
   // ── ICU & EMERGENCY ──
   { id: "icu-01", category: "icu", name: "ICU Ventilator",
     desc: "Critical care ventilator with multiple ventilation modes (VCV, PCV, SIMV, PSV). For adult and pediatric patients.",
-    price: null, cta: "sales", imageSrc: null, featured: true, tag: "ICU & Emergency" },
+    price: null, cta: "sales", imageSrc: "/images/icu-ventilator.png", featured: true, tag: "ICU & Emergency" },
   { id: "icu-02", category: "icu", name: "Biphasic Defibrillator / AED",
     desc: "Biphasic defibrillator with AED capability, 12-lead ECG, SpO₂, NIBP, and pacing. For ER, ICU, and ambulance use.",
-    price: null, cta: "quote", imageSrc: null, featured: false, tag: "ICU & Emergency" },
+    price: null, cta: "quote", imageSrc: "/images/icu-ventilator-2.png", featured: false, tag: "ICU & Emergency" },
   { id: "icu-03", category: "icu", name: "12-Lead ECG Machine",
     desc: "Clinical 12-lead ECG for resting acquisition. Thermal printer, touchscreen, and data export options.",
     price: null, cta: "quote", imageSrc: null, featured: false, tag: "ICU & Emergency" },
@@ -310,16 +310,16 @@ const PRODUCTS = [
   // ── OB GYNE & PEDIATRICS ──
   { id: "ob-01", category: "obgyne", name: "Neonatal Incubator",
     desc: "Closed servo-controlled incubator for premature infants. Humidity monitoring, access ports, and integrated alarms.",
-    price: null, cta: "quote", imageSrc: null, featured: true, tag: "OB Gyne & Pediatrics" },
+    price: null, cta: "quote", imageSrc: "/images/ob-incubator.png", featured: true, tag: "OB Gyne & Pediatrics" },
   { id: "ob-02", category: "obgyne", name: "Infant Radiant Warmer",
     desc: "Open-care radiant warmer for stabilization and resuscitation of newborns. Servo and manual heating modes.",
-    price: null, cta: "quote", imageSrc: null, featured: false, tag: "OB Gyne & Pediatrics" },
+    price: null, cta: "quote", imageSrc: "/images/ob-warmer.png", featured: false, tag: "OB Gyne & Pediatrics" },
   { id: "ob-03", category: "obgyne", name: "OB Delivery Bed",
     desc: "Gynecological delivery and examination bed. Adjustable backrest, leg supports, and drop-down sections.",
-    price: null, cta: "quote", imageSrc: null, featured: false, tag: "OB Gyne & Pediatrics" },
+    price: null, cta: "quote", imageSrc: "/images/ob-delivery-bed.png", featured: false, tag: "OB Gyne & Pediatrics" },
   { id: "ob-04", category: "obgyne", name: "Fetal Doppler",
     desc: "Handheld fetal Doppler for prenatal heart rate monitoring. Waterproof probe available.",
-    price: 2850, cta: "buy", imageSrc: null, featured: false, tag: "OB Gyne & Pediatrics" },
+    price: 2850, cta: "buy", imageSrc: "/images/ob-fetal-doppler-edan.png", featured: false, tag: "OB Gyne & Pediatrics" },
 
   // ── PHARMACEUTICALS ──
   // requiresPrescription based on Philippine FDA / DOH / R.A. 10918 (Pharmacy Law)
@@ -388,6 +388,146 @@ const PRODUCTS = [
   { id: "veh-05", category: "vehicles", name: "Fire-Trike",
     desc: "Compact fire-response trike for barangay brigades. Lightweight and easily deployed in dense areas.",
     price: null, cta: "sales", imageSrc: null, featured: false, tag: "Specialized Vehicles" },
+
+  // ── BEAUTY & WELLNESS ──
+  // Prices sourced from updated 2025 pricelist
+  // Numbing Creams / Topical Anesthesia
+  { id: "bw-01", category: "beauty", name: "Nexcain Numbing Cream (500g)",
+    desc: "Lidocaine 10.56% topical anesthesia. 500g jar. Fast-acting numbing cream for aesthetic procedures. OTC.",
+    price: 2160, cta: "buy", imageSrc: "/images/bw-nexcain.png", featured: true, tag: "Beauty & Wellness",
+    requiresPrescription: false, rxCategory: null },
+  { id: "bw-02", category: "beauty", name: "P-Cain Numbing Cream (500g)",
+    desc: "Lidocaine 25mg + Prilocaine 25mg. 500g jar. Enhanced numbing with booster effect. OTC.",
+    price: 2400, cta: "buy", imageSrc: "/images/bw-pcain.png", featured: false, tag: "Beauty & Wellness",
+    requiresPrescription: false, rxCategory: null },
+  { id: "bw-03", category: "beauty", name: "Scain Numbing Cream (30g tube)",
+    desc: "Lidocaine 10.56% + Hyaluronic Acid 24mg/ml. 30g tube. Numbing cream with booster effect.",
+    price: 1080, cta: "buy", imageSrc: "/images/bw-scain-tube.png", featured: false, tag: "Beauty & Wellness",
+    requiresPrescription: false, rxCategory: null },
+
+  // Botox
+  { id: "bw-04", category: "beauty", name: "Botulax 100 Units",
+    desc: "Botulinum toxin for smoothing wrinkles and muscle relaxation. 100 units/vial. For licensed practitioners only. ⚠️ Prescription required.",
+    price: 2880, cta: "buy", imageSrc: "/images/bw-botulax.png", featured: true, tag: "Beauty & Wellness",
+    requiresPrescription: true, rxCategory: "Botulinum Toxin / Aesthetic" },
+  { id: "bw-05", category: "beauty", name: "Nabota 100 Units",
+    desc: "Botulinum toxin type A. 100 units/vial. Korean brand. For aesthetic practitioners. ⚠️ Prescription required.",
+    price: 2880, cta: "buy", imageSrc: "/images/bw-nabota.png", featured: false, tag: "Beauty & Wellness",
+    requiresPrescription: true, rxCategory: "Botulinum Toxin / Aesthetic" },
+  { id: "bw-06", category: "beauty", name: "Wondertox 100 Units",
+    desc: "Botulinum toxin type A. 100 units/vial. For wrinkle treatment and muscle relaxation. ⚠️ Prescription required.",
+    price: 2040, cta: "buy", imageSrc: "/images/bw-wondertox.png", featured: false, tag: "Beauty & Wellness",
+    requiresPrescription: true, rxCategory: "Botulinum Toxin / Aesthetic" },
+  { id: "bw-07", category: "beauty", name: "Rentox 100 Units",
+    desc: "Botulinum toxin for aesthetic use. 100 units/vial. ⚠️ Prescription required.",
+    price: 2880, cta: "buy", imageSrc: "/images/bw-rentox.png", featured: false, tag: "Beauty & Wellness",
+    requiresPrescription: true, rxCategory: "Botulinum Toxin / Aesthetic" },
+
+  // Fillers
+  { id: "bw-08", category: "beauty", name: "Neuramis Volume (HA Filler)",
+    desc: "Cross-linked hyaluronic acid 24mg/ml + Lidocaine 3mg/ml. For volume restoration. ⚠️ Prescription required.",
+    price: 1800, cta: "buy", imageSrc: "/images/bw-neuramis-volume.png", featured: true, tag: "Beauty & Wellness",
+    requiresPrescription: true, rxCategory: "Dermal Filler / Aesthetic" },
+  { id: "bw-09", category: "beauty", name: "Neuramis Deep (HA Filler)",
+    desc: "Cross-linked hyaluronic acid 20mg/ml + Lidocaine 3mg/ml. Deep dermal filler for nasolabial folds. ⚠️ Prescription required.",
+    price: 1800, cta: "buy", imageSrc: "/images/bw-neuramis-deep.png", featured: false, tag: "Beauty & Wellness",
+    requiresPrescription: true, rxCategory: "Dermal Filler / Aesthetic" },
+  { id: "bw-10", category: "beauty", name: "Neuramis Light (HA Filler)",
+    desc: "Cross-linked hyaluronic acid. Light formulation for fine lines and superficial wrinkles. ⚠️ Prescription required.",
+    price: 1800, cta: "buy", imageSrc: "/images/bw-neuramis-light.png", featured: false, tag: "Beauty & Wellness",
+    requiresPrescription: true, rxCategory: "Dermal Filler / Aesthetic" },
+  { id: "bw-11", category: "beauty", name: "Misfill Volume (HA Filler)",
+    desc: "Cross-linked hyaluronic acid 24mg/ml + Lidocaine 3mg/ml. Volume filler for facial contouring. ⚠️ Prescription required.",
+    price: 2040, cta: "buy", imageSrc: "/images/bw-misfill-volume.png", featured: false, tag: "Beauty & Wellness",
+    requiresPrescription: true, rxCategory: "Dermal Filler / Aesthetic" },
+
+  // Threads
+  { id: "bw-12", category: "beauty", name: "Minerva Threads PDO (19G x 60mm)",
+    desc: "PDO thread lifting. 19G x 60mm. 20 pcs/pack. For face and body lifting procedures. ⚠️ For licensed practitioners.",
+    price: 3240, cta: "buy", imageSrc: "/images/bw-minerva-threads.png", featured: false, tag: "Beauty & Wellness",
+    requiresPrescription: true, rxCategory: "Aesthetic / PDO Threads" },
+  { id: "bw-13", category: "beauty", name: "Minerva Threads PDO (Mono)",
+    desc: "PDO mono threads. 29G x 38mm. 20 pcs/pack. For skin tightening and collagen stimulation.",
+    price: 840, cta: "buy", imageSrc: "/images/bw-minerva-mono.png", featured: false, tag: "Beauty & Wellness",
+    requiresPrescription: true, rxCategory: "Aesthetic / PDO Threads" },
+
+  // Mesolipo / Fat Dissolving
+  { id: "bw-14", category: "beauty", name: "Lemon Bottle Fat Dissolving",
+    desc: "Mesolipo fat dissolving solution. 10ml/vial, 5 vials/box. For body contouring and facial slimming. ⚠️ For licensed practitioners.",
+    price: 9000, cta: "buy", imageSrc: "/images/bw-lemon-bottle.png", featured: true, tag: "Beauty & Wellness",
+    requiresPrescription: true, rxCategory: "Lipolysis / Aesthetic" },
+  { id: "bw-15", category: "beauty", name: "Lipolab Plus (Brown Vials)",
+    desc: "Mesolipo solution. 10ml/vial, 10 vials/box. For fat dissolution and body contouring.",
+    price: 2760, cta: "buy", imageSrc: "/images/bw-lipolab.png", featured: false, tag: "Beauty & Wellness",
+    requiresPrescription: true, rxCategory: "Lipolysis / Aesthetic" },
+  { id: "bw-16", category: "beauty", name: "Lipo Advance Body",
+    desc: "Mesolipo contouring + whitening solution. 10ml/vial, 10 vials/box.",
+    price: 3720, cta: "buy", imageSrc: "/images/bw-lipo-advance.png", featured: false, tag: "Beauty & Wellness",
+    requiresPrescription: true, rxCategory: "Lipolysis / Aesthetic" },
+
+  // Skin Boosters / PDRN
+  { id: "bw-17", category: "beauty", name: "Misfill PDRN Skin Booster",
+    desc: "Regeneration and prevention of skin thinning. 2.2ml/syringe, 2 syringes/box. PDRN skin booster.",
+    price: 3840, cta: "buy", imageSrc: "/images/bw-misfill-pdrn.png", featured: true, tag: "Beauty & Wellness",
+    requiresPrescription: true, rxCategory: "PDRN / Skin Booster" },
+  { id: "bw-18", category: "beauty", name: "Ireju Aqua Skin Booster",
+    desc: "Non cross-linked HA. 2.5ml/syringe, 10 syringes/box. Deep skin hydration and rejuvenation.",
+    price: 4920, cta: "buy", imageSrc: "/images/bw-ireju-aqua.png", featured: false, tag: "Beauty & Wellness",
+    requiresPrescription: true, rxCategory: "PDRN / Skin Booster" },
+  { id: "bw-19", category: "beauty", name: "Hyaron Pre-Filled Injection",
+    desc: "Sodium hyaluronate 25mg/2.5ml. Pre-filled syringe. 10 syringes/box. Skin booster.",
+    price: 3600, cta: "buy", imageSrc: "/images/bw-hyaron.png", featured: false, tag: "Beauty & Wellness",
+    requiresPrescription: true, rxCategory: "PDRN / Skin Booster" },
+  { id: "bw-20", category: "beauty", name: "Selastin Exo Plus (Exosome)",
+    desc: "Ultra nano particle exosome 1.3 billion/ml. PDRN + Growth Factor. Premium skin rejuvenation.",
+    price: 7320, cta: "buy", imageSrc: "/images/bw-selastin-exo.png", featured: false, tag: "Beauty & Wellness",
+    requiresPrescription: true, rxCategory: "Exosome / Aesthetic" },
+
+  // Glutathione — Whitening Injections
+  { id: "bw-21", category: "beauty", name: "Glutanex 1200mg (Korea)",
+    desc: "Reduced glutathione 1,200mg. 10 vials/box. Korean formulation. Whitening injection, anti-oxidant.",
+    price: 3960, cta: "buy", imageSrc: "/images/bw-glutanex.png", featured: true, tag: "Beauty & Wellness",
+    requiresPrescription: true, rxCategory: "Whitening Injection / Rx" },
+  { id: "bw-22", category: "beauty", name: "Salutha 1200mg Glutathione",
+    desc: "Reduced glutathione 1,200mg. 10 vials/box. Whitening injection and anti-oxidant.",
+    price: 3000, cta: "buy", imageSrc: "/images/bw-salutha.png", featured: false, tag: "Beauty & Wellness",
+    requiresPrescription: true, rxCategory: "Whitening Injection / Rx" },
+  { id: "bw-23", category: "beauty", name: "Tatiomax Gold 1.2g",
+    desc: "Reduced glutathione with booster. Premium whitening injection, anti-oxidant, skin glow.",
+    price: 2880, cta: "buy", imageSrc: "/images/bw-tatiomax.png", featured: false, tag: "Beauty & Wellness",
+    requiresPrescription: true, rxCategory: "Whitening Injection / Rx" },
+  { id: "bw-24", category: "beauty", name: "Cindella 1.2g (Hidden Tag Seal)",
+    desc: "Combo reduced glutathione 1,200mg + Ascorbic Acid 10,000mg + Lipoic Acid 25mg. Korea. Whitening + anti-oxidant.",
+    price: 7200, cta: "buy", imageSrc: "/images/bw-cindella.png", featured: false, tag: "Beauty & Wellness",
+    requiresPrescription: true, rxCategory: "Whitening Injection / Rx" },
+
+  // Oral Supplements
+  { id: "bw-25", category: "beauty", name: "Lustrous Pro (60 Softgels)",
+    desc: "Reduced L-Glutathione, Hyaluronic Acid, Collagen, Polypodium Leucotomos, Vitamin E, Astaxanthin. Oral sunblock + glutathione.",
+    price: 3600, cta: "buy", imageSrc: "/images/bw-lustrous-pro.png", featured: true, tag: "Beauty & Wellness",
+    requiresPrescription: false, rxCategory: null },
+  { id: "bw-26", category: "beauty", name: "Lustrous Glow (60 Softgels)",
+    desc: "Reduced L-Glutathione, Sodium Ascorbate, Collagen, Stem Cells, Lycopene, Grape Seed Extract. Oral glutathione supplement.",
+    price: 3600, cta: "buy", imageSrc: "/images/bw-lustrous-glow.png", featured: false, tag: "Beauty & Wellness",
+    requiresPrescription: false, rxCategory: null },
+  { id: "bw-27", category: "beauty", name: "Accunex Capsule (Isotretinoin 10mg)",
+    desc: "Isotretinoin 10mg oral capsule. For severe acne treatment. ⚠️ Prescription required — teratogenic medication.",
+    price: 2160, cta: "buy", imageSrc: "/images/bw-accunex.png", featured: false, tag: "Beauty & Wellness",
+    requiresPrescription: true, rxCategory: "Oral Acne Medication / Rx" },
+
+  // IV Drips / Whitening Boosters
+  { id: "bw-28", category: "beauty", name: "Snow White Whitening Drip Set",
+    desc: "Complete whitening IV drip set. Combo reduced glutathione 1,200mg + Ascorbic Acid 10,000mg + Lipoic Acid 300mg.",
+    price: 7800, cta: "buy", imageSrc: "/images/bw-snow-white.png", featured: false, tag: "Beauty & Wellness",
+    requiresPrescription: true, rxCategory: "IV Whitening / Rx" },
+  { id: "bw-29", category: "beauty", name: "Glutanex Trio Drip Set",
+    desc: "Premium whitening IV drip combo set. Anti-oxidant + appetite suppressant effect.",
+    price: 7800, cta: "buy", imageSrc: "/images/bw-glutanex-trio.png", featured: false, tag: "Beauty & Wellness",
+    requiresPrescription: true, rxCategory: "IV Whitening / Rx" },
+  { id: "bw-30", category: "beauty", name: "Tationil 600mg",
+    desc: "Reduced glutathione 600mg IV. For whitening injection and anti-oxidant therapy.",
+    price: 3000, cta: "buy", imageSrc: "/images/bw-tationil.png", featured: false, tag: "Beauty & Wellness",
+    requiresPrescription: true, rxCategory: "Whitening Injection / Rx" },
 ];
 
 const CATEGORIES = [
@@ -399,6 +539,7 @@ const CATEGORIES = [
   { id: "pharma",      label: "Pharmaceuticals",       shortLabel: "Pharma",      color: "#3B5A1A", accent: "#6AAB2E" },
   { id: "specialized", label: "Specialized Equipment", shortLabel: "Specialized", color: "#4A3A1A", accent: "#D4943A" },
   { id: "vehicles",    label: "Specialized Vehicles",  shortLabel: "Vehicles",    color: "#1A2B5A", accent: "#3A6FD4" },
+  { id: "beauty",      label: "Beauty & Wellness",     shortLabel: "Beauty",      color: "#7A2060", accent: "#C8509A" },
 ];
 
 const CLIENT_TYPES = [
@@ -608,8 +749,28 @@ function ProductImg({ imageSrc, category, name, height = 180 }) {
   const cat = CATEGORIES.find(c => c.id === category) || { color: "#8B2635", accent: "#CC2F3C" };
   if (imageSrc) {
     return (
-      <div style={{ height, overflow: "hidden", borderRadius: `${ds.radius.md}px ${ds.radius.md}px 0 0`, background: ds.color.canvas }}>
-        <img src={imageSrc} alt={name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+      <div style={{
+        height,
+        overflow: "hidden",
+        borderRadius: `${ds.radius.md}px ${ds.radius.md}px 0 0`,
+        background: "#F8F7F5",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "12px",
+        boxSizing: "border-box",
+      }}>
+        <img
+          src={imageSrc}
+          alt={name}
+          style={{
+            maxWidth: "100%",
+            maxHeight: "100%",
+            objectFit: "contain",
+            borderRadius: ds.radius.sm,
+            filter: "drop-shadow(0 2px 8px rgba(0,0,0,0.10))",
+          }}
+        />
       </div>
     );
   }
@@ -893,7 +1054,7 @@ function HeroSection({ setPage }) {
                 { v: "5+",   l: "Years in Operation", accent: ds.color.red },
                 { v: "3",    l: "Island Groups",       accent: ds.color.goldBright },
                 { v: "500+", l: "Global Clients", accent: ds.color.red },
-                { v: "8",    l: "Product Categories",  accent: ds.color.goldBright },
+                { v: "9",    l: "Product Categories",  accent: ds.color.goldBright },
               ].map((s, i) => (
                 <div key={i} style={{
                   background: ds.color.white, border: `1px solid ${ds.color.border}`,
