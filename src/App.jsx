@@ -1795,7 +1795,7 @@ function CartPage({cart,removeFromCart,updateQty,setPage,user,onOrderComplete}){
   const errTxt = {fontSize:11.5,color:ds.color.red,marginTop:4};
   const fo     = e => e.target.style.borderColor = ds.color.red;
   const bl     = (e,key) => { e.target.style.borderColor = fieldErrors[key] ? ds.color.red : ds.color.border; };
-  const setD   = k => e => { setDetails(p=>({...p,[k]:e.target.value})); if(fieldErrors[k]) setFieldErrors(p=>({...p,[k]:"";})); };
+  const setD   = k => e => { setDetails(p=>({...p,[k]:e.target.value})); if(fieldErrors[k]) setFieldErrors(p=>({...p,[k]:""})); };
   const setI   = k => e => setIntlForm(p=>({...p,[k]:e.target.value}));
 
   const handleRxUpload = e => {
