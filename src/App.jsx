@@ -1,6 +1,7 @@
 /**
- * DMEAST — Medical Solutions Platform  v5.0
- * Firebase Auth + Customer Portal + Admin Dashboard
+ * DMEAST — Medical Solutions Platform  v6.0
+ * Frontend repositioning: ecommerce-first, institutional orders secondary
+ * Firebase Auth + Customer Portal + Admin Dashboard (all v5 features intact)
  *
  * npm install firebase @emailjs/browser
  */
@@ -98,25 +99,26 @@ const CONTACT = {
   messenger:"https://m.me/dmeastph",
 };
 
+// institutional:true = shown in Institutional Orders section, not main shop
 const CATEGORIES = [
-  {id:"monitoring", label:"Patient Monitoring",   color:"#8B2635",accent:"#CC2F3C",icon:"🫀"},
-  {id:"laboratory", label:"Laboratory Equipment", color:"#0F4C81",accent:"#1A7BB4",icon:"🔬"},
-  {id:"imaging",    label:"Imaging & Radiology",  color:"#5C3317",accent:"#8B5E3C",icon:"🩻"},
-  {id:"icu",        label:"ICU & Emergency",      color:"#7B1FA2",accent:"#AB47BC",icon:"🚨"},
-  {id:"obgyne",     label:"OB Gyne & Pediatrics", color:"#C2185B",accent:"#E91E8C",icon:"👶"},
-  {id:"pharma",     label:"Pharmaceuticals",      color:"#1B5E20",accent:"#388E3C",icon:"💊"},
-  {id:"specialized",label:"Specialized Equipment",color:"#004D40",accent:"#00897B",icon:"⚙️"},
-  {id:"vehicles",   label:"Medical Vehicles",     color:"#BF360C",accent:"#F4511E",icon:"🚑"},
-  {id:"beauty",     label:"Beauty & Wellness",    color:"#880E4F",accent:"#D81B60",icon:"✨"},
+  {id:"pharma",     label:"Pharmaceuticals",       color:"#1B5E20",accent:"#388E3C",icon:"💊", institutional:false},
+  {id:"beauty",     label:"Beauty & Wellness",     color:"#880E4F",accent:"#D81B60",icon:"✨", institutional:false},
+  {id:"monitoring", label:"Diagnostic Devices",    color:"#8B2635",accent:"#CC2F3C",icon:"🩺", institutional:false},
+  {id:"obgyne",     label:"OB Gyne & Pediatrics",  color:"#C2185B",accent:"#E91E8C",icon:"👶", institutional:false},
+  {id:"laboratory", label:"Laboratory Equipment",  color:"#0F4C81",accent:"#1A7BB4",icon:"🔬", institutional:true},
+  {id:"imaging",    label:"Imaging & Radiology",   color:"#5C3317",accent:"#8B5E3C",icon:"🩻", institutional:true},
+  {id:"icu",        label:"ICU & Emergency",       color:"#7B1FA2",accent:"#AB47BC",icon:"🚨", institutional:true},
+  {id:"specialized",label:"Specialized Systems",   color:"#004D40",accent:"#00897B",icon:"⚙️", institutional:true},
+  {id:"vehicles",   label:"Medical Vehicles",      color:"#BF360C",accent:"#F4511E",icon:"🚑", institutional:true},
 ];
 
 const CLIENT_TYPES = [
-  {icon:"🏥",label:"Hospitals & Clinics",      desc:"Public and private hospitals, specialty clinics, medical centers."},
-  {icon:"🏛️",label:"LGUs & Government",        desc:"Local Government Units, RHUs, DOH programs, and government hospitals."},
-  {icon:"🔬",label:"Laboratories",              desc:"Diagnostic labs, pathology centers, and research institutions."},
-  {icon:"💊",label:"Pharmacies",                desc:"Licensed pharmacies and pharmaceutical distributors."},
-  {icon:"🌍",label:"International Buyers",      desc:"Hospitals, ministries of health, and distributors worldwide."},
-  {icon:"💼",label:"Distributors & Traders",   desc:"Medical trading companies and authorized resellers."},
+  {icon:"🏥",label:"Clinics & Medical Practices", desc:"Private clinics, dental offices, specialty practices, and medical centers across the Philippines."},
+  {icon:"💊",label:"Pharmacies & Drugstores",     desc:"Licensed pharmacies, drugstore chains, and pharmaceutical distributors."},
+  {icon:"🏢",label:"Businesses & BPOs",           desc:"Companies maintaining workplace health programs, first-aid supplies, and employee wellness."},
+  {icon:"🏠",label:"Individuals & Families",      desc:"Home healthcare, personal wellness, and everyday health essentials delivered nationwide."},
+  {icon:"🏛️",label:"Institutions & Government",  desc:"Hospitals, LGUs, RHUs, and government health programs. Institutional orders available upon request."},
+  {icon:"🌍",label:"International Buyers",        desc:"Distributors, hospitals, and health ministries across Southeast Asia and the Middle East."},
 ];
 
 const COMPANY_MILESTONES = [
@@ -129,19 +131,19 @@ const COMPANY_MILESTONES = [
 ];
 
 const HOW_IT_WORKS = [
-  {step:"01",title:"Browse & Select",  desc:"Browse our catalog of 60+ medical products across 9 categories."},
-  {step:"02",title:"Order or Inquire", desc:"Place a direct order for priced items, or submit a quote for equipment."},
-  {step:"03",title:"Confirm & Pay",    desc:"We confirm availability and pricing. Full payment required before processing."},
-  {step:"04",title:"We Source & Ship", desc:"We procure from authorized suppliers and arrange delivery — nationwide or international."},
+  {step:"01",title:"Browse the Shop",  desc:"Explore our catalog of healthcare products with clear prices and categories. Filter by what you need."},
+  {step:"02",title:"Add to Cart",      desc:"Add items directly to your cart. Standard products are available for immediate online checkout."},
+  {step:"03",title:"Pay Securely",     desc:"Choose your payment method — credit/debit card, GCash, Maya, or bank transfer. Fully secured checkout."},
+  {step:"04",title:"Fast Nationwide Delivery", desc:"We deliver to all Philippine regions. International shipping available. Track your order after dispatch."},
 ];
 
-const TURNKEY_SERVICES = [
-  {title:"Hemodialysis Centers",      body:"Complete dialysis center setup — machines, RO water treatment, consumables.",icon:"💧"},
-  {title:"Hospital Ward Equipping",   body:"Full equipment packages for ICU, ER, OB wards, and diagnostic areas.",icon:"🏥"},
-  {title:"Mobile Health Programs",    body:"Ambulances, ambu-trikes, mobile clinics, and super mobile clinics for LGUs.",icon:"🚑"},
-  {title:"Laboratory Setup",          body:"Complete lab equipping for hospitals and RHUs — analyzers, sterilizers, cold storage.",icon:"🔬"},
-  {title:"Bulk Pharmaceutical Supply",body:"Large-volume medicine, vaccine, and consumables supply for DOH/LGU programs.",icon:"💊"},
-  {title:"Specialized Systems",       body:"Hyperbaric chambers, air-to-water generators, and water purification systems.",icon:"⚙️"},
+const INSTITUTIONAL_SERVICES = [
+  {title:"Diagnostic Imaging Systems",  body:"Digital X-Ray, CT Scan, MRI, ultrasound, and mammography units for hospitals and diagnostic centers.",icon:"🩻"},
+  {title:"Hemodialysis Centers",        body:"Complete dialysis center setup — machines, RO water treatment, consumables, and technical support.",icon:"💧"},
+  {title:"ICU & Emergency Equipment",   body:"Ventilators, defibrillators, patient monitors, and full ICU/ER equipment packages.",icon:"🚨"},
+  {title:"Laboratory Setup",            body:"Complete lab equipping — analyzers, centrifuges, sterilizers, and cold storage systems.",icon:"🔬"},
+  {title:"Medical Vehicles",            body:"Ambulances, ambu-trikes, and mobile clinics for healthcare programs and emergency response.",icon:"🚑"},
+  {title:"Bulk & Specialized Supply",   body:"Large-volume pharmaceuticals, vaccines, hyperbaric chambers, and specialized systems upon request.",icon:"⚙️"},
 ];
 
 const SHIPPING_METHODS = [
@@ -514,7 +516,7 @@ function Navbar({activePage,setPage,cartCount,user,isAdmin,onSignIn,onSignOut}){
     return()=>document.removeEventListener("mousedown",fn);
   },[]);
 
-  const links=[{id:"home",label:"Home"},{id:"about",label:"About Us"},{id:"products",label:"Products"},{id:"services",label:"Services"},{id:"quote",label:"Request Quote"},{id:"contact",label:"Contact"}];
+  const links=[{id:"home",label:"Home"},{id:"about",label:"About Us"},{id:"products",label:"Shop"},{id:"institutional",label:"Institutional Orders"},{id:"quote",label:"Request Quote"},{id:"contact",label:"Contact"}];
   const nav=id=>{setPage(id);setMenuOpen(false);};
 
   return(
@@ -1052,19 +1054,19 @@ function HeroSection({setPage}){
           <div>
             <div className="dm-fade-up" style={{display:"inline-flex",alignItems:"center",gap:8,background:ds.color.redLight,border:`1px solid ${ds.color.redBorder}`,borderRadius:ds.radius.pill,padding:"6px 16px 6px 8px",marginBottom:28}}>
               <span style={{width:22,height:22,borderRadius:"50%",background:ds.color.red,display:"inline-flex",alignItems:"center",justifyContent:"center",fontSize:12}}>🇵🇭</span>
-              <span style={{fontSize:12,color:ds.color.red,fontWeight:600,letterSpacing:"0.04em"}}>Philippine-Based · Worldwide Delivery · Est. 2020</span>
+              <span style={{fontSize:12,color:ds.color.red,fontWeight:600,letterSpacing:"0.04em"}}>Philippine-Based · Nationwide Delivery · Est. 2020</span>
             </div>
-            <h1 className="dm-fade-up dm-fade-up-1" style={{fontFamily:ds.font.display,fontSize:"clamp(2.4rem,4.5vw,3.6rem)",fontWeight:400,color:ds.color.textDark,lineHeight:1.12,marginBottom:6}}>Your Source for</h1>
+            <h1 className="dm-fade-up dm-fade-up-1" style={{fontFamily:ds.font.display,fontSize:"clamp(2.4rem,4.5vw,3.6rem)",fontWeight:400,color:ds.color.textDark,lineHeight:1.12,marginBottom:6}}>Affordable Medical</h1>
             <h1 className="dm-fade-up dm-fade-up-2" style={{fontFamily:ds.font.display,fontSize:"clamp(2.4rem,4.5vw,3.6rem)",fontWeight:400,lineHeight:1.12,marginBottom:24}}>
-              <span style={{color:ds.color.red}}>Quality Medical</span><br/><span style={{color:ds.color.textDark}}>Solutions.</span>
+              <span style={{color:ds.color.red}}>Supplies & Healthcare</span><br/><span style={{color:ds.color.textDark}}>Products Online.</span>
             </h1>
-            <p className="dm-fade-up dm-fade-up-3" style={{fontSize:16,color:ds.color.textMuted,lineHeight:1.8,maxWidth:500,marginBottom:36}}>DMEAST is a Philippine-based medical solutions provider supplying hospitals, LGUs, RHUs, institutions, and international buyers worldwide — with medical equipment, pharmaceuticals, laboratory systems, and specialized healthcare solutions shipped to any country.</p>
+            <p className="dm-fade-up dm-fade-up-3" style={{fontSize:16,color:ds.color.textMuted,lineHeight:1.8,maxWidth:500,marginBottom:36}}>Shop healthcare products, pharmaceuticals, diagnostic devices, and beauty & wellness essentials — trusted by clinics, businesses, and individuals across the Philippines.</p>
             <div className="dm-fade-up dm-fade-up-4" style={{display:"flex",gap:12,flexWrap:"wrap",marginBottom:44}}>
-              <Btn variant="primary" size="lg" onClick={()=>setPage("products")}>Browse Products</Btn>
-              <Btn variant="secondary" size="lg" onClick={()=>setPage("quote")}>Request a Quote</Btn>
+              <Btn variant="primary" size="lg" onClick={()=>setPage("products")}>Shop Now</Btn>
+              <Btn variant="secondary" size="lg" onClick={()=>setPage("institutional")}>Institutional Orders</Btn>
             </div>
             <div className="dm-fade-up dm-fade-up-4" style={{display:"flex",gap:24,flexWrap:"wrap"}}>
-              {[["🏛️","Gov't & Private"],["🌍","Worldwide Delivery"],["🌐","Intl. Sourcing"],["📋","Procurement-Based"]].map(([icon,label])=>(
+              {[["🚚","Fast Nationwide Delivery"],["🔒","Secure Checkout"],["✅","Authorized Suppliers"],["💬","Dedicated Support"]].map(([icon,label])=>(
                 <div key={label} style={{display:"flex",alignItems:"center",gap:6}}><span style={{fontSize:14}}>{icon}</span><span style={{fontSize:12,color:ds.color.textMuted,fontWeight:500}}>{label}</span></div>
               ))}
             </div>
@@ -1079,22 +1081,24 @@ function HeroSection({setPage}){
               ))}
             </div>
           </div>
+          {/* Right — Stats + trust cards */}
           <div style={{display:"flex",flexDirection:"column",gap:16}}>
             <div className="dm-grid-4" style={{gridTemplateColumns:"repeat(2,1fr)"}}>
-              {[{v:"5+",l:"Years in Operation",accent:ds.color.red},{v:"3",l:"Island Groups",accent:ds.color.goldBright},{v:"500+",l:"Global Clients",accent:ds.color.red},{v:"9",l:"Product Categories",accent:ds.color.goldBright}].map((s,i)=>(
+              {[{v:"5+",l:"Years Serving PH",accent:ds.color.red},{v:"500+",l:"Clients Nationwide",accent:ds.color.goldBright},{v:"9",l:"Product Categories",accent:ds.color.red},{v:"24/7",l:"Order Support",accent:ds.color.goldBright}].map((s,i)=>(
                 <div key={i} style={{background:ds.color.white,border:`1px solid ${ds.color.border}`,borderRadius:ds.radius.lg,padding:"22px 18px",textAlign:"center",borderTop:`3px solid ${s.accent}`,boxShadow:ds.shadow.xs}}>
                   <div style={{fontFamily:ds.font.display,fontSize:"2rem",color:s.accent,lineHeight:1}}>{s.v}</div>
                   <div style={{fontSize:11,color:ds.color.textMuted,marginTop:6,fontWeight:500,letterSpacing:"0.04em",textTransform:"uppercase"}}>{s.l}</div>
                 </div>
               ))}
             </div>
+            {/* Trust card — replaced "Procurement-Based Supply" */}
             <div style={{background:ds.color.textDark,borderRadius:ds.radius.lg,padding:"22px 24px"}}>
-              <div style={{fontSize:10,fontWeight:700,color:ds.color.goldBright,letterSpacing:"0.14em",textTransform:"uppercase",marginBottom:8}}>Our Model</div>
-              <div style={{fontSize:15,fontWeight:600,color:"#fff",marginBottom:8}}>Procurement-Based Supply</div>
-              <div style={{fontSize:13,color:"rgba(255,255,255,0.6)",lineHeight:1.7}}>We source from authorized suppliers on-demand — no heavy inventory overhead. Transparent pricing from single units to full facility setups.</div>
+              <div style={{fontSize:10,fontWeight:700,color:ds.color.goldBright,letterSpacing:"0.14em",textTransform:"uppercase",marginBottom:8}}>Why Choose DMEAST</div>
+              <div style={{fontSize:15,fontWeight:600,color:"#fff",marginBottom:8}}>Products from Authorized Suppliers</div>
+              <div style={{fontSize:13,color:"rgba(255,255,255,0.6)",lineHeight:1.7}}>All products are sourced from verified and authorized suppliers. Standard items available for direct purchase. Institutional and specialized orders handled upon request.</div>
             </div>
             <div style={{display:"flex",gap:10}}>
-              <button onClick={()=>setPage("services")} style={{flex:1,background:ds.color.redLight,border:`1px solid ${ds.color.redBorder}`,borderRadius:ds.radius.md,padding:"13px",cursor:"pointer",fontFamily:ds.font.body,fontSize:13,fontWeight:600,color:ds.color.red}}>Turnkey Projects →</button>
+              <button onClick={()=>setPage("institutional")} style={{flex:1,background:ds.color.redLight,border:`1px solid ${ds.color.redBorder}`,borderRadius:ds.radius.md,padding:"13px",cursor:"pointer",fontFamily:ds.font.body,fontSize:13,fontWeight:600,color:ds.color.red}}>Institutional Orders →</button>
               <button onClick={()=>setPage("about")} style={{flex:1,background:ds.color.canvas,border:`1px solid ${ds.color.border}`,borderRadius:ds.radius.md,padding:"13px",cursor:"pointer",fontFamily:ds.font.body,fontSize:13,fontWeight:600,color:ds.color.textMuted}}>Our Story →</button>
             </div>
           </div>
@@ -1105,11 +1109,18 @@ function HeroSection({setPage}){
 }
 
 function CategoriesSection({setPage,setActiveCategory}){
+  const shopCats = CATEGORIES.filter(c => !c.institutional);
   return(
     <section style={{background:ds.color.canvas,padding:"80px 28px"}}>
       <div style={{maxWidth:1280,margin:"0 auto"}}>
-        <SectionHeader eyebrow="Our Catalog" title="9 Medical Categories" subtitle="From diagnostic equipment to pharmaceuticals, medical vehicles to beauty & wellness — we source and supply everything your facility needs." center/>
-        <div className="dm-grid-3">{CATEGORIES.map(cat=><CategoryCard key={cat.id} cat={cat} onClick={()=>{setActiveCategory(cat.id);setPage("products");}}/>)}</div>
+        <SectionHeader eyebrow="Shop by Category" title="Find What You Need" subtitle="Browse healthcare products, pharmaceuticals, diagnostic devices, and beauty & wellness essentials — all available for direct online purchase." center/>
+        <div className="dm-grid-4" style={{marginBottom:36}}>
+          {shopCats.map(cat=><CategoryCard key={cat.id} cat={cat} onClick={()=>{setActiveCategory(cat.id);setPage("products");}}/>)}
+        </div>
+        <div style={{textAlign:"center"}}>
+          <div style={{fontSize:13,color:ds.color.textMuted,marginBottom:12}}>Looking for hospital equipment, imaging systems, or specialized medical devices?</div>
+          <Btn variant="outline" size="md" onClick={()=>setPage("institutional")}>View Institutional Orders →</Btn>
+        </div>
       </div>
     </section>
   );
@@ -1119,7 +1130,7 @@ function WhoWeServeSection(){
   return(
     <section style={{background:ds.color.canvasWarm,padding:"80px 28px"}}>
       <div style={{maxWidth:1280,margin:"0 auto"}}>
-        <SectionHeader eyebrow="Who We Serve" title="Built for Healthcare Buyers" subtitle="DMEAST works with government and private healthcare organizations of all sizes." center/>
+        <SectionHeader eyebrow="Who We Serve" title="For Clinics, Businesses & Individuals" subtitle="DMEAST serves everyone who needs quality healthcare products — from individual buyers to clinics and institutions." center/>
         <div className="dm-grid-3">
           {CLIENT_TYPES.map(c=>(
             <div key={c.label} style={{background:ds.color.white,border:`1px solid ${ds.color.border}`,borderRadius:ds.radius.lg,padding:"26px 24px",boxShadow:ds.shadow.xs}}>
@@ -1155,21 +1166,35 @@ function HowItWorksSection(){
   );
 }
 
-function TurnkeySection({setPage}){
+function InstitutionalPreviewSection({setPage}){
   return(
-    <section style={{background:ds.color.textDark,padding:"80px 28px"}}>
+    <section style={{background:ds.color.canvas,padding:"72px 28px"}}>
       <div style={{maxWidth:1280,margin:"0 auto"}}>
-        <SectionHeader eyebrow="Turnkey Solutions" title="Complete Healthcare Projects" subtitle="Beyond individual products — we plan, source, and deliver entire healthcare facility setups." center dark/>
-        <div className="dm-grid-3">
-          {TURNKEY_SERVICES.map((s,i)=>(
-            <div key={i} style={{background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:ds.radius.lg,padding:"24px 22px"}}>
-              <div style={{fontSize:28,marginBottom:12}}>{s.icon}</div>
-              <div style={{fontSize:14.5,fontWeight:700,color:"#fff",marginBottom:8}}>{s.title}</div>
-              <div style={{fontSize:13,color:"rgba(255,255,255,0.6)",lineHeight:1.7}}>{s.body}</div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:48,alignItems:"center"}}>
+          <div>
+            <div style={{fontSize:11,fontWeight:700,letterSpacing:"0.14em",textTransform:"uppercase",color:ds.color.red,marginBottom:12}}>Institutional & Enterprise</div>
+            <h2 style={{fontFamily:ds.font.display,fontSize:"clamp(1.6rem,2.5vw,2.1rem)",fontWeight:400,color:ds.color.textDark,lineHeight:1.3,marginBottom:16}}>Specialized & Large-Scale Healthcare Solutions</h2>
+            <p style={{fontSize:15,color:ds.color.textMuted,lineHeight:1.8,marginBottom:24}}>For hospitals, diagnostic centers, and healthcare institutions requiring specialized equipment, bulk supply, or complete facility setups — we handle institutional orders upon request with formal quotation and dedicated account support.</p>
+            <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:28}}>
+              {["Imaging Systems","Dialysis Centers","ICU Equipment","Medical Vehicles","Lab Setup","Bulk Pharma"].map(tag=>(
+                <span key={tag} style={{fontSize:12,fontWeight:500,padding:"5px 12px",borderRadius:ds.radius.pill,background:ds.color.white,border:`1px solid ${ds.color.border}`,color:ds.color.textBody}}>{tag}</span>
+              ))}
             </div>
-          ))}
+            <div style={{display:"flex",gap:12,flexWrap:"wrap"}}>
+              <Btn variant="primary" size="md" onClick={()=>setPage("institutional")}>View Institutional Orders</Btn>
+              <Btn variant="outline" size="md" onClick={()=>setPage("quote")}>Request a Quote</Btn>
+            </div>
+          </div>
+          <div className="dm-grid-3" style={{gridTemplateColumns:"repeat(2,1fr)",gap:14}}>
+            {INSTITUTIONAL_SERVICES.map((s,i)=>(
+              <div key={i} style={{background:ds.color.white,border:`1px solid ${ds.color.border}`,borderRadius:ds.radius.lg,padding:"20px 18px",boxShadow:ds.shadow.xs}}>
+                <div style={{fontSize:22,marginBottom:10}}>{s.icon}</div>
+                <div style={{fontSize:13,fontWeight:700,color:ds.color.textDark,marginBottom:5}}>{s.title}</div>
+                <div style={{fontSize:12,color:ds.color.textMuted,lineHeight:1.6}}>{s.body}</div>
+              </div>
+            ))}
+          </div>
         </div>
-        <div style={{textAlign:"center",marginTop:40}}><Btn variant="gold" size="xl" onClick={()=>setPage("services")}>View All Services →</Btn></div>
       </div>
     </section>
   );
@@ -1212,10 +1237,10 @@ function CtaBanner({setPage}){
   return(
     <section style={{background:`linear-gradient(135deg,${ds.color.red} 0%,${ds.color.redDark} 100%)`,padding:"72px 28px"}}>
       <div style={{maxWidth:800,margin:"0 auto",textAlign:"center"}}>
-        <div style={{fontFamily:ds.font.display,fontSize:"clamp(1.8rem,3.5vw,2.6rem)",color:"#fff",lineHeight:1.2,marginBottom:16}}>Ready to equip your facility?</div>
-        <p style={{fontSize:16,color:"rgba(255,255,255,0.8)",lineHeight:1.7,marginBottom:32}}>Whether you're outfitting an ICU, stocking a pharmacy, or planning a turnkey project — DMEAST delivers.</p>
+        <div style={{fontFamily:ds.font.display,fontSize:"clamp(1.8rem,3.5vw,2.6rem)",color:"#fff",lineHeight:1.2,marginBottom:16}}>Your health needs, delivered nationwide.</div>
+        <p style={{fontSize:16,color:"rgba(255,255,255,0.8)",lineHeight:1.7,marginBottom:32}}>From everyday health essentials to professional clinic supplies — DMEAST has you covered with fast, reliable delivery across the Philippines.</p>
         <div style={{display:"flex",gap:12,justifyContent:"center",flexWrap:"wrap"}}>
-          <Btn variant="dark" size="xl" onClick={()=>setPage("quote")}>Request a Quote →</Btn>
+          <Btn variant="dark" size="xl" onClick={()=>setPage("products")}>Shop Now →</Btn>
           <Btn href={CONTACT.whatsapp} variant="outline" size="xl">💬 Chat with Us</Btn>
         </div>
       </div>
@@ -1223,25 +1248,95 @@ function CtaBanner({setPage}){
   );
 }
 
+function PaymentMethodsSection(){
+  return(
+    <section style={{background:ds.color.white,padding:"60px 28px"}}>
+      <div style={{maxWidth:900,margin:"0 auto",textAlign:"center"}}>
+        <div style={{fontSize:11,fontWeight:700,letterSpacing:"0.14em",textTransform:"uppercase",color:ds.color.red,marginBottom:12}}>Secure Payments</div>
+        <h2 style={{fontFamily:ds.font.display,fontSize:"clamp(1.5rem,2.5vw,2rem)",fontWeight:400,color:ds.color.textDark,marginBottom:12}}>Multiple Payment Options</h2>
+        <p style={{fontSize:15,color:ds.color.textMuted,marginBottom:32,maxWidth:500,margin:"0 auto 32px"}}>Pay your way — we accept all major payment methods for a smooth and secure checkout experience.</p>
+        <div style={{display:"flex",justifyContent:"center",gap:16,flexWrap:"wrap",marginBottom:20}}>
+          {[{icon:"💳",label:"Credit Card",sub:"Visa & Mastercard"},{icon:"💳",label:"Debit Card",sub:"All major banks"},{icon:"📱",label:"GCash",sub:"Instant transfer"},{icon:"💜",label:"Maya",sub:"Instant transfer"},{icon:"🏦",label:"Bank Transfer",sub:"All PH banks"},{icon:"📲",label:"QR Ph",sub:"Scan & pay"}].map(m=>(
+            <div key={m.label} style={{background:ds.color.canvas,border:`1px solid ${ds.color.border}`,borderRadius:ds.radius.lg,padding:"20px 24px",textAlign:"center",minWidth:110}}>
+              <div style={{fontSize:28,marginBottom:8}}>{m.icon}</div>
+              <div style={{fontSize:13,fontWeight:700,color:ds.color.textDark}}>{m.label}</div>
+              <div style={{fontSize:11,color:ds.color.textMuted,marginTop:3}}>{m.sub}</div>
+            </div>
+          ))}
+        </div>
+        <div style={{display:"inline-flex",alignItems:"center",gap:8,background:ds.color.successBg,border:`1px solid ${ds.color.successBorder}`,borderRadius:ds.radius.pill,padding:"8px 20px",fontSize:13,color:ds.color.success,fontWeight:600}}>
+          🔒 All transactions are SSL-secured and encrypted
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function WhyChooseSection(){
+  const points=[
+    {icon:"✅",title:"Authorized Suppliers",desc:"All products are sourced from verified and authorized suppliers. Quality you can trust."},
+    {icon:"🚚",title:"Nationwide Delivery",desc:"We deliver to all Philippine regions — Metro Manila, Visayas, Mindanao, and everywhere in between."},
+    {icon:"💊",title:"Wide Product Range",desc:"Pharmaceuticals, diagnostic devices, beauty & wellness, and healthcare essentials all in one place."},
+    {icon:"🏥",title:"Trusted by Clinics",desc:"Hundreds of clinics, pharmacies, and healthcare businesses rely on DMEAST for their supply needs."},
+    {icon:"💬",title:"Dedicated Support",desc:"Our team is ready to assist with orders, inquiries, and after-sales questions via call, email, or chat."},
+    {icon:"🌍",title:"International Shipping",desc:"We serve customers worldwide. International orders handled with full export documentation."},
+  ];
+  return(
+    <section style={{background:ds.color.canvasWarm,padding:"80px 28px"}}>
+      <div style={{maxWidth:1280,margin:"0 auto"}}>
+        <SectionHeader eyebrow="Why Choose DMEAST" title="Reliable. Affordable. Trusted." subtitle="Here's why clinics, businesses, and individuals across the Philippines choose us." center/>
+        <div className="dm-grid-3">
+          {points.map((p,i)=>(
+            <div key={i} style={{background:ds.color.white,border:`1px solid ${ds.color.border}`,borderRadius:ds.radius.lg,padding:"26px 24px",boxShadow:ds.shadow.xs,display:"flex",gap:16}}>
+              <div style={{width:44,height:44,borderRadius:ds.radius.md,background:ds.color.redLight,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>{p.icon}</div>
+              <div>
+                <div style={{fontSize:14.5,fontWeight:700,color:ds.color.textDark,marginBottom:6}}>{p.title}</div>
+                <div style={{fontSize:13.5,color:ds.color.textMuted,lineHeight:1.65}}>{p.desc}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function HomePage({setPage,setActiveCategory,addToCart}){
-  const featured=PRODUCTS.filter(p=>p.featured).slice(0,4);
+  // Featured products: show OTC/standard buy-able items first (no institutional, no Rx-only)
+  const featuredStandard = PRODUCTS.filter(p =>
+    p.featured && p.cta === "buy" && !p.requiresPrescription &&
+    !CATEGORIES.find(c=>c.id===p.category)?.institutional
+  ).slice(0,4);
+  // Fall back to any featured buy items if not enough
+  const featured = featuredStandard.length >= 4
+    ? featuredStandard
+    : PRODUCTS.filter(p => p.featured && p.cta === "buy").slice(0,4);
+
   return(
     <div style={{paddingTop:67}}>
+      {/* 1. Hero */}
       <HeroSection setPage={setPage}/>
-      <CategoriesSection setPage={setPage} setActiveCategory={setActiveCategory}/>
-      <WhoWeServeSection/>
-      <HowItWorksSection/>
+      {/* 2. Featured Standard Products */}
       <section style={{background:ds.color.white,padding:"80px 28px"}}>
         <div style={{maxWidth:1280,margin:"0 auto"}}>
-          <SectionHeader eyebrow="Featured Products" title="Popular Across Categories" subtitle="High-demand products from our catalog." center/>
+          <SectionHeader eyebrow="Featured Products" title="Popular Health & Wellness Products" subtitle="Directly available for online purchase with fast nationwide delivery." center/>
           <div className="dm-grid-4">
             {featured.map(p=><ProductCard key={p.id} product={p} addToCart={addToCart} setPage={setPage}/>)}
           </div>
           <div style={{textAlign:"center",marginTop:36}}><Btn variant="secondary" size="lg" onClick={()=>setPage("products")}>View All Products →</Btn></div>
         </div>
       </section>
-      <TurnkeySection setPage={setPage}/>
-      <WorldwideShipping/>
+      {/* 3. Shop by Category */}
+      <CategoriesSection setPage={setPage} setActiveCategory={setActiveCategory}/>
+      {/* 4. How to Order */}
+      <HowItWorksSection/>
+      {/* 5. Payment Methods */}
+      <PaymentMethodsSection/>
+      {/* 6. Why Choose DMEAST */}
+      <WhyChooseSection/>
+      {/* 7. Institutional Orders Preview */}
+      <InstitutionalPreviewSection setPage={setPage}/>
+      {/* 8. CTA Banner */}
       <CtaBanner setPage={setPage}/>
     </div>
   );
@@ -1251,14 +1346,14 @@ function HomePage({setPage,setActiveCategory,addToCart}){
 function AboutPage(){
   return(
     <div style={{paddingTop:67}}>
-      <PageHero eyebrow="About Us" title="Your Source for Quality Medical Solutions" subtitle="Since 2020, DMEAST has been supplying hospitals, LGUs, pharmacies, and international buyers with reliable medical equipment and healthcare solutions."/>
+      <PageHero eyebrow="About Us" title="Affordable Healthcare Products, Delivered Nationwide" subtitle="Since 2020, DMEAST has been a trusted source of medical supplies, pharmaceuticals, diagnostic devices, and healthcare essentials for clinics, businesses, and individuals across the Philippines."/>
       <div style={{maxWidth:1160,margin:"0 auto",padding:"72px 28px"}}>
         <div className="dm-grid-2" style={{gap:64,marginBottom:72}}>
           <div>
-            <SectionHeader eyebrow="Our Story" title="From Manila to the World"/>
-            <p style={{fontSize:15,color:ds.color.textBody,lineHeight:1.85,marginBottom:18}}>DMEAST (Decon Medical Equipment and Supplies Trading) was established in 2020 in Sta. Cruz, Manila — with a mission to make quality healthcare products accessible to institutions across the Philippines and beyond.</p>
-            <p style={{fontSize:15,color:ds.color.textBody,lineHeight:1.85,marginBottom:18}}>We operate on a procurement-based model — sourcing from authorized local and international suppliers to fulfill specific orders, ensuring competitive pricing without maintaining excess inventory.</p>
-            <p style={{fontSize:15,color:ds.color.textBody,lineHeight:1.85}}>From single-unit orders to full facility setups for government LGU programs, DMEAST has become a trusted partner to over 500 clients nationwide and internationally.</p>
+            <SectionHeader eyebrow="Our Story" title="From Manila to the Philippines and Beyond"/>
+            <p style={{fontSize:15,color:ds.color.textBody,lineHeight:1.85,marginBottom:18}}>DMEAST (Decon Medical Equipment and Supplies Trading) was established in 2020 in Sta. Cruz, Manila — with a mission to make quality healthcare products accessible to everyone who needs them, from individual buyers to clinics and institutions.</p>
+            <p style={{fontSize:15,color:ds.color.textBody,lineHeight:1.85,marginBottom:18}}>We carry a wide range of standard healthcare products available for direct online purchase, along with specialized and institutional solutions handled upon request. All products are sourced from verified and authorized suppliers.</p>
+            <p style={{fontSize:15,color:ds.color.textBody,lineHeight:1.85}}>Over the years, DMEAST has grown into a trusted partner for over 500 clients — serving clinics, pharmacies, businesses, and healthcare institutions nationwide and internationally.</p>
           </div>
           <div>
             <SectionHeader eyebrow="Milestones" title="Our Journey"/>
@@ -1275,35 +1370,67 @@ function AboutPage(){
             ))}
           </div>
         </div>
-        <WhoWeServeSection/>
+        <WhyChooseSection/>
       </div>
     </div>
   );
 }
 
-// ─── PRODUCTS PAGE ───────────────────────────────────────────────────────────
+// ─── PRODUCTS PAGE (SHOP) ────────────────────────────────────────────────────
 function ProductsPage({setPage,addToCart,setActiveCategory,activeCategory,wishlist,toggleWishlist}){
   const [search,setSearch]=useState("");
   const [cat,setCat]=useState(activeCategory||null);
+  const [showAll,setShowAll]=useState(false);
   useEffect(()=>{if(activeCategory)setCat(activeCategory);},[activeCategory]);
+
+  // By default show only non-institutional categories unless user picks one or searches
+  const shopCats = CATEGORIES.filter(c=>!c.institutional);
+  const isInstitutionalCat = cat && CATEGORIES.find(c=>c.id===cat)?.institutional;
+
   const filtered=PRODUCTS.filter(p=>{
     const mc=!cat||p.category===cat;
     const q=search.toLowerCase();
     const ms=!q||p.name.toLowerCase().includes(q)||p.desc.toLowerCase().includes(q)||p.tag.toLowerCase().includes(q);
-    return mc&&ms;
+    // If no filter active and not showing all, hide institutional categories
+    const notInstit = showAll||cat||q ? true : !CATEGORIES.find(c=>c.id===p.category)?.institutional;
+    return mc&&ms&&notInstit;
   });
+
+  const shopProductCount = PRODUCTS.filter(p=>!CATEGORIES.find(c=>c.id===p.category)?.institutional).length;
+
   return(
     <div style={{paddingTop:67}}>
-      <PageHero eyebrow="Products" title="Medical Products Catalog" subtitle={`${PRODUCTS.length} products across 9 categories`}/>
+      <PageHero eyebrow="Online Shop" title="Healthcare Products & Medical Supplies" subtitle={`${shopProductCount}+ products available for direct purchase with nationwide delivery.`}/>
       <div style={{maxWidth:1280,margin:"0 auto",padding:"40px 28px"}}>
-        <div style={{display:"flex",gap:12,marginBottom:28,flexWrap:"wrap",alignItems:"center"}}>
+
+        {/* Institutional notice banner */}
+        {isInstitutionalCat && (
+          <div style={{background:ds.color.goldLight,border:`1px solid ${ds.color.goldBorder}`,borderRadius:ds.radius.lg,padding:"14px 20px",marginBottom:24,display:"flex",alignItems:"center",justifyContent:"space-between",gap:16,flexWrap:"wrap"}}>
+            <div style={{fontSize:13.5,color:ds.color.gold}}>
+              <strong>ℹ️ Institutional Category:</strong> Items in this category are available through institutional inquiry. <button onClick={()=>setPage("institutional")} style={{background:"none",border:"none",color:ds.color.gold,fontWeight:700,cursor:"pointer",fontFamily:ds.font.body,fontSize:13.5,textDecoration:"underline"}}>View Institutional Orders →</button>
+            </div>
+            <Btn variant="gold" size="sm" onClick={()=>setPage("quote")}>Request a Quote</Btn>
+          </div>
+        )}
+
+        <div style={{display:"flex",gap:12,marginBottom:24,flexWrap:"wrap",alignItems:"center"}}>
           <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="🔍 Search products…" style={{flex:1,minWidth:200,padding:"11px 16px",border:`1.5px solid ${ds.color.border}`,borderRadius:ds.radius.md,fontSize:14,outline:"none",fontFamily:ds.font.body}} onFocus={e=>e.target.style.borderColor=ds.color.red} onBlur={e=>e.target.style.borderColor=ds.color.border}/>
           <select value={cat||""} onChange={e=>{setCat(e.target.value||null);setActiveCategory(e.target.value||null);}} style={{padding:"11px 16px",border:`1.5px solid ${ds.color.border}`,borderRadius:ds.radius.md,fontSize:14,outline:"none",fontFamily:ds.font.body,background:"#fff",cursor:"pointer"}}>
-            <option value="">All Categories</option>
-            {CATEGORIES.map(c=><option key={c.id} value={c.id}>{c.label}</option>)}
+            <option value="">All Shop Categories</option>
+            {shopCats.map(c=><option key={c.id} value={c.id}>{c.label}</option>)}
+            <optgroup label="── Institutional Orders ──">
+              {CATEGORIES.filter(c=>c.institutional).map(c=><option key={c.id} value={c.id}>{c.label}</option>)}
+            </optgroup>
           </select>
         </div>
-        <div style={{fontSize:13,color:ds.color.textMuted,marginBottom:22}}>{filtered.length} product{filtered.length!==1?"s":""} found</div>
+
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:22,flexWrap:"wrap",gap:10}}>
+          <div style={{fontSize:13,color:ds.color.textMuted}}>{filtered.length} product{filtered.length!==1?"s":""} found</div>
+          {!showAll&&!cat&&!search&&(
+            <button onClick={()=>setShowAll(true)} style={{background:"none",border:"none",cursor:"pointer",fontSize:13,color:ds.color.red,fontFamily:ds.font.body,fontWeight:600}}>Show all products including institutional →</button>
+          )}
+        </div>
+
         <div className="dm-grid-4">
           {filtered.map(p=><ProductCard key={p.id} product={p} addToCart={addToCart} setPage={setPage} wishlist={wishlist} toggleWishlist={toggleWishlist}/>)}
         </div>
@@ -1314,19 +1441,78 @@ function ProductsPage({setPage,addToCart,setActiveCategory,activeCategory,wishli
             <div style={{fontSize:13}}>Try a different search term or category.</div>
           </div>
         )}
+
+        {/* Bottom link to institutional */}
+        {!isInstitutionalCat&&(
+          <div style={{marginTop:48,padding:"28px 32px",background:ds.color.canvas,borderRadius:ds.radius.xl,border:`1px solid ${ds.color.border}`,textAlign:"center"}}>
+            <div style={{fontSize:15,fontWeight:600,color:ds.color.textDark,marginBottom:6}}>Need hospital equipment, imaging systems, or specialized devices?</div>
+            <div style={{fontSize:13.5,color:ds.color.textMuted,marginBottom:16}}>Institutional and specialized orders are handled separately with formal quotation.</div>
+            <Btn variant="secondary" size="md" onClick={()=>setPage("institutional")}>View Institutional Orders →</Btn>
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
-// ─── SERVICES PAGE ───────────────────────────────────────────────────────────
-function ServicesPage({setPage}){
+// ─── INSTITUTIONAL ORDERS PAGE ───────────────────────────────────────────────
+function InstitutionalOrdersPage({setPage}){
+  const institutionalCats = CATEGORIES.filter(c=>c.institutional);
+  const institutionalProducts = PRODUCTS.filter(p=>CATEGORIES.find(c=>c.id===p.category)?.institutional);
   return(
     <div style={{paddingTop:67}}>
-      <PageHero eyebrow="Services" title="Turnkey Medical Solutions" subtitle="Beyond individual products — we plan, source, and deliver complete healthcare facility setups."/>
+      <PageHero eyebrow="Institutional Orders" title="Specialized & Enterprise Healthcare Solutions" subtitle="For hospitals, diagnostic centers, and healthcare institutions requiring specialized equipment, bulk pharmaceutical supply, or complete facility setups."/>
       <div style={{maxWidth:1160,margin:"0 auto",padding:"72px 28px"}}>
-        <div className="dm-grid-3" style={{marginBottom:64}}>
-          {TURNKEY_SERVICES.map((s,i)=>(
+
+        {/* How institutional orders work */}
+        <div style={{background:ds.color.canvas,borderRadius:ds.radius.xl,border:`1px solid ${ds.color.border}`,padding:"32px 36px",marginBottom:56}}>
+          <div style={{fontFamily:ds.font.display,fontSize:20,color:ds.color.textDark,marginBottom:20}}>How Institutional Orders Work</div>
+          <div className="dm-grid-4">
+            {[{step:"01",icon:"📋",title:"Submit a Request",desc:"Fill out our quote request form with your requirements, quantities, and specifications."},
+              {step:"02",icon:"💬",title:"We Review & Confirm",desc:"Our team reviews your request and follows up within 24–48 hours to confirm details."},
+              {step:"03",icon:"📄",title:"Formal Quotation",desc:"We provide a formal quotation with pricing, lead times, and delivery terms."},
+              {step:"04",icon:"🚚",title:"Fulfillment & Delivery",desc:"Upon payment confirmation, we source, prepare, and arrange delivery to your location."},
+            ].map((s,i)=>(
+              <div key={i} style={{textAlign:"center",padding:"16px 12px"}}>
+                <div style={{width:48,height:48,borderRadius:"50%",background:ds.color.redLight,border:`1px solid ${ds.color.redBorder}`,display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 14px",fontSize:20}}>{s.icon}</div>
+                <div style={{fontSize:10,fontWeight:700,color:ds.color.red,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:6}}>Step {s.step}</div>
+                <div style={{fontSize:14,fontWeight:700,color:ds.color.textDark,marginBottom:6}}>{s.title}</div>
+                <div style={{fontSize:13,color:ds.color.textMuted,lineHeight:1.6}}>{s.desc}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Institutional categories */}
+        <SectionHeader eyebrow="Available Categories" title="Institutional Product Areas" subtitle="Pricing and availability for institutional items are confirmed upon request."/>
+        <div className="dm-grid-3" style={{marginBottom:56}}>
+          {institutionalCats.map(cat=>{
+            const catProds = institutionalProducts.filter(p=>p.category===cat.id);
+            return(
+              <div key={cat.id} style={{background:ds.color.white,border:`1px solid ${ds.color.border}`,borderRadius:ds.radius.lg,overflow:"hidden",boxShadow:ds.shadow.xs}}>
+                <div style={{height:5,background:`linear-gradient(90deg,${cat.color},${cat.accent})`}}/>
+                <div style={{padding:"24px 22px"}}>
+                  <div style={{fontSize:24,marginBottom:10}}>{cat.icon}</div>
+                  <div style={{fontSize:15,fontWeight:700,color:ds.color.textDark,marginBottom:8}}>{cat.label}</div>
+                  <div style={{display:"flex",flexDirection:"column",gap:5,marginBottom:16}}>
+                    {catProds.slice(0,4).map(p=>(
+                      <div key={p.id} style={{fontSize:12.5,color:ds.color.textMuted,display:"flex",alignItems:"center",gap:6}}>
+                        <span style={{color:cat.accent,fontSize:10}}>●</span>{p.name}
+                      </div>
+                    ))}
+                    {catProds.length>4&&<div style={{fontSize:12,color:ds.color.textLight}}>+{catProds.length-4} more items</div>}
+                  </div>
+                  <Btn variant="outline" size="sm" fullWidth onClick={()=>setPage("quote")}>Request Quote</Btn>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Services offered */}
+        <SectionHeader eyebrow="What We Handle" title="Full-Scope Institutional Solutions"/>
+        <div className="dm-grid-3" style={{marginBottom:56}}>
+          {INSTITUTIONAL_SERVICES.map((s,i)=>(
             <div key={i} style={{background:ds.color.white,border:`1px solid ${ds.color.border}`,borderRadius:ds.radius.lg,padding:"28px 24px",boxShadow:ds.shadow.xs}}>
               <div style={{fontSize:32,marginBottom:14}}>{s.icon}</div>
               <div style={{fontFamily:ds.font.display,fontSize:17,color:ds.color.textDark,marginBottom:10}}>{s.title}</div>
@@ -1334,12 +1520,15 @@ function ServicesPage({setPage}){
             </div>
           ))}
         </div>
+
+        {/* CTA */}
         <div style={{textAlign:"center",padding:"48px 0",background:ds.color.canvasWarm,borderRadius:ds.radius.xl,border:`1px solid ${ds.color.borderLight}`}}>
-          <div style={{fontFamily:ds.font.display,fontSize:22,color:ds.color.textDark,marginBottom:10}}>Have a project in mind?</div>
-          <p style={{fontSize:15,color:ds.color.textMuted,marginBottom:24}}>Tell us about your requirements and we'll prepare a detailed quotation.</p>
+          <div style={{fontFamily:ds.font.display,fontSize:22,color:ds.color.textDark,marginBottom:10}}>Ready to submit an institutional order?</div>
+          <p style={{fontSize:15,color:ds.color.textMuted,marginBottom:8,maxWidth:520,margin:"0 auto 8px"}}>Tell us your requirements and we'll prepare a detailed formal quotation within 24–48 hours.</p>
+          <p style={{fontSize:13,color:ds.color.textLight,marginBottom:28}}>Pricing and availability for institutional items are subject to confirmation.</p>
           <div style={{display:"flex",gap:12,justifyContent:"center",flexWrap:"wrap"}}>
-            <Btn variant="primary" size="lg" onClick={()=>setPage("quote")}>Request a Quote</Btn>
-            <Btn variant="outline" size="lg" onClick={()=>setPage("contact")}>Talk to Sales</Btn>
+            <Btn variant="primary" size="lg" onClick={()=>setPage("quote")}>Submit a Quote Request</Btn>
+            <Btn variant="outline" size="lg" onClick={()=>setPage("contact")}>Talk to Our Team</Btn>
           </div>
         </div>
       </div>
@@ -1974,17 +2163,19 @@ function Footer({setPage}){
           </div>
           <div>
             <div style={{fontSize:11,fontWeight:700,color:"rgba(255,255,255,0.35)",textTransform:"uppercase",letterSpacing:"0.14em",marginBottom:16}}>Quick Links</div>
-            {[["home","Home"],["about","About Us"],["products","Products"],["services","Services"],["quote","Request Quote"],["contact","Contact"]].map(([id,label])=>(
+            {[["home","Home"],["about","About Us"],["products","Shop"],["institutional","Institutional Orders"],["quote","Request Quote"],["contact","Contact"]].map(([id,label])=>(
               <button key={id} onClick={()=>setPage(id)} style={{display:"block",background:"none",border:"none",cursor:"pointer",fontSize:13.5,color:"rgba(255,255,255,0.6)",fontFamily:ds.font.body,padding:"4px 0",textAlign:"left"}}
                 onMouseEnter={e=>e.target.style.color="#F0A81C"} onMouseLeave={e=>e.target.style.color="rgba(255,255,255,0.6)"}>{label}</button>
             ))}
           </div>
           <div>
-            <div style={{fontSize:11,fontWeight:700,color:"rgba(255,255,255,0.35)",textTransform:"uppercase",letterSpacing:"0.14em",marginBottom:16}}>Products</div>
-            {CATEGORIES.map(c=>(
+            <div style={{fontSize:11,fontWeight:700,color:"rgba(255,255,255,0.35)",textTransform:"uppercase",letterSpacing:"0.14em",marginBottom:16}}>Shop Categories</div>
+            {CATEGORIES.filter(c=>!c.institutional).map(c=>(
               <button key={c.id} onClick={()=>setPage("products")} style={{display:"block",background:"none",border:"none",cursor:"pointer",fontSize:13.5,color:"rgba(255,255,255,0.6)",fontFamily:ds.font.body,padding:"4px 0",textAlign:"left"}}
                 onMouseEnter={e=>e.target.style.color="#F0A81C"} onMouseLeave={e=>e.target.style.color="rgba(255,255,255,0.6)"}>{c.label}</button>
             ))}
+            <button onClick={()=>setPage("institutional")} style={{display:"block",background:"none",border:"none",cursor:"pointer",fontSize:13.5,color:ds.color.goldBright,fontFamily:ds.font.body,padding:"4px 0",textAlign:"left",marginTop:6,fontWeight:600}}
+              onMouseEnter={e=>e.target.style.color="#fff"} onMouseLeave={e=>e.target.style.color=ds.color.goldBright}>Institutional Orders →</button>
           </div>
           <div>
             <div style={{fontSize:11,fontWeight:700,color:"rgba(255,255,255,0.35)",textTransform:"uppercase",letterSpacing:"0.14em",marginBottom:16}}>Contact</div>
@@ -2095,19 +2286,19 @@ export default function App(){
       <style>{GLOBAL_CSS}</style>
       <Navbar activePage={page} setPage={setPage} cartCount={cartCount} user={user} isAdmin={isAdmin} onSignIn={handleSignIn} onSignOut={handleSignOut}/>
       <main>
-        {page==="home"     &&<HomePage     {...shared}/>}
-        {page==="about"    &&<AboutPage/>}
-        {page==="products" &&<ProductsPage {...shared}/>}
-        {page==="services" &&<ServicesPage setPage={setPage}/>}
-        {page==="quote"    &&<QuotePage/>}
-        {page==="contact"  &&<ContactPage/>}
-        {page==="cart"     &&<CartPage cart={cart} removeFromCart={removeFromCart} updateQty={updateQty} setPage={setPage} user={user} onOrderComplete={handleOrderComplete}/>}
-        {page==="portal"   &&(user?<CustomerPortal user={user} setPage={setPage} addToCart={addToCart} wishlist={wishlist} toggleWishlist={toggleWishlist}/>:<div style={{paddingTop:67,minHeight:"80vh",display:"flex",alignItems:"center",justifyContent:"center"}}><div style={{textAlign:"center"}}><div style={{fontSize:32,marginBottom:12}}>🔒</div><div style={{fontFamily:ds.font.display,fontSize:20,color:ds.color.textDark,marginBottom:12}}>Sign in to access your portal</div><Btn variant="primary" size="md" onClick={handleSignIn}>Sign In</Btn></div></div>)}
-        {page==="admin"    &&(isAdmin?<AdminDashboard user={user}/>:<div style={{paddingTop:67,minHeight:"80vh",display:"flex",alignItems:"center",justifyContent:"center"}}><div style={{textAlign:"center",color:ds.color.textMuted}}>⛔ Admin access only.</div></div>)}
-        {page==="privacy"  &&<PrivacyPage/>}
-        {page==="terms"    &&<TermsPage/>}
-        {page==="refunds"  &&<RefundPage/>}
-        {page==="shipping" &&<ShippingPage/>}
+        {page==="home"         &&<HomePage     {...shared}/>}
+        {page==="about"        &&<AboutPage/>}
+        {page==="products"     &&<ProductsPage {...shared}/>}
+        {page==="institutional"&&<InstitutionalOrdersPage setPage={setPage}/>}
+        {page==="quote"        &&<QuotePage/>}
+        {page==="contact"      &&<ContactPage/>}
+        {page==="cart"         &&<CartPage cart={cart} removeFromCart={removeFromCart} updateQty={updateQty} setPage={setPage} user={user} onOrderComplete={handleOrderComplete}/>}
+        {page==="portal"       &&(user?<CustomerPortal user={user} setPage={setPage} addToCart={addToCart} wishlist={wishlist} toggleWishlist={toggleWishlist}/>:<div style={{paddingTop:67,minHeight:"80vh",display:"flex",alignItems:"center",justifyContent:"center"}}><div style={{textAlign:"center"}}><div style={{fontSize:32,marginBottom:12}}>🔒</div><div style={{fontFamily:ds.font.display,fontSize:20,color:ds.color.textDark,marginBottom:12}}>Sign in to access your portal</div><Btn variant="primary" size="md" onClick={handleSignIn}>Sign In</Btn></div></div>)}
+        {page==="admin"        &&(isAdmin?<AdminDashboard user={user}/>:<div style={{paddingTop:67,minHeight:"80vh",display:"flex",alignItems:"center",justifyContent:"center"}}><div style={{textAlign:"center",color:ds.color.textMuted}}>⛔ Admin access only.</div></div>)}
+        {page==="privacy"      &&<PrivacyPage/>}
+        {page==="terms"        &&<TermsPage/>}
+        {page==="refunds"      &&<RefundPage/>}
+        {page==="shipping"     &&<ShippingPage/>}
       </main>
       <Footer setPage={setPage}/>
       <FloatingChat/>
