@@ -1,9 +1,17 @@
 /**
- * DMEAST — Medical Solutions Platform  v6.0
- * Frontend repositioning: ecommerce-first, institutional orders secondary
- * Firebase Auth + Customer Portal + Admin Dashboard (all v5 features intact)
- *
- * npm install firebase @emailjs/browser
+ * DMEAST — Medical Solutions Platform  v7.0
+ * - Auto-populate delivery details from logged-in user profile
+ * - "Ordering for someone else?" toggle
+ * - Real field validation (email format, PH/intl phone, name min length)
+ * - Country code selector on phone field
+ * - Rewards: ₱200 per point (was ₱100)
+ * - Fixed order placement hang — emailjs properly awaited, Firebase writes wrapped
+ * - Email to both customer and DMEAST on every order
+ * - Orders always written to Firestore (logged-in and guest)
+ * - Rx camera trigger fixed
+ * - Payment method styled badges (professional)
+ * - About Us milestones corrected
+ * - npm install firebase @emailjs/browser
  */
 
 import { useState, useEffect, useCallback, useRef } from "react";
@@ -39,8 +47,8 @@ const EMAILJS_CONFIG = {
   receiptTemplateId: "template_adb2so7", publicKey: "gV5OXqbN2PHond86B",
 };
 
-const POINTS_PER_PHP = 1 / 100;
-const POINT_VALUE    = 0.50;
+const POINTS_PER_PHP = 1 / 200;   // 1 pt per ₱200 spent
+const POINT_VALUE    = 0.50;        // ₱0.50 per point
 
 const ds = {
   color: {
@@ -122,12 +130,12 @@ const CLIENT_TYPES = [
 ];
 
 const COMPANY_MILESTONES = [
-  {year:"2020",title:"Founded",            desc:"DMEAST established in Sta. Cruz, Manila as a medical trading company."},
-  {year:"2021",title:"LGU Programs",       desc:"First LGU partnership for ambulances and mobile clinics."},
-  {year:"2022",title:"Beauty Line Launch", desc:"Expanded into aesthetic and beauty & wellness products."},
-  {year:"2023",title:"International",      desc:"First international exports to Southeast Asia and the Middle East."},
-  {year:"2024",title:"Online Platform",    desc:"Launched dmeastph.com for online ordering and quote requests."},
-  {year:"2025",title:"500+ Clients",       desc:"Reached 500+ clients across government, private, and international sectors."},
+  {year:"2020",title:"Founded",                  desc:"DMEAST established in Sta. Cruz, Manila as a registered medical trading company."},
+  {year:"2021",title:"LGU Programs",             desc:"First local government unit partnership for ambulances and mobile clinic vehicles."},
+  {year:"2022",title:"Pharmaceutical Expansion", desc:"Expanded pharmaceutical supply line, adding a wider range of branded and generic medicines."},
+  {year:"2023",title:"Beauty & Wellness Launch", desc:"Launched the Beauty & Wellness product line, serving aesthetic clinics and practitioners nationwide."},
+  {year:"2025",title:"500+ Clients",             desc:"Reached 500+ clients served across clinics, pharmacies, businesses, and institutions nationwide."},
+  {year:"2026",title:"Online Store Launch",      desc:"Launched dmeastph.com — making it easier to shop, order, and request quotes online."},
 ];
 
 const HOW_IT_WORKS = [
@@ -780,7 +788,7 @@ function CustomerPortal({user,setPage,addToCart,wishlist,toggleWishlist}){
               </div>
               <div style={{background:"#fff",border:`1px solid ${ds.color.border}`,borderRadius:ds.radius.xl,padding:"28px 32px",boxShadow:ds.shadow.xs}}>
                 <div style={{fontFamily:ds.font.display,fontSize:18,color:ds.color.textDark,marginBottom:18}}>How to Earn</div>
-                {[{icon:"🛒",label:"Place an order",desc:`Earn 1 point for every ₱100 spent`},{icon:"💊",label:"Rx products",desc:"Points earned on all purchases including Rx items"},{icon:"💰",label:"Redeem points",desc:`₱${POINT_VALUE} value per point — ask us at checkout`}].map((e,i)=>(
+                {[{icon:"🛒",label:"Place an order",desc:`Earn 1 point for every ₱200 spent`},{icon:"💊",label:"Rx products",desc:"Points earned on all purchases including Rx items"},{icon:"💰",label:"Redeem points",desc:`₱${POINT_VALUE} value per point — ask us at checkout`}].map((e,i)=>(
                   <div key={i} style={{display:"flex",gap:14,marginBottom:16}}>
                     <div style={{width:36,height:36,borderRadius:ds.radius.md,background:ds.color.goldLight,display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,flexShrink:0}}>{e.icon}</div>
                     <div><div style={{fontSize:13.5,fontWeight:600,color:ds.color.textDark}}>{e.label}</div><div style={{fontSize:12.5,color:ds.color.textMuted,marginTop:2}}>{e.desc}</div></div>
@@ -1669,92 +1677,247 @@ function ContactPage(){
 }
 
 
+// ─── HELPERS ─────────────────────────────────────────────────────────────────
+const COUNTRY_CODES = [
+  {code:"+63",flag:"🇵🇭",name:"Philippines"},
+  {code:"+1", flag:"🇺🇸",name:"USA / Canada"},
+  {code:"+65",flag:"🇸🇬",name:"Singapore"},
+  {code:"+60",flag:"🇲🇾",name:"Malaysia"},
+  {code:"+62",flag:"🇮🇩",name:"Indonesia"},
+  {code:"+66",flag:"🇹🇭",name:"Thailand"},
+  {code:"+84",flag:"🇻🇳",name:"Vietnam"},
+  {code:"+971",flag:"🇦🇪",name:"UAE"},
+  {code:"+966",flag:"🇸🇦",name:"Saudi Arabia"},
+  {code:"+974",flag:"🇶🇦",name:"Qatar"},
+  {code:"+44",flag:"🇬🇧",name:"UK"},
+  {code:"+61",flag:"🇦🇺",name:"Australia"},
+  {code:"+81",flag:"🇯🇵",name:"Japan"},
+  {code:"+82",flag:"🇰🇷",name:"South Korea"},
+];
+
+// Validation helpers
+const validateEmail = e => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(e.trim());
+const validateName  = n => n.trim().length >= 2;
+const validatePhone = p => p.replace(/\D/g,"").length >= 7;
+
+const PAYMENT_METHODS_DATA = [
+  {id:"gcash",    label:"GCash",         color:"#007DFF", bg:"#E8F2FF",
+   logo: <svg viewBox="0 0 80 28" fill="none" xmlns="http://www.w3.org/2000/svg" style={{height:22,width:"auto"}}><text x="4" y="21" fontFamily="Arial Black,Arial" fontWeight="900" fontSize="20" fill="#007DFF">G</text><text x="22" y="21" fontFamily="Arial,sans-serif" fontWeight="700" fontSize="16" fill="#1A1410">Cash</text></svg>},
+  {id:"maya",     label:"Maya",          color:"#5B2D8E", bg:"#F0E8FF",
+   logo: <svg viewBox="0 0 80 28" fill="none" xmlns="http://www.w3.org/2000/svg" style={{height:22,width:"auto"}}><rect x="2" y="4" width="20" height="20" rx="5" fill="#5B2D8E"/><text x="6" y="19" fontFamily="Arial" fontWeight="900" fontSize="14" fill="#fff">M</text><text x="26" y="21" fontFamily="Arial,sans-serif" fontWeight="700" fontSize="16" fill="#1A1410">maya</text></svg>},
+  {id:"visa",     label:"Visa",          color:"#1A1F71", bg:"#EEF0FF",
+   logo: <svg viewBox="0 0 60 24" fill="none" style={{height:22,width:"auto"}}><rect width="60" height="24" rx="4" fill="#1A1F71"/><text x="6" y="18" fontFamily="Arial" fontWeight="900" fontStyle="italic" fontSize="16" fill="#fff" letterSpacing="-1">VISA</text></svg>},
+  {id:"mastercard",label:"Mastercard",   color:"#EB001B", bg:"#FFF0F0",
+   logo: <svg viewBox="0 0 52 24" fill="none" style={{height:22,width:"auto"}}><circle cx="18" cy="12" r="10" fill="#EB001B"/><circle cx="34" cy="12" r="10" fill="#F79E1B"/><ellipse cx="26" cy="12" rx="4" ry="9.5" fill="#FF5F00"/></svg>},
+  {id:"bank",     label:"Bank Transfer", color:"#1A7F5B", bg:"#E6F5EF",
+   logo: <svg viewBox="0 0 80 28" fill="none" style={{height:22,width:"auto"}}><rect x="2" y="10" width="18" height="14" rx="2" fill="#1A7F5B"/><polygon points="11,2 2,10 20,10" fill="#1A7F5B"/><rect x="5" y="14" width="4" height="7" fill="#fff"/><rect x="12" y="14" width="4" height="7" fill="#fff"/><text x="24" y="21" fontFamily="Arial,sans-serif" fontWeight="700" fontSize="13" fill="#1A1410">Bank Transfer</text></svg>},
+  {id:"qrph",     label:"QR Ph",         color:"#CC2F3C", bg:"#FDECEA",
+   logo: <svg viewBox="0 0 70 28" fill="none" style={{height:22,width:"auto"}}><rect x="2" y="2" width="11" height="11" rx="1.5" stroke="#CC2F3C" strokeWidth="2" fill="none"/><rect x="5" y="5" width="5" height="5" rx="0.5" fill="#CC2F3C"/><rect x="17" y="2" width="11" height="11" rx="1.5" stroke="#CC2F3C" strokeWidth="2" fill="none"/><rect x="20" y="5" width="5" height="5" rx="0.5" fill="#CC2F3C"/><rect x="2" y="17" width="11" height="11" rx="1.5" stroke="#CC2F3C" strokeWidth="2" fill="none"/><rect x="5" y="20" width="5" height="5" rx="0.5" fill="#CC2F3C"/><rect x="17" y="17" width="3" height="3" fill="#CC2F3C"/><rect x="22" y="17" width="3" height="3" fill="#CC2F3C"/><rect x="25" y="20" width="3" height="3" fill="#CC2F3C"/><rect x="17" y="25" width="3" height="3" fill="#CC2F3C"/><rect x="22" y="22" width="3" height="6" fill="#CC2F3C"/><text x="34" y="21" fontFamily="Arial,sans-serif" fontWeight="700" fontSize="14" fill="#CC2F3C">QR Ph</text></svg>},
+];
+
 // ─── CART PAGE ───────────────────────────────────────────────────────────────
 function CartPage({cart,removeFromCart,updateQty,setPage,user,onOrderComplete}){
-  const [step,setStep]=useState(1);
-  const [orderMode,setOrderMode]=useState(null);
-  const [details,setDetails]=useState({name:"",email:"",phone:"",address:"",instructions:""});
-  const [method,setMethod]=useState("");
-  const [sending,setSending]=useState(false);
-  const [errMsg,setErrMsg]=useState("");
-  const [prescription,setPrescription]=useState(null);
-  const [intlForm,setIntlForm]=useState({name:"",company:"",email:"",phone:"",country:"",city:"",shippingMethod:"",currency:"PHP",details:""});
-  const [intlSending,setIntlSending]=useState(false);
-  const [intlErr,setIntlErr]=useState("");
-  const [intlDone,setIntlDone]=useState(false);
-  const cameraRef=useRef(null);
-  const uploadRef=useRef(null);
+  const [step,setStep]         = useState(1);
+  const [orderMode,setOrderMode] = useState(null);
+  const [forSomeoneElse,setForSomeoneElse] = useState(false);
+  const [countryCode,setCountryCode] = useState("+63");
+  const [details,setDetails]   = useState({name:"",email:"",phoneNum:"",address:"",instructions:""});
+  const [fieldErrors,setFieldErrors] = useState({});
+  const [method,setMethod]     = useState("");
+  const [sending,setSending]   = useState(false);
+  const [errMsg,setErrMsg]     = useState("");
+  const [prescription,setPrescription] = useState(null);
+  const [intlForm,setIntlForm] = useState({name:"",company:"",email:"",phone:"",country:"",city:"",shippingMethod:"",currency:"PHP",details:""});
+  const [intlSending,setIntlSending] = useState(false);
+  const [intlErr,setIntlErr]   = useState("");
+  const [intlDone,setIntlDone] = useState(false);
+  const [profileLoaded,setProfileLoaded] = useState(false);
+  const cameraRef  = useRef(null);
+  const uploadRef  = useRef(null);
 
-  const total=cart.reduce((s,i)=>s+i.price*i.qty,0);
-  const hasRx=cart.some(i=>i.requiresPrescription);
-  const intlFilled=intlForm.name&&intlForm.email&&intlForm.phone&&intlForm.country;
-  const detFilled=details.name&&details.email&&details.phone&&details.address;
-  const orderSummary=cart.map(i=>`${i.name} x${i.qty} — ${formatPHP(i.price*i.qty)}`).join("\n");
-  const inp={width:"100%",padding:"11px 14px",border:`1.5px solid ${ds.color.border}`,borderRadius:ds.radius.md,fontSize:14,color:ds.color.textDark,outline:"none",fontFamily:ds.font.body,boxSizing:"border-box",background:"#fff",transition:"border-color 0.15s"};
-  const lbl={fontSize:12.5,fontWeight:600,color:ds.color.textDark,display:"block",marginBottom:6};
-  const fo=e=>e.target.style.borderColor=ds.color.red;
-  const bl=e=>e.target.style.borderColor=ds.color.border;
-  const setD=k=>e=>setDetails(p=>({...p,[k]:e.target.value}));
-  const setI=k=>e=>setIntlForm(p=>({...p,[k]:e.target.value}));
-
-  const handleRxUpload=e=>{const file=e.target.files[0];if(!file)return;e.target.value="";const r=new FileReader();r.onload=ev=>setPrescription({preview:ev.target.result,name:file.name});r.readAsDataURL(file);};
-  const goNext=()=>{if(step===2&&!hasRx)setStep(4);else setStep(s=>s+1);};
-  const goBack=()=>{if(step===4&&!hasRx)setStep(2);else setStep(s=>s-1);};
-
-  const handlePlaceOrder=async()=>{
-    if(!method)return;
-    setSending(true);setErrMsg("");
-    try{
-      await emailjs.send(EMAILJS_CONFIG.serviceId,EMAILJS_CONFIG.templateId,{
-        from_name:details.name,company:"Direct Order — Local (PH)",from_email:details.email,phone:details.phone,
-        product:orderSummary,quantity:cart.reduce((s,i)=>s+i.qty,0)+" items",
-        budget:formatPHP(total),location:details.address,timeline:"Direct Order",
-        details:`Payment: ${method}\nAddress: ${details.address}\nInstructions: ${details.instructions||"None"}\n\nItems:\n${orderSummary}\n\nTotal: ${formatPHP(total)} ${formatUSD(total)}${hasRx?"\n\n⚠️ PRESCRIPTION attached.":""}`,
-        reply_to:details.email,
-      },EMAILJS_CONFIG.publicKey);
-      await emailjs.send(EMAILJS_CONFIG.serviceId,EMAILJS_CONFIG.receiptTemplateId,{
-        customer_name:details.name,customer_email:details.email,customer_phone:details.phone,customer_address:details.address,
-        order_items:orderSummary,order_total:formatPHP(total),payment_method:method,to_email:details.email,
-      },EMAILJS_CONFIG.publicKey);
-      if(user){
-        const orderRef=await addDoc(collection(db,"orders"),{
-          uid:user.uid,name:details.name,email:details.email,phone:details.phone,address:details.address,
-          paymentMethod:method,items:cart.map(i=>({id:i.id,name:i.name,price:i.price,qty:i.qty})),
-          total,status:"pending",createdAt:serverTimestamp(),
-        });
-        const earnedPts=Math.floor(total*POINTS_PER_PHP);
-        const cSnap=await getDoc(doc(db,"customers",user.uid));
-        if(cSnap.exists()){
-          const d=cSnap.data();
-          await updateDoc(doc(db,"customers",user.uid),{totalOrders:(d.totalOrders||0)+1,totalSpent:(d.totalSpent||0)+total,points:(d.points||0)+earnedPts});
+  // Auto-populate from logged-in user profile
+  useEffect(()=>{
+    if(!user||profileLoaded) return;
+    (async()=>{
+      try{
+        const snap = await getDoc(doc(db,"customers",user.uid));
+        if(snap.exists()){
+          const d = snap.data();
+          setDetails(prev=>({
+            ...prev,
+            name:    d.name    || prev.name,
+            email:   d.email   || user.email || prev.email,
+            address: d.savedAddress || prev.address,
+          }));
+          // Try to parse saved phone if any
+          if(d.phone){
+            const saved = d.phone;
+            const matchedCode = COUNTRY_CODES.find(c=>saved.startsWith(c.code));
+            if(matchedCode){
+              setCountryCode(matchedCode.code);
+              setDetails(prev=>({...prev, phoneNum: saved.slice(matchedCode.code.length).trim()}));
+            } else {
+              setDetails(prev=>({...prev, phoneNum: saved}));
+            }
+          }
+        } else {
+          // No customer doc yet — at least pre-fill email
+          setDetails(prev=>({...prev, email: user.email||""}));
         }
-        if(hasRx&&prescription){
-          await addDoc(collection(db,"rxUploads"),{uid:user.uid,customerName:details.name,orderId:orderRef.id,fileName:prescription.name,status:"pending",createdAt:serverTimestamp()});
-        }
-        if(onOrderComplete)onOrderComplete();
-      }
-      setStep(5);
-    }catch{setErrMsg("Something went wrong. Please email us at "+CONTACT.email);}
-    finally{setSending(false);}
+      }catch(_){}
+      setProfileLoaded(true);
+    })();
+  },[user, profileLoaded]);
+
+  const fullPhone = countryCode + details.phoneNum.replace(/^0+/,"");
+  const total     = cart.reduce((s,i)=>s+i.price*i.qty,0);
+  const hasRx     = cart.some(i=>i.requiresPrescription);
+  const intlFilled = intlForm.name&&intlForm.email&&intlForm.phone&&intlForm.country;
+  const orderSummary = cart.map(i=>`${i.name} x${i.qty} — ${formatPHP(i.price*i.qty)}`).join("\n");
+
+  // Field validation
+  const validateFields = () => {
+    const errs = {};
+    if(!validateName(details.name))      errs.name    = "Please enter your full name (at least 2 characters).";
+    if(!validateEmail(details.email))    errs.email   = "Please enter a valid email address (e.g. you@email.com).";
+    if(!validatePhone(details.phoneNum)) errs.phoneNum= "Please enter a valid phone number.";
+    if(!details.address.trim())          errs.address = "Delivery address is required.";
+    setFieldErrors(errs);
+    return Object.keys(errs).length === 0;
   };
 
-  const handleIntlSubmit=async()=>{
-    if(!intlFilled)return;
-    setIntlSending(true);setIntlErr("");
-    try{
-      await emailjs.send(EMAILJS_CONFIG.serviceId,EMAILJS_CONFIG.templateId,{
-        from_name:intlForm.name,company:intlForm.company||"N/A",from_email:intlForm.email,phone:intlForm.phone,
-        product:orderSummary,quantity:cart.reduce((s,i)=>s+i.qty,0)+" items",
-        budget:`${formatPHP(total)} — INTERNATIONAL ORDER`,location:`${intlForm.city}, ${intlForm.country}`,timeline:"International Inquiry",
+  const detFilled = validateName(details.name) && validateEmail(details.email) &&
+                    validatePhone(details.phoneNum) && details.address.trim().length>0;
+
+  const inp    = {width:"100%",padding:"11px 14px",border:`1.5px solid ${ds.color.border}`,borderRadius:ds.radius.md,fontSize:14,color:ds.color.textDark,outline:"none",fontFamily:ds.font.body,boxSizing:"border-box",background:"#fff",transition:"border-color 0.15s"};
+  const inpErr = {border:`1.5px solid ${ds.color.red}`};
+  const lbl    = {fontSize:12.5,fontWeight:600,color:ds.color.textDark,display:"block",marginBottom:6};
+  const errTxt = {fontSize:11.5,color:ds.color.red,marginTop:4};
+  const fo     = e => e.target.style.borderColor = ds.color.red;
+  const bl     = (e,key) => { e.target.style.borderColor = fieldErrors[key] ? ds.color.red : ds.color.border; };
+  const setD   = k => e => { setDetails(p=>({...p,[k]:e.target.value})); if(fieldErrors[k]) setFieldErrors(p=>({...p,[k]:"";})); };
+  const setI   = k => e => setIntlForm(p=>({...p,[k]:e.target.value}));
+
+  const handleRxUpload = e => {
+    const file = e.target.files[0];
+    if(!file) return;
+    e.target.value = "";
+    const r = new FileReader();
+    r.onload = ev => setPrescription({preview:ev.target.result, name:file.name});
+    r.readAsDataURL(file);
+  };
+
+  const goNext = () => { if(step===2&&!hasRx) setStep(4); else setStep(s=>s+1); };
+  const goBack = () => { if(step===4&&!hasRx) setStep(2); else setStep(s=>s-1); };
+
+  const handleContinue = () => {
+    if(validateFields()) goNext();
+  };
+
+  // ── Place local order (fixed: all async ops properly wrapped)
+  const handlePlaceOrder = async () => {
+    if(!method) return;
+    setSending(true); setErrMsg("");
+    const phone = fullPhone;
+    const orderData = {
+      name: details.name, email: details.email, phone,
+      address: details.address, paymentMethod: method,
+      items: cart.map(i=>({id:i.id,name:i.name,price:i.price,qty:i.qty})),
+      total, status:"pending", createdAt: serverTimestamp(),
+      uid: user ? user.uid : "guest",
+    };
+    const emailParams = {
+      from_name: details.name, company: user ? "Registered Customer" : "Guest Order",
+      from_email: details.email, phone,
+      product: orderSummary, quantity: cart.reduce((s,i)=>s+i.qty,0)+" items",
+      budget: formatPHP(total), location: details.address, timeline: "Direct Order",
+      details: `Payment: ${method}\nAddress: ${details.address}\nInstructions: ${details.instructions||"None"}\n\nItems:\n${orderSummary}\n\nTotal: ${formatPHP(total)}${hasRx?"\n\n⚠️ PRESCRIPTION attached.":""}`,
+      reply_to: details.email,
+    };
+    const receiptParams = {
+      customer_name: details.name, customer_email: details.email,
+      customer_phone: phone, customer_address: details.address,
+      order_items: orderSummary, order_total: formatPHP(total),
+      payment_method: method, to_email: details.email,
+    };
+    try {
+      // 1. Save to Firestore first (always, guest or logged in)
+      const orderRef = await addDoc(collection(db,"orders"), orderData);
+
+      // 2. Update customer stats if logged in
+      if(user){
+        const earnedPts = Math.floor(total * POINTS_PER_PHP);
+        try {
+          const cSnap = await getDoc(doc(db,"customers",user.uid));
+          if(cSnap.exists()){
+            const d = cSnap.data();
+            await updateDoc(doc(db,"customers",user.uid),{
+              totalOrders:(d.totalOrders||0)+1,
+              totalSpent:(d.totalSpent||0)+total,
+              points:(d.points||0)+earnedPts,
+              phone: phone, // save phone back to profile
+            });
+          }
+        } catch(_){}
+        // 3. Save Rx if needed
+        if(hasRx && prescription){
+          try {
+            await addDoc(collection(db,"rxUploads"),{
+              uid:user.uid, customerName:details.name, orderId:orderRef.id,
+              fileName:prescription.name, status:"pending", createdAt:serverTimestamp(),
+            });
+          } catch(_){}
+        }
+      }
+
+      // 4. Send emails (non-blocking — don't let email failure stop order)
+      try {
+        await emailjs.send(EMAILJS_CONFIG.serviceId, EMAILJS_CONFIG.templateId, emailParams, EMAILJS_CONFIG.publicKey);
+        await emailjs.send(EMAILJS_CONFIG.serviceId, EMAILJS_CONFIG.receiptTemplateId, receiptParams, EMAILJS_CONFIG.publicKey);
+      } catch(emailErr){
+        console.warn("Email send failed (order still placed):", emailErr);
+      }
+
+      if(onOrderComplete) onOrderComplete();
+      setStep(5);
+    } catch(err) {
+      console.error("Order placement error:", err);
+      setErrMsg("Something went wrong saving your order. Please try again or contact us at "+CONTACT.email);
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const handleIntlSubmit = async () => {
+    if(!intlFilled) return;
+    setIntlSending(true); setIntlErr("");
+    try {
+      await emailjs.send(EMAILJS_CONFIG.serviceId, EMAILJS_CONFIG.templateId, {
+        from_name:intlForm.name, company:intlForm.company||"N/A",
+        from_email:intlForm.email, phone:intlForm.phone,
+        product:orderSummary, quantity:cart.reduce((s,i)=>s+i.qty,0)+" items",
+        budget:`${formatPHP(total)} — INTERNATIONAL ORDER`,
+        location:`${intlForm.city}, ${intlForm.country}`, timeline:"International Inquiry",
         details:`🌍 INTERNATIONAL\n\nCountry: ${intlForm.country}\nCity: ${intlForm.city}\nShipping: ${intlForm.shippingMethod||"Advise"}\nCurrency: ${intlForm.currency}\n\nItems:\n${orderSummary}\n\nValue: ${formatPHP(total)} (${formatUSD(total)} indicative)\n\nNotes:\n${intlForm.details||"None"}`,
         reply_to:intlForm.email,
-      },EMAILJS_CONFIG.publicKey);
+      }, EMAILJS_CONFIG.publicKey);
+      // Also save intl inquiry to Firestore
+      await addDoc(collection(db,"orders"),{
+        name:intlForm.name, email:intlForm.email, phone:intlForm.phone,
+        address:`${intlForm.city}, ${intlForm.country}`, paymentMethod:"International Inquiry",
+        items:cart.map(i=>({id:i.id,name:i.name,price:i.price,qty:i.qty})),
+        total, status:"international_inquiry", createdAt:serverTimestamp(), uid:"guest",
+      });
       setIntlDone(true);
-    }catch{setIntlErr("Something went wrong. Please email "+CONTACT.email);}
-    finally{setIntlSending(false);}
+    } catch(err) {
+      console.error("Intl submit error:", err);
+      setIntlErr("Something went wrong. Please email "+CONTACT.email);
+    } finally {
+      setIntlSending(false);
+    }
   };
 
-  // Empty cart
+  // ── Empty cart
   if(cart.length===0) return(
     <div style={{paddingTop:67,minHeight:"80vh",display:"flex",alignItems:"center",justifyContent:"center",background:ds.color.canvas}}>
       <div style={{textAlign:"center",maxWidth:400,padding:"0 24px"}}>
@@ -1766,7 +1929,7 @@ function CartPage({cart,removeFromCart,updateQty,setPage,user,onOrderComplete}){
     </div>
   );
 
-  // Success
+  // ── Order success
   if(step===5) return(
     <div style={{paddingTop:67,minHeight:"80vh",display:"flex",alignItems:"center",justifyContent:"center",background:ds.color.canvas}}>
       <div style={{textAlign:"center",maxWidth:460,padding:"0 24px"}}>
@@ -1776,7 +1939,7 @@ function CartPage({cart,removeFromCart,updateQty,setPage,user,onOrderComplete}){
         {user&&<div style={{background:ds.color.goldLight,border:`1px solid ${ds.color.goldBorder}`,borderRadius:ds.radius.md,padding:"12px 16px",marginBottom:20,fontSize:13,color:ds.color.gold}}>⭐ You earned <strong>{Math.floor(total*POINTS_PER_PHP)} reward points</strong>!</div>}
         <div style={{background:ds.color.goldLight,border:`1px solid ${ds.color.goldBorder}`,borderRadius:ds.radius.lg,padding:"16px 20px",marginBottom:28,textAlign:"left"}}>
           <div style={{fontSize:12,fontWeight:700,color:ds.color.gold,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:8}}>What happens next</div>
-          {["Our team confirms your order","We contact you to confirm payment","Tracking info sent once shipped","Rx items: ensure prescription is valid"].map((s,i)=>(
+          {["Our team confirms your order and availability","We contact you to confirm payment details","Tracking info will be sent once your order is shipped","For Rx items: ensure your prescription is valid"].map((s,i)=>(
             <div key={i} style={{display:"flex",gap:10,fontSize:13,color:ds.color.textBody,marginBottom:4}}>
               <span style={{color:ds.color.gold,fontWeight:700,flexShrink:0}}>{i+1}.</span><span>{s}</span>
             </div>
@@ -1790,7 +1953,7 @@ function CartPage({cart,removeFromCart,updateQty,setPage,user,onOrderComplete}){
     </div>
   );
 
-  // Step 0 — Local or International
+  // ── Step 0 — Choose Local or International
   if(orderMode===null) return(
     <div style={{paddingTop:67,minHeight:"80vh",background:ds.color.canvas,display:"flex",alignItems:"center",justifyContent:"center"}}>
       <div style={{maxWidth:620,width:"100%",padding:"0 24px"}}>
@@ -1799,7 +1962,9 @@ function CartPage({cart,removeFromCart,updateQty,setPage,user,onOrderComplete}){
           <p style={{fontSize:14,color:ds.color.textMuted,lineHeight:1.7}}>This helps us give you the right checkout process and accurate shipping options.</p>
         </div>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:20}}>
-          {[{flag:"🇵🇭",title:"Philippines",desc:"Local delivery nationwide. Standard checkout with payment selection.",features:["✓ Direct checkout","✓ GCash / Maya / Bank","✓ 1–7 day delivery"],mode:"local",accent:ds.color.red},{flag:"🌍",title:"International",desc:"Outside the Philippines. We'll prepare a proforma invoice.",features:["✓ Proforma invoice","✓ FedEx / Air / Sea Cargo","✓ Full export docs"],mode:"intl",accent:ds.color.gold}].map(o=>(
+          {[{flag:"🇵🇭",title:"Philippines",desc:"Local delivery nationwide. Standard checkout with payment selection.",features:["✓ Direct checkout","✓ GCash / Maya / Bank","✓ 1–7 day delivery"],mode:"local",accent:ds.color.red},
+            {flag:"🌍",title:"International",desc:"Outside the Philippines. We'll prepare a proforma invoice.",features:["✓ Proforma invoice","✓ FedEx / Air / Sea Cargo","✓ Full export docs"],mode:"intl",accent:ds.color.gold}
+          ].map(o=>(
             <button key={o.mode} onClick={()=>setOrderMode(o.mode)} style={{background:ds.color.white,border:`2px solid ${ds.color.border}`,borderRadius:ds.radius.xl,padding:"32px 24px",cursor:"pointer",textAlign:"center",transition:"all 0.2s",fontFamily:ds.font.body}}
               onMouseEnter={e=>{e.currentTarget.style.borderColor=o.accent;e.currentTarget.style.boxShadow=ds.shadow.md;}}
               onMouseLeave={e=>{e.currentTarget.style.borderColor=ds.color.border;e.currentTarget.style.boxShadow="none";}}>
@@ -1815,7 +1980,7 @@ function CartPage({cart,removeFromCart,updateQty,setPage,user,onOrderComplete}){
     </div>
   );
 
-  // International
+  // ── International
   if(orderMode==="intl"){
     if(intlDone) return(
       <div style={{paddingTop:67,minHeight:"80vh",display:"flex",alignItems:"center",justifyContent:"center",background:ds.color.canvas}}>
@@ -1840,13 +2005,22 @@ function CartPage({cart,removeFromCart,updateQty,setPage,user,onOrderComplete}){
           <div style={{display:"grid",gridTemplateColumns:"1fr 300px",gap:24,alignItems:"start"}}>
             <div style={{background:"#fff",borderRadius:ds.radius.xl,padding:"32px 36px",boxShadow:ds.shadow.sm,border:`1px solid ${ds.color.borderLight}`}}>
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"16px 20px",marginBottom:16}}>
-                {[["Full Name *","name","text","Your full name"],["Company / Organization","company","text","Hospital, clinic…"],["Email Address *","email","email","you@email.com"],["Phone / WhatsApp *","phone","text","+1/+65/+971…"]].map(([l,k,t,ph])=>(
-                  <div key={k}><label style={lbl}>{l}</label><input type={t} value={intlForm[k]} onChange={setI(k)} placeholder={ph} style={inp} onFocus={fo} onBlur={bl}/></div>
+                {[["Full Name *","name","text","Your full name"],["Company / Organization","company","text","Hospital, clinic…"],["Email Address *","email","email","you@email.com"]].map(([l,k,t,ph])=>(
+                  <div key={k}><label style={lbl}>{l}</label><input type={t} value={intlForm[k]} onChange={setI(k)} placeholder={ph} style={inp} onFocus={fo} onBlur={e=>e.target.style.borderColor=ds.color.border}/></div>
                 ))}
+                <div>
+                  <label style={lbl}>Phone / WhatsApp *</label>
+                  <div style={{display:"flex",gap:8}}>
+                    <select value={intlForm.countryCode||"+63"} onChange={e=>setIntlForm(p=>({...p,countryCode:e.target.value}))} style={{...inp,width:"auto",minWidth:90,flexShrink:0,padding:"11px 10px"}}>
+                      {COUNTRY_CODES.map(c=><option key={c.code} value={c.code}>{c.flag} {c.code}</option>)}
+                    </select>
+                    <input value={intlForm.phone} onChange={setI("phone")} placeholder="9XX XXX XXXX" style={inp} onFocus={fo} onBlur={e=>e.target.style.borderColor=ds.color.border}/>
+                  </div>
+                </div>
               </div>
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"16px 20px",marginBottom:16}}>
                 {[["Country *","country","text","e.g. Singapore, UAE…"],["City / Port","city","text","e.g. Dubai, Singapore…"]].map(([l,k,t,ph])=>(
-                  <div key={k}><label style={lbl}>{l}</label><input type={t} value={intlForm[k]} onChange={setI(k)} placeholder={ph} style={inp} onFocus={fo} onBlur={bl}/></div>
+                  <div key={k}><label style={lbl}>{l}</label><input type={t} value={intlForm[k]} onChange={setI(k)} placeholder={ph} style={inp} onFocus={fo} onBlur={e=>e.target.style.borderColor=ds.color.border}/></div>
                 ))}
                 <div><label style={lbl}>Preferred Shipping</label>
                   <select value={intlForm.shippingMethod} onChange={setI("shippingMethod")} style={{...inp,cursor:"pointer"}}>
@@ -1859,7 +2033,7 @@ function CartPage({cart,removeFromCart,updateQty,setPage,user,onOrderComplete}){
                   </select>
                 </div>
               </div>
-              <div style={{marginBottom:20}}><label style={lbl}>Additional Notes</label><textarea value={intlForm.details} onChange={setI("details")} rows={3} placeholder="Delivery port, special requirements…" style={{...inp,resize:"vertical",lineHeight:1.65}} onFocus={fo} onBlur={bl}/></div>
+              <div style={{marginBottom:20}}><label style={lbl}>Additional Notes</label><textarea value={intlForm.details} onChange={setI("details")} rows={3} placeholder="Delivery port, special requirements…" style={{...inp,resize:"vertical",lineHeight:1.65}} onFocus={fo} onBlur={e=>e.target.style.borderColor=ds.color.border}/></div>
               {intlErr&&<div style={{marginBottom:14,padding:"12px 16px",background:ds.color.redLight,borderRadius:ds.radius.md,fontSize:13,color:ds.color.red}}>{intlErr}</div>}
               <Btn variant={intlFilled?"gold":"outline"} size="lg" fullWidth disabled={!intlFilled||intlSending} onClick={handleIntlSubmit}>{intlSending?"Sending…":"Submit International Inquiry →"}</Btn>
             </div>
@@ -1875,26 +2049,30 @@ function CartPage({cart,removeFromCart,updateQty,setPage,user,onOrderComplete}){
     );
   }
 
-  // Local checkout — step indicator
+  // ── Local checkout
   const stepLabels=[["1","Review"],["2","Details"],["3","Rx"],["4","Payment"]];
 
   return(
     <div style={{paddingTop:67,background:ds.color.canvas,minHeight:"80vh"}}>
       <div style={{maxWidth:900,margin:"0 auto",padding:"40px 28px"}}>
+
         {/* Step indicator */}
         <div style={{display:"flex",alignItems:"center",gap:0,marginBottom:32,maxWidth:500}}>
-          {stepLabels.map(([n,label],i)=>{const s=parseInt(n);const active=step===s;const done=step>s;return(
-            <div key={n} style={{display:"flex",alignItems:"center",flex:i<3?1:0}}>
-              <div style={{display:"flex",alignItems:"center",gap:8}}>
-                <div style={{width:30,height:30,borderRadius:"50%",background:done?ds.color.success:active?ds.color.red:ds.color.border,color:done||active?"#fff":ds.color.textMuted,display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:700,flexShrink:0}}>{done?"✓":n}</div>
-                <span style={{fontSize:12,fontWeight:500,color:active?ds.color.textDark:ds.color.textMuted,whiteSpace:"nowrap"}}>{label}</span>
+          {stepLabels.map(([n,label],i)=>{
+            const s=parseInt(n); const active=step===s; const done=step>s;
+            return(
+              <div key={n} style={{display:"flex",alignItems:"center",flex:i<3?1:0}}>
+                <div style={{display:"flex",alignItems:"center",gap:8}}>
+                  <div style={{width:30,height:30,borderRadius:"50%",background:done?ds.color.success:active?ds.color.red:ds.color.border,color:done||active?"#fff":ds.color.textMuted,display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:700,flexShrink:0}}>{done?"✓":n}</div>
+                  <span style={{fontSize:12,fontWeight:500,color:active?ds.color.textDark:ds.color.textMuted,whiteSpace:"nowrap"}}>{label}</span>
+                </div>
+                {i<3&&<div style={{flex:1,height:2,background:done?ds.color.success:ds.color.borderLight,margin:"0 12px"}}/>}
               </div>
-              {i<3&&<div style={{flex:1,height:2,background:done?ds.color.success:ds.color.borderLight,margin:"0 12px"}}/>}
-            </div>
-          );})}
+            );
+          })}
         </div>
 
-        {/* Step 1 — Cart Review */}
+        {/* ── Step 1 — Cart Review */}
         {step===1&&(
           <div style={{display:"grid",gridTemplateColumns:"1fr 320px",gap:24,alignItems:"start"}}>
             <div style={{background:"#fff",borderRadius:ds.radius.xl,padding:"28px 32px",boxShadow:ds.shadow.sm,border:`1px solid ${ds.color.borderLight}`}}>
@@ -1928,22 +2106,91 @@ function CartPage({cart,removeFromCart,updateQty,setPage,user,onOrderComplete}){
           </div>
         )}
 
-        {/* Step 2 — Delivery Details */}
+        {/* ── Step 2 — Delivery Details */}
         {step===2&&(
           <div style={{display:"grid",gridTemplateColumns:"1fr 300px",gap:24,alignItems:"start"}}>
             <div style={{background:"#fff",borderRadius:ds.radius.xl,padding:"32px 36px",boxShadow:ds.shadow.sm,border:`1px solid ${ds.color.borderLight}`}}>
-              <div style={{fontFamily:ds.font.display,fontSize:20,color:ds.color.textDark,marginBottom:20}}>📦 Delivery Details</div>
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"16px 20px",marginBottom:16}}>
-                <div><label style={lbl}>Full Name *</label><input value={details.name} onChange={setD("name")} placeholder="Your full name" style={inp} onFocus={fo} onBlur={bl}/></div>
-                <div><label style={lbl}>Email Address *</label><input type="email" value={details.email} onChange={setD("email")} placeholder="you@email.com" style={inp} onFocus={fo} onBlur={bl}/></div>
-                <div style={{gridColumn:"1/-1"}}><label style={lbl}>Phone / WhatsApp *</label><input value={details.phone} onChange={setD("phone")} placeholder="+63 9XX XXX XXXX" style={inp} onFocus={fo} onBlur={bl}/></div>
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:20,flexWrap:"wrap",gap:12}}>
+                <div style={{fontFamily:ds.font.display,fontSize:20,color:ds.color.textDark}}>📦 Delivery Details</div>
+                {user&&(
+                  <label style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer",fontSize:13,color:ds.color.textMuted,userSelect:"none"}}>
+                    <input type="checkbox" checked={forSomeoneElse} onChange={e=>setForSomeoneElse(e.target.checked)} style={{width:16,height:16,accentColor:ds.color.red,cursor:"pointer"}}/>
+                    Ordering for someone else?
+                  </label>
+                )}
               </div>
-              <div style={{marginBottom:16}}><label style={lbl}>Delivery Address *</label><textarea value={details.address} onChange={setD("address")} rows={3} placeholder="Unit/House No., Street, Barangay, City, Province, ZIP" style={{...inp,resize:"vertical",lineHeight:1.65}} onFocus={fo} onBlur={bl}/></div>
-              <div style={{marginBottom:24}}><label style={lbl}>Delivery Instructions (optional)</label><input value={details.instructions} onChange={setD("instructions")} placeholder="Gate code, landmark, special instructions…" style={inp} onFocus={fo} onBlur={bl}/></div>
+
+              {user&&!forSomeoneElse&&(
+                <div style={{background:ds.color.successBg,border:`1px solid ${ds.color.successBorder}`,borderRadius:ds.radius.md,padding:"10px 14px",marginBottom:20,fontSize:13,color:ds.color.success}}>
+                  ✓ Delivering to your saved profile. Check details below and edit if needed.
+                </div>
+              )}
+              {user&&forSomeoneElse&&(
+                <div style={{background:ds.color.goldLight,border:`1px solid ${ds.color.goldBorder}`,borderRadius:ds.radius.md,padding:"10px 14px",marginBottom:20,fontSize:13,color:ds.color.gold}}>
+                  📦 Enter the recipient's details below.
+                </div>
+              )}
+
+              {/* Name */}
+              <div style={{marginBottom:16}}>
+                <label style={lbl}>{forSomeoneElse?"Recipient's Full Name *":"Your Full Name *"}</label>
+                <input value={details.name} onChange={setD("name")} placeholder="Full name" style={{...inp,...(fieldErrors.name?inpErr:{})}} onFocus={fo} onBlur={e=>bl(e,"name")}/>
+                {fieldErrors.name&&<div style={errTxt}>⚠ {fieldErrors.name}</div>}
+              </div>
+
+              {/* Email — only show "your" email if ordering for self */}
+              {!forSomeoneElse&&(
+                <div style={{marginBottom:16}}>
+                  <label style={lbl}>Email Address *</label>
+                  <input type="email" value={details.email} onChange={setD("email")} placeholder="you@email.com" style={{...inp,...(fieldErrors.email?inpErr:{})}} onFocus={fo} onBlur={e=>bl(e,"email")}/>
+                  {fieldErrors.email&&<div style={errTxt}>⚠ {fieldErrors.email}</div>}
+                </div>
+              )}
+              {forSomeoneElse&&(
+                <div style={{marginBottom:16}}>
+                  <label style={lbl}>Order Confirmation Email * <span style={{fontSize:11,fontWeight:400,color:ds.color.textMuted}}>(yours or recipient's)</span></label>
+                  <input type="email" value={details.email} onChange={setD("email")} placeholder="Confirmation will be sent here" style={{...inp,...(fieldErrors.email?inpErr:{})}} onFocus={fo} onBlur={e=>bl(e,"email")}/>
+                  {fieldErrors.email&&<div style={errTxt}>⚠ {fieldErrors.email}</div>}
+                </div>
+              )}
+
+              {/* Phone with country code */}
+              <div style={{marginBottom:16}}>
+                <label style={lbl}>{forSomeoneElse?"Recipient's Phone / WhatsApp *":"Phone / WhatsApp *"}</label>
+                <div style={{display:"flex",gap:8}}>
+                  <select value={countryCode} onChange={e=>setCountryCode(e.target.value)} style={{...inp,width:"auto",minWidth:100,flexShrink:0,padding:"11px 10px",cursor:"pointer"}}>
+                    {COUNTRY_CODES.map(c=><option key={c.code} value={c.code}>{c.flag} {c.code}</option>)}
+                  </select>
+                  <div style={{flex:1}}>
+                    <input value={details.phoneNum} onChange={setD("phoneNum")} placeholder={countryCode==="+63"?"9XX XXX XXXX":"Phone number"} style={{...inp,...(fieldErrors.phoneNum?inpErr:{})}} onFocus={fo} onBlur={e=>bl(e,"phoneNum")}/>
+                    {fieldErrors.phoneNum&&<div style={errTxt}>⚠ {fieldErrors.phoneNum}</div>}
+                  </div>
+                </div>
+                <div style={{fontSize:11,color:ds.color.textLight,marginTop:4}}>Full number: {fullPhone||"—"}</div>
+              </div>
+
+              {/* Address */}
+              <div style={{marginBottom:16}}>
+                <label style={lbl}>{forSomeoneElse?"Recipient's Delivery Address *":"Delivery Address *"}</label>
+                <textarea value={details.address} onChange={setD("address")} rows={3} placeholder="Unit/House No., Street, Barangay, City, Province, ZIP" style={{...inp,...(fieldErrors.address?inpErr:{}),resize:"vertical",lineHeight:1.65}} onFocus={fo} onBlur={e=>bl(e,"address")}/>
+                {fieldErrors.address&&<div style={errTxt}>⚠ {fieldErrors.address}</div>}
+              </div>
+
+              {/* Delivery instructions */}
+              <div style={{marginBottom:24}}>
+                <label style={lbl}>Delivery Instructions <span style={{fontSize:11,fontWeight:400,color:ds.color.textMuted}}>(optional)</span></label>
+                <input value={details.instructions} onChange={setD("instructions")} placeholder="Gate code, landmark, leave at door…" style={inp} onFocus={fo} onBlur={e=>e.target.style.borderColor=ds.color.border}/>
+              </div>
+
               <div style={{display:"flex",gap:12}}>
                 <Btn variant="outline" size="lg" onClick={()=>setStep(1)}>← Back</Btn>
-                <div style={{flex:1}}><Btn variant={detFilled?"primary":"outline"} size="lg" fullWidth disabled={!detFilled} onClick={goNext}>Continue →</Btn></div>
+                <div style={{flex:1}}><Btn variant={detFilled?"primary":"outline"} size="lg" fullWidth disabled={!detFilled} onClick={handleContinue}>Continue →</Btn></div>
               </div>
+              {Object.keys(fieldErrors).length>0&&(
+                <div style={{marginTop:12,padding:"10px 14px",background:ds.color.redLight,borderRadius:ds.radius.md,fontSize:13,color:ds.color.red}}>
+                  ⚠ Please correct the highlighted fields above to continue.
+                </div>
+              )}
             </div>
             <div style={{background:"#fff",borderRadius:ds.radius.xl,padding:"24px",border:`1px solid ${ds.color.border}`}}>
               <div style={{fontSize:11,fontWeight:700,color:ds.color.textMuted,textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:14}}>Order Summary</div>
@@ -1953,12 +2200,12 @@ function CartPage({cart,removeFromCart,updateQty,setPage,user,onOrderComplete}){
           </div>
         )}
 
-        {/* Step 3 — Prescription */}
+        {/* ── Step 3 — Prescription */}
         {step===3&&hasRx&&(
           <div style={{maxWidth:600,margin:"0 auto"}}>
             <div style={{background:"#fff",borderRadius:ds.radius.xl,padding:"36px 40px",boxShadow:ds.shadow.sm,border:`1px solid ${ds.color.borderLight}`}}>
               <div style={{fontFamily:ds.font.display,fontSize:20,color:ds.color.textDark,marginBottom:8}}>💊 Prescription Upload</div>
-              <p style={{fontSize:14,color:ds.color.textMuted,lineHeight:1.7,marginBottom:24}}>Your cart contains prescription-only items. A valid doctor's prescription is required.</p>
+              <p style={{fontSize:14,color:ds.color.textMuted,lineHeight:1.7,marginBottom:24}}>Your cart contains prescription-only items. A valid doctor's prescription is required to process your order.</p>
               <div style={{border:`2px dashed ${prescription?ds.color.success:ds.color.border}`,borderRadius:ds.radius.lg,padding:28,textAlign:"center",background:prescription?ds.color.successBg:ds.color.canvas,marginBottom:20,transition:"all 0.2s"}}>
                 {prescription?(
                   <>
@@ -1971,17 +2218,24 @@ function CartPage({cart,removeFromCart,updateQty,setPage,user,onOrderComplete}){
                 ):(
                   <>
                     <div style={{fontSize:40,marginBottom:10}}>📋</div>
-                    <div style={{fontSize:14,fontWeight:600,color:ds.color.textDark,marginBottom:12}}>Upload your doctor's prescription</div>
+                    <div style={{fontSize:14,fontWeight:600,color:ds.color.textDark,marginBottom:16}}>Upload your doctor's prescription</div>
                     <div style={{display:"flex",gap:12,justifyContent:"center",flexWrap:"wrap",marginBottom:12}}>
-                      <button onClick={()=>cameraRef.current?.click()} style={{display:"flex",alignItems:"center",gap:8,padding:"12px 20px",borderRadius:ds.radius.lg,border:`2px solid ${ds.color.red}`,background:ds.color.redLight,cursor:"pointer",fontSize:14,fontWeight:700,color:ds.color.red,fontFamily:ds.font.body}}>📷 Take a Photo</button>
-                      <button onClick={()=>uploadRef.current?.click()} style={{display:"flex",alignItems:"center",gap:8,padding:"12px 20px",borderRadius:ds.radius.lg,border:`2px solid ${ds.color.border}`,background:"#fff",cursor:"pointer",fontSize:14,fontWeight:700,color:ds.color.textBody,fontFamily:ds.font.body}}>📁 Upload from Device</button>
+                      {/* Camera — renders separate visible button, uses label trick for reliability */}
+                      <label htmlFor="rx-camera-input" style={{display:"inline-flex",alignItems:"center",gap:8,padding:"12px 20px",borderRadius:ds.radius.lg,border:`2px solid ${ds.color.red}`,background:ds.color.redLight,cursor:"pointer",fontSize:14,fontWeight:700,color:ds.color.red,fontFamily:ds.font.body}}>
+                        📷 Take a Photo
+                      </label>
+                      <label htmlFor="rx-file-input" style={{display:"inline-flex",alignItems:"center",gap:8,padding:"12px 20px",borderRadius:ds.radius.lg,border:`2px solid ${ds.color.border}`,background:"#fff",cursor:"pointer",fontSize:14,fontWeight:700,color:ds.color.textBody,fontFamily:ds.font.body}}>
+                        📁 Upload from Device
+                      </label>
                     </div>
                     <div style={{fontSize:12,color:ds.color.textLight}}>Accepted: JPG, PNG, PDF · Max 10MB</div>
                   </>
                 )}
               </div>
-              <input ref={cameraRef} type="file" accept="image/*" capture="environment" onChange={handleRxUpload} style={{display:"none"}}/>
-              <input ref={uploadRef} type="file" accept="image/*,application/pdf" onChange={handleRxUpload} style={{display:"none"}}/>
+              {/* Camera input — id-linked via label above for maximum mobile compatibility */}
+              <input id="rx-camera-input" type="file" accept="image/*" capture="environment" onChange={handleRxUpload} style={{display:"none"}}/>
+              {/* File input */}
+              <input id="rx-file-input" type="file" accept="image/*,application/pdf" onChange={handleRxUpload} style={{display:"none"}}/>
               <div style={{fontSize:12,color:ds.color.textMuted,lineHeight:1.7,marginBottom:24,padding:"12px 14px",background:ds.color.canvas,borderRadius:ds.radius.md,border:`1px solid ${ds.color.borderLight}`}}>
                 <strong style={{color:ds.color.textDark}}>Valid prescription must show:</strong><br/>
                 ✓ Doctor's name and PRC license · ✓ Patient name and date<br/>
@@ -1989,39 +2243,47 @@ function CartPage({cart,removeFromCart,updateQty,setPage,user,onOrderComplete}){
               </div>
               <div style={{display:"flex",gap:12}}>
                 <Btn variant="outline" size="lg" onClick={goBack}>← Back</Btn>
-                <div style={{flex:1}}><Btn variant={prescription?"primary":"outline"} size="lg" fullWidth disabled={!prescription} onClick={goNext}>{prescription?"Continue to Payment →":"Please upload prescription to continue"}</Btn></div>
+                <div style={{flex:1}}><Btn variant={prescription?"primary":"outline"} size="lg" fullWidth disabled={!prescription} onClick={goNext}>{prescription?"Continue to Payment →":"Upload prescription to continue"}</Btn></div>
               </div>
             </div>
           </div>
         )}
 
-        {/* Step 4 — Payment */}
+        {/* ── Step 4 — Payment */}
         {step===4&&(
           <div style={{display:"grid",gridTemplateColumns:"1fr 300px",gap:24,alignItems:"start"}}>
             <div style={{background:"#fff",borderRadius:ds.radius.xl,padding:"32px 36px",boxShadow:ds.shadow.sm,border:`1px solid ${ds.color.borderLight}`}}>
-              <div style={{fontFamily:ds.font.display,fontSize:20,color:ds.color.textDark,marginBottom:6}}>💳 Select Payment Method</div>
+              <div style={{fontFamily:ds.font.display,fontSize:20,color:ds.color.textDark,marginBottom:6}}>Select Payment Method</div>
               <p style={{fontSize:14,color:ds.color.textMuted,marginBottom:22}}>Payment instructions will be sent to <strong>{details.email}</strong> after placing your order.</p>
-              <div style={{display:"flex",flexWrap:"wrap",gap:8,marginBottom:22,padding:"12px 14px",background:ds.color.canvas,borderRadius:ds.radius.md,border:`1px solid ${ds.color.borderLight}`,alignItems:"center"}}>
+
+              <div style={{display:"flex",flexWrap:"wrap",gap:8,marginBottom:24,padding:"12px 14px",background:ds.color.canvas,borderRadius:ds.radius.md,border:`1px solid ${ds.color.borderLight}`,alignItems:"center"}}>
                 <span style={{fontSize:13}}>🔒</span><span style={{fontSize:11,fontWeight:700,color:ds.color.success}}>Secure Checkout</span>
                 <div style={{width:1,height:16,background:ds.color.border}}/>
-                {[{icon:"💳",label:"Visa"},{icon:"💳",label:"Mastercard"},{icon:"📱",label:"GCash"},{icon:"💜",label:"Maya"},{icon:"🏦",label:"Bank"},{icon:"📲",label:"QR Ph"}].map(b=>(
-                  <div key={b.label} style={{display:"flex",alignItems:"center",gap:4,background:"#fff",border:`1px solid ${ds.color.border}`,borderRadius:ds.radius.sm,padding:"4px 10px"}}>
-                    <span style={{fontSize:12}}>{b.icon}</span><span style={{fontSize:11,fontWeight:600,color:ds.color.textMuted}}>{b.label}</span>
-                  </div>
-                ))}
+                <span style={{fontSize:11,color:ds.color.textMuted}}>All payments processed securely</span>
               </div>
-              <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12,marginBottom:22}}>
-                {PAYMENT_METHODS.map(m=>(
-                  <button key={m.label} onClick={()=>setMethod(m.label)} style={{padding:"16px 10px",borderRadius:ds.radius.lg,border:`2px solid ${method===m.label?ds.color.red:ds.color.border}`,background:method===m.label?ds.color.redLight:ds.color.canvas,cursor:"pointer",fontFamily:ds.font.body,display:"flex",flexDirection:"column",alignItems:"center",gap:7,transition:"all 0.15s"}}>
-                    <span style={{fontSize:26}}>{m.icon}</span>
-                    <span style={{fontSize:12,fontWeight:600,color:method===m.label?ds.color.red:ds.color.textBody}}>{m.label}</span>
+
+              <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12,marginBottom:24}}>
+                {PAYMENT_METHODS_DATA.map(m=>(
+                  <button key={m.id} onClick={()=>setMethod(m.label)} style={{
+                    padding:"18px 12px",borderRadius:ds.radius.lg,
+                    border:`2px solid ${method===m.label?m.color:ds.color.border}`,
+                    background:method===m.label?m.bg:ds.color.canvas,
+                    cursor:"pointer",fontFamily:ds.font.body,
+                    display:"flex",flexDirection:"column",alignItems:"center",gap:10,
+                    transition:"all 0.15s",boxShadow:method===m.label?`0 0 0 3px ${m.color}22`:"none",
+                  }}>
+                    <div style={{height:26,display:"flex",alignItems:"center",justifyContent:"center"}}>{m.logo}</div>
+                    <span style={{fontSize:11.5,fontWeight:600,color:method===m.label?m.color:ds.color.textBody}}>{m.label}</span>
                   </button>
                 ))}
               </div>
+
               {errMsg&&<div style={{marginBottom:14,padding:"12px 16px",background:ds.color.redLight,borderRadius:ds.radius.md,fontSize:13,color:ds.color.red}}>{errMsg}</div>}
               <div style={{display:"flex",gap:12}}>
                 <Btn variant="outline" size="lg" onClick={goBack}>← Back</Btn>
-                <div style={{flex:1}}><Btn variant={method?"primary":"outline"} size="lg" fullWidth disabled={!method||sending} onClick={handlePlaceOrder}>{sending?"Placing Order…":method?`Place Order — ${formatPHP(total)} →`:"Select a payment method"}</Btn></div>
+                <div style={{flex:1}}><Btn variant={method?"primary":"outline"} size="lg" fullWidth disabled={!method||sending} onClick={handlePlaceOrder}>
+                  {sending?<><Spinner size={16} color="#fff"/>&nbsp;Placing Order…</>:method?`Place Order — ${formatPHP(total)} →`:"Select a payment method"}
+                </Btn></div>
               </div>
               <p style={{textAlign:"center",fontSize:12,color:ds.color.textMuted,marginTop:12,lineHeight:1.6}}>By placing your order you agree to be contacted for payment and delivery confirmation.</p>
             </div>
@@ -2031,7 +2293,7 @@ function CartPage({cart,removeFromCart,updateQty,setPage,user,onOrderComplete}){
               <div style={{borderTop:`1px solid ${ds.color.border}`,marginTop:8,paddingTop:8,display:"flex",justifyContent:"space-between",fontWeight:700,fontSize:15}}><span>Total</span><span>{formatPHP(total)}</span></div>
               <div style={{marginTop:8,fontSize:13,color:ds.color.textMuted}}>📍 {details.address}</div>
               {hasRx&&prescription&&<div style={{marginTop:4,fontSize:13,color:ds.color.success}}>✓ Rx: {prescription.name}</div>}
-              {user&&<div style={{marginTop:12,background:ds.color.goldLight,borderRadius:ds.radius.md,padding:"10px 12px",fontSize:12,color:ds.color.gold}}>⭐ Earn <strong>{Math.floor(total*POINTS_PER_PHP)} points</strong>!</div>}
+              {user&&<div style={{marginTop:12,background:ds.color.goldLight,borderRadius:ds.radius.md,padding:"10px 12px",fontSize:12,color:ds.color.gold}}>⭐ Earn <strong>{Math.floor(total*POINTS_PER_PHP)} points</strong> for this order!</div>}
             </div>
           </div>
         )}
@@ -2039,7 +2301,6 @@ function CartPage({cart,removeFromCart,updateQty,setPage,user,onOrderComplete}){
     </div>
   );
 }
-
 
 // ─── POLICY PAGES ────────────────────────────────────────────────────────────
 function PrivacyPage(){
@@ -2076,7 +2337,7 @@ function TermsPage(){
     {title:"Products and Pricing",body:"Prices are in Philippine Peso (PHP). Direct-purchase prices are fixed at checkout. Quote/sales items are confirmed via formal quotation. International orders exclude shipping, duties, and taxes."},
     {title:"Minimum Order",body:"Minimum order value for direct purchase is ₱500.00. No minimum for quote-based orders."},
     {title:"Payment Terms",body:"Full payment required before order processing. Accepted: credit card, debit card, GCash, Maya, bank transfer, QR Ph."},
-    {title:"Rewards Program",body:"Registered customers earn 1 reward point per ₱100 spent. Points are worth ₱0.50 each and can be redeemed as purchase credits. Points are non-transferable and non-encashable. DMEAST reserves the right to modify or cancel the rewards program at any time."},
+    {title:"Rewards Program",body:"Registered customers earn 1 reward point for every ₱200 spent. Each point is worth ₱0.50 and can be redeemed as purchase credits. Points are non-transferable, non-encashable, and subject to DMEAST's rewards terms. DMEAST reserves the right to modify or cancel the rewards program at any time."},
     {title:"Order Processing",body:"All orders subject to availability. DM EAST sources on confirmed orders. We reserve the right to cancel orders due to pricing errors, unavailability, or force majeure."},
     {title:"Out of Stock Items",body:"If an item becomes unavailable after payment, we will offer a full refund as store credit or an alternative product with your approval."},
     {title:"Delivery and Shipping",body:"Nationwide delivery across the Philippines. International shipping via FedEx, air cargo, and sea freight. International shipping fees and import duties are the buyer's responsibility."},
