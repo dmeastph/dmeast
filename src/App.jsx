@@ -1852,9 +1852,13 @@ function CartPage({cart,removeFromCart,updateQty,setPage,user,onOrderComplete}){
       payment_method:   method,
       to_email:         details.email,
     };
+    // Helper: fail fast if Firestore takes more than 10 seconds
+    const withTimeout = (promise, ms=10000) =>
+      Promise.race([promise, new Promise((_,reject)=>setTimeout(()=>reject(new Error("Request timed out. Check your connection and try again.")),ms))]);
+
     try {
       // 1. Save to Firestore first (always, guest or logged in)
-      const orderRef = await addDoc(collection(db,"orders"), orderData);
+      const orderRef = await withTimeout(addDoc(collection(db,"orders"), orderData));
 
       // 2. Update customer stats if logged in
       if(user){
@@ -1896,7 +1900,12 @@ function CartPage({cart,removeFromCart,updateQty,setPage,user,onOrderComplete}){
       setStep(5);
     } catch(err) {
       console.error("Order placement error:", err);
-      setErrMsg("Something went wrong saving your order. Please try again or contact us at "+CONTACT.email);
+      const msg = err.message?.includes("timed out")
+        ? "Connection timed out. Please check your internet and try again."
+        : err.message?.includes("permission")
+        ? "Order could not be saved. Please contact us at "+CONTACT.email+" or try again."
+        : "Something went wrong. Please try again or contact us at "+CONTACT.email;
+      setErrMsg(msg);
     } finally {
       setSending(false);
     }
