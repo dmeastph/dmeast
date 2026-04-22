@@ -40,11 +40,16 @@ const auth = getAuth(firebaseApp);
 const db   = getFirestore(firebaseApp);
 const ADMIN_EMAILS = ["info@dmeastph.com", "admin@dmeastph.com"];
 
-// EmailJS — swap mock for real import in production
-const emailjs = { send: async () => { await new Promise(r => setTimeout(r, 1500)); return { status: 200 }; } };
+// ─── EMAILJS — real implementation ───────────────────────────────────────────
+// Requires: npm install @emailjs/browser
+// If you see "emailjs is not defined", run that command and redeploy.
+import emailjs from "@emailjs/browser";
 const EMAILJS_CONFIG = {
-  serviceId: "service_0hvjrv6", templateId: "template_5r24wue",
-  receiptTemplateId: "template_adb2so7", publicKey: "gV5OXqbN2PHond86B",
+  serviceId:           "service_0hvjrv6",
+  orderTemplateId:     "template_udt3wjn",  // New Order → to info@dmeastph.com
+  templateId:          "template_5r24wue",  // New Quotation → to info@dmeastph.com
+  receiptTemplateId:   "template_adb2so7",  // Receipt → to customer
+  publicKey:           "gV5OXqbN2PHond86B",
 };
 
 const POINTS_PER_PHP = 1 / 200;   // 1 pt per ₱200 spent
@@ -1826,19 +1831,26 @@ function CartPage({cart,removeFromCart,updateQty,setPage,user,onOrderComplete}){
       total, status:"pending", createdAt: serverTimestamp(),
       uid: user ? user.uid : "guest",
     };
-    const emailParams = {
-      from_name: details.name, company: user ? "Registered Customer" : "Guest Order",
-      from_email: details.email, phone,
-      product: orderSummary, quantity: cart.reduce((s,i)=>s+i.qty,0)+" items",
-      budget: formatPHP(total), location: details.address, timeline: "Direct Order",
-      details: `Payment: ${method}\nAddress: ${details.address}\nInstructions: ${details.instructions||"None"}\n\nItems:\n${orderSummary}\n\nTotal: ${formatPHP(total)}${hasRx?"\n\n⚠️ PRESCRIPTION attached.":""}`,
-      reply_to: details.email,
+    // Params for New Order template (template_udt3wjn) → sends to info@dmeastph.com
+    const orderNotifParams = {
+      customer_name:    details.name,
+      customer_email:   details.email,
+      customer_phone:   phone,
+      customer_address: details.address,
+      order_items:      orderSummary,
+      order_total:      formatPHP(total),
+      payment_method:   method,
     };
+    // Params for Receipt template (template_adb2so7) → sends to customer
     const receiptParams = {
-      customer_name: details.name, customer_email: details.email,
-      customer_phone: phone, customer_address: details.address,
-      order_items: orderSummary, order_total: formatPHP(total),
-      payment_method: method, to_email: details.email,
+      customer_name:    details.name,
+      customer_email:   details.email,
+      customer_phone:   phone,
+      customer_address: details.address,
+      order_items:      orderSummary,
+      order_total:      formatPHP(total),
+      payment_method:   method,
+      to_email:         details.email,
     };
     try {
       // 1. Save to Firestore first (always, guest or logged in)
@@ -1870,9 +1882,11 @@ function CartPage({cart,removeFromCart,updateQty,setPage,user,onOrderComplete}){
         }
       }
 
-      // 4. Send emails (non-blocking — don't let email failure stop order)
+      // 4. Send emails (non-blocking — order is already saved, email failure won't undo it)
       try {
-        await emailjs.send(EMAILJS_CONFIG.serviceId, EMAILJS_CONFIG.templateId, emailParams, EMAILJS_CONFIG.publicKey);
+        // Notification to DMEAST (New Order template)
+        await emailjs.send(EMAILJS_CONFIG.serviceId, EMAILJS_CONFIG.orderTemplateId, orderNotifParams, EMAILJS_CONFIG.publicKey);
+        // Receipt to customer (Receipt template)
         await emailjs.send(EMAILJS_CONFIG.serviceId, EMAILJS_CONFIG.receiptTemplateId, receiptParams, EMAILJS_CONFIG.publicKey);
       } catch(emailErr){
         console.warn("Email send failed (order still placed):", emailErr);
