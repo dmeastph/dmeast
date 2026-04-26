@@ -99,6 +99,7 @@ const GLOBAL_CSS = `
   .dm-dot-bg{background-image:radial-gradient(circle,#E8E0DA 1px,transparent 1px);background-size:24px 24px}
   @keyframes spin{to{transform:rotate(360deg)}}
   @keyframes modalIn{from{opacity:0;transform:translateY(20px) scale(.97)}to{opacity:1;transform:translateY(0) scale(1)}}
+  @media print{nav,footer,.dm-no-print{display:none!important}body{background:#fff!important}#dmeast-order-receipt{box-shadow:none!important;border:1px solid #ccc!important}}
   ::-webkit-scrollbar{width:5px}::-webkit-scrollbar-track{background:#FAFAFA}::-webkit-scrollbar-thumb{background:#E8E0DA;border-radius:99px}
 `;
 
@@ -280,13 +281,26 @@ const formatDate = ts => {
   return d.toLocaleDateString("en-PH",{year:"numeric",month:"short",day:"numeric"});
 };
 const orderStatusColor = s => ({
-  pending:   {bg:"#FEF9C3",color:"#A16207"},
-  confirmed: {bg:"#DBEAFE",color:"#1E40AF"},
-  processing:{bg:"#EDE9FE",color:"#5B21B6"},
-  shipped:   {bg:"#DCFCE7",color:"#166534"},
-  delivered: {bg:"#D1FAE5",color:"#065F46"},
-  cancelled: {bg:"#FEE2E2",color:"#991B1B"},
+  pending:       {bg:"#FEF9C3",color:"#A16207"},
+  confirmed:     {bg:"#DBEAFE",color:"#1E40AF"},
+  processing:    {bg:"#EDE9FE",color:"#5B21B6"},
+  shipped:       {bg:"#DCFCE7",color:"#166534"},
+  delivered:     {bg:"#D1FAE5",color:"#065F46"},
+  cancelled:     {bg:"#FEE2E2",color:"#991B1B"},
+  out_of_stock:  {bg:"#FFF7ED",color:"#C2410C"},
+  international_inquiry:{bg:"#F0FDF4",color:"#15803D"},
 }[s]||{bg:"#F3F4F6",color:"#374151"});
+
+const ORDER_STATUS_LABELS = {
+  pending:      "Pending",
+  confirmed:    "Confirmed",
+  processing:   "Processing",
+  shipped:      "Shipped",
+  delivered:    "Delivered",
+  cancelled:    "Cancelled",
+  out_of_stock: "Out of Stock",
+  international_inquiry: "International Inquiry",
+};
 
 
 // ─── PRIMITIVE COMPONENTS ────────────────────────────────────────────────────
@@ -688,7 +702,7 @@ function CustomerPortal({user,setPage,addToCart,wishlist,toggleWishlist}){
                     </div>
                     <div style={{display:"flex",alignItems:"center",gap:12}}>
                       <span style={{fontSize:15,fontWeight:700}}>{formatPHP(o.total||0)}</span>
-                      <span style={{fontSize:11,fontWeight:700,padding:"3px 10px",borderRadius:ds.radius.pill,background:sc.bg,color:sc.color,textTransform:"capitalize"}}>{o.status||"pending"}</span>
+                      <span style={{fontSize:11,fontWeight:700,padding:"3px 10px",borderRadius:ds.radius.pill,background:sc.bg,color:sc.color}}>{ORDER_STATUS_LABELS[o.status]||"Pending"}</span>
                     </div>
                   </div>
                 );
@@ -700,28 +714,70 @@ function CustomerPortal({user,setPage,addToCart,wishlist,toggleWishlist}){
         {tab==="orders"&&(
           <div style={{background:"#fff",border:`1px solid ${ds.color.border}`,borderRadius:ds.radius.lg,padding:"24px 28px",boxShadow:ds.shadow.xs}}>
             <div style={{fontFamily:ds.font.display,fontSize:18,color:ds.color.textDark,marginBottom:20}}>Order History</div>
-            {orders.length===0?<div style={{textAlign:"center",padding:"40px 0",color:ds.color.textMuted}}>No orders yet.</div>:orders.map(o=>{
+            {orders.length===0?(
+              <div style={{textAlign:"center",padding:"48px 0",color:ds.color.textMuted}}>
+                <div style={{fontSize:36,marginBottom:12}}>📦</div>
+                <div style={{fontSize:15,fontWeight:600,marginBottom:8}}>No orders yet</div>
+                <div style={{fontSize:13,marginBottom:20}}>Your orders will appear here after you place them.</div>
+                <Btn variant="primary" size="md" onClick={()=>setPage("products")}>Shop Now</Btn>
+              </div>
+            ):orders.map(o=>{
               const sc=orderStatusColor(o.status||"pending");
+              const isOOS = o.status==="out_of_stock";
+              const statusLabel = ORDER_STATUS_LABELS[o.status]||o.status||"Pending";
               return(
-                <div key={o.id} style={{border:`1px solid ${ds.color.border}`,borderRadius:ds.radius.lg,marginBottom:16,overflow:"hidden"}}>
-                  <div style={{background:ds.color.canvas,padding:"14px 20px",display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10}}>
+                <div key={o.id} style={{border:`1px solid ${isOOS?"#C2410C":ds.color.border}`,borderRadius:ds.radius.lg,marginBottom:16,overflow:"hidden"}}>
+                  {/* Order header */}
+                  <div style={{background:isOOS?"#FFF7ED":ds.color.canvas,padding:"14px 20px",display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10}}>
                     <div>
                       <div style={{fontSize:14,fontWeight:700,color:ds.color.textDark}}>Order #{o.id.slice(-6).toUpperCase()}</div>
-                      <div style={{fontSize:12,color:ds.color.textMuted,marginTop:2}}>{formatDate(o.createdAt)}</div>
+                      <div style={{fontSize:12,color:ds.color.textMuted,marginTop:2}}>{formatDate(o.createdAt)} · {o.items?.length||0} item(s)</div>
                     </div>
-                    <div style={{display:"flex",alignItems:"center",gap:12}}>
-                      <span style={{fontSize:15,fontWeight:700}}>{formatPHP(o.total||0)}</span>
-                      <span style={{fontSize:11,fontWeight:700,padding:"3px 10px",borderRadius:ds.radius.pill,background:sc.bg,color:sc.color,textTransform:"capitalize"}}>{o.status||"pending"}</span>
+                    <div style={{display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
+                      <span style={{fontSize:16,fontWeight:700,color:ds.color.textDark}}>{formatPHP(o.total||0)}</span>
+                      <span style={{fontSize:11,fontWeight:700,padding:"5px 12px",borderRadius:ds.radius.pill,background:sc.bg,color:sc.color}}>{statusLabel}</span>
                       <Btn variant="ghost" size="sm" onClick={()=>handleReorder(o)}>🔄 Reorder</Btn>
                     </div>
                   </div>
+                  {/* Out of stock alert */}
+                  {isOOS&&(
+                    <div style={{background:"#FEF2F2",padding:"10px 20px",fontSize:13,color:"#C2410C",borderBottom:`1px solid #FED7AA`}}>
+                      ⚠️ <strong>Item(s) in this order are currently unavailable.</strong> Our team will contact you to discuss alternatives or arrange a refund. Check your email or call us at <strong>{CONTACT.phone1}</strong>.
+                    </div>
+                  )}
+                  {/* Status tracker */}
+                  {!isOOS&&o.status!=="cancelled"&&(
+                    <div style={{padding:"14px 20px",borderBottom:`1px solid ${ds.color.borderLight}`}}>
+                      <div style={{display:"flex",alignItems:"center",gap:0}}>
+                        {["pending","confirmed","processing","shipped","delivered"].map((s,i)=>{
+                          const statOrder=["pending","confirmed","processing","shipped","delivered"];
+                          const curIdx=statOrder.indexOf(o.status||"pending");
+                          const done=i<=curIdx; const active=i===curIdx;
+                          return(
+                            <div key={s} style={{display:"flex",alignItems:"center",flex:i<4?1:0}}>
+                              <div style={{textAlign:"center"}}>
+                                <div style={{width:24,height:24,borderRadius:"50%",background:done?ds.color.success:ds.color.borderLight,border:`2px solid ${done?ds.color.success:ds.color.border}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,color:done?"#fff":ds.color.textMuted,margin:"0 auto 4px",fontWeight:700}}>{done&&!active?"✓":i+1}</div>
+                                <div style={{fontSize:9,color:active?ds.color.success:ds.color.textMuted,fontWeight:active?700:400,whiteSpace:"nowrap",textTransform:"capitalize"}}>{s}</div>
+                              </div>
+                              {i<4&&<div style={{flex:1,height:2,background:i<curIdx?ds.color.success:ds.color.borderLight,margin:"0 4px 14px"}}/>}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                  {/* Items */}
                   <div style={{padding:"14px 20px"}}>
                     {o.items?.map((item,i)=>(
-                      <div key={i} style={{display:"flex",justifyContent:"space-between",fontSize:13,color:ds.color.textBody,padding:"4px 0"}}>
-                        <span>{item.name} × {item.qty}</span><span style={{fontWeight:600}}>{formatPHP(item.price*item.qty)}</span>
+                      <div key={i} style={{display:"flex",justifyContent:"space-between",fontSize:13,color:ds.color.textBody,padding:"4px 0",borderBottom:i<(o.items.length-1)?`1px solid ${ds.color.borderLight}`:"none"}}>
+                        <span>{item.name} × {item.qty}</span>
+                        <span style={{fontWeight:600}}>{formatPHP(item.price*item.qty)}</span>
                       </div>
                     ))}
-                    {o.address&&<div style={{marginTop:10,fontSize:12,color:ds.color.textMuted}}>📍 {o.address}</div>}
+                    <div style={{display:"flex",justifyContent:"space-between",marginTop:10,paddingTop:8,borderTop:`1px solid ${ds.color.border}`,fontWeight:700,fontSize:14}}>
+                      <span>Total</span><span>{formatPHP(o.total||0)}</span>
+                    </div>
+                    {o.address&&<div style={{marginTop:8,fontSize:12,color:ds.color.textMuted}}>📍 {o.address}</div>}
                     {o.paymentMethod&&<div style={{fontSize:12,color:ds.color.textMuted,marginTop:2}}>💳 {o.paymentMethod}</div>}
                   </div>
                 </div>
@@ -847,8 +903,92 @@ function AdminDashboard(){
   },[]);
 
   const updateOrderStatus=async(id,status)=>{
-    await updateDoc(doc(db,"orders",id),{status});
+    await updateDoc(doc(db,"orders",id),{status, statusUpdatedAt: serverTimestamp()});
     setOrders(os=>os.map(o=>o.id===id?{...o,status}:o));
+    // Auto-email customer on key status changes
+    const order = orders.find(o=>o.id===id);
+    if(!order) return;
+    const customerEmail = order.email;
+    const customerName  = order.name || "Customer";
+    const orderRef      = id.slice(-6).toUpperCase();
+    if(status==="out_of_stock"){
+      try {
+        await emailjs.send(EMAILJS_CONFIG.serviceId, EMAILJS_CONFIG.templateId, {
+          from_name: "DM EAST Team", company: "DM EAST",
+          from_email: CONTACT.email, phone: CONTACT.phone1,
+          product: `ORDER #${orderRef} — Out of Stock Notice`,
+          quantity: "N/A", budget: "N/A", timeline: "Immediate",
+          location: order.address||"",
+          details: `Dear ${customerName},
+
+We regret to inform you that one or more items in your order #${orderRef} are currently unavailable.
+
+Order Items:
+${order.items?.map(i=>i.name+" x"+i.qty).join("\n")||""}
+
+Our team will contact you shortly to discuss alternatives or arrange a full refund.
+
+You can reach us at:
+📱 ${CONTACT.phone1}
+💬 WhatsApp: ${CONTACT.whatsapp}
+✉️ ${CONTACT.email}
+
+We apologize for the inconvenience.`,
+          reply_to: CONTACT.email,
+          to_email: customerEmail,
+        }, EMAILJS_CONFIG.publicKey);
+      } catch(e){ console.warn("Out-of-stock email failed:", e); }
+    }
+    if(status==="confirmed"){
+      try {
+        await emailjs.send(EMAILJS_CONFIG.serviceId, EMAILJS_CONFIG.templateId, {
+          from_name: "DM EAST Team", company: "DM EAST",
+          from_email: CONTACT.email, phone: CONTACT.phone1,
+          product: `ORDER #${orderRef} — Confirmed`,
+          quantity: "N/A", budget: order.total ? formatPHP(order.total) : "N/A",
+          timeline: "In Progress", location: order.address||"",
+          details: `Dear ${customerName},
+
+Great news! Your order #${orderRef} has been confirmed and is now being processed.
+
+Order Items:
+${order.items?.map(i=>i.name+" x"+i.qty).join("\n")||""}
+
+Total: ${order.total ? formatPHP(order.total) : "N/A"}
+Payment Method: ${order.paymentMethod||""}
+
+Our team will be in touch with payment instructions and delivery details.
+
+Thank you for choosing DM EAST!`,
+          reply_to: CONTACT.email,
+          to_email: customerEmail,
+        }, EMAILJS_CONFIG.publicKey);
+      } catch(e){ console.warn("Confirmed email failed:", e); }
+    }
+    if(status==="shipped"){
+      try {
+        await emailjs.send(EMAILJS_CONFIG.serviceId, EMAILJS_CONFIG.templateId, {
+          from_name: "DM EAST Team", company: "DM EAST",
+          from_email: CONTACT.email, phone: CONTACT.phone1,
+          product: `ORDER #${orderRef} — Shipped`,
+          quantity: "N/A", budget: "N/A", timeline: "In Transit",
+          location: order.address||"",
+          details: `Dear ${customerName},
+
+Your order #${orderRef} has been shipped!
+
+Delivery Address: ${order.address||""}
+
+For delivery updates or questions, contact us:
+📱 ${CONTACT.phone1}
+💬 WhatsApp: ${CONTACT.whatsapp}
+
+Thank you for choosing DM EAST!`,
+          reply_to: CONTACT.email,
+          to_email: customerEmail,
+        }, EMAILJS_CONFIG.publicKey);
+      } catch(e){ console.warn("Shipped email failed:", e); }
+    }
   };
   const updateRxStatus=async(id,status)=>{
     await updateDoc(doc(db,"rxUploads",id),{status});
@@ -865,7 +1005,7 @@ function AdminDashboard(){
 
   const totalRevenue=orders.reduce((s,o)=>s+(o.total||0),0);
   const pendingCount=orders.filter(o=>!o.status||o.status==="pending").length;
-  const statuses=["pending","confirmed","processing","shipped","delivered","cancelled"];
+  const statuses=["pending","confirmed","processing","shipped","delivered","cancelled","out_of_stock"];
   const selS={padding:"7px 12px",border:`1px solid ${ds.color.border}`,borderRadius:ds.radius.md,fontSize:13,outline:"none",fontFamily:ds.font.body,background:"#fff",cursor:"pointer"};
 
   if(loading) return(
@@ -926,7 +1066,7 @@ function AdminDashboard(){
                         <td style={{padding:"12px",fontWeight:600}}>{formatPHP(o.total||0)}</td>
                         <td style={{padding:"12px",color:ds.color.textMuted}}>{o.items?.length||0}</td>
                         <td style={{padding:"12px",color:ds.color.textMuted}}>{o.paymentMethod||"—"}</td>
-                        <td style={{padding:"12px"}}><span style={{fontSize:11,fontWeight:700,padding:"3px 10px",borderRadius:ds.radius.pill,background:sc.bg,color:sc.color,textTransform:"capitalize"}}>{o.status||"pending"}</span></td>
+                        <td style={{padding:"12px"}}><span style={{fontSize:11,fontWeight:700,padding:"3px 10px",borderRadius:ds.radius.pill,background:sc.bg,color:sc.color}}>{ORDER_STATUS_LABELS[o.status]||"Pending"}</span></td>
                         <td style={{padding:"12px",color:ds.color.textMuted}}>{formatDate(o.createdAt)}</td>
                       </tr>
                     );})}
@@ -945,24 +1085,43 @@ function AdminDashboard(){
             </div>
             {orders.length===0?<div style={{textAlign:"center",padding:"40px 0",color:ds.color.textMuted}}>No orders yet.</div>:orders.map(o=>{
               const sc=orderStatusColor(o.status||"pending");
+              const isOOS = o.status==="out_of_stock";
               return(
-                <div key={o.id} style={{border:`1px solid ${ds.color.border}`,borderRadius:ds.radius.lg,marginBottom:14,overflow:"hidden"}}>
-                  <div style={{background:ds.color.canvas,padding:"12px 18px",display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10}}>
+                <div key={o.id} style={{border:`2px solid ${isOOS?"#C2410C":ds.color.border}`,borderRadius:ds.radius.lg,marginBottom:14,overflow:"hidden"}}>
+                  <div style={{background:isOOS?"#FFF7ED":ds.color.canvas,padding:"12px 18px",display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10}}>
                     <div>
                       <span style={{fontWeight:700,color:ds.color.textDark,fontSize:14}}>#{o.id.slice(-6).toUpperCase()}</span>
-                      <span style={{fontSize:12,color:ds.color.textMuted,marginLeft:12}}>{o.name||"Guest"} · {o.email||"—"}</span>
+                      <span style={{fontSize:12,color:ds.color.textMuted,marginLeft:12}}>{o.name||"Guest"}</span>
+                      <span style={{fontSize:12,color:ds.color.textMuted,marginLeft:8}}>· {o.email||"—"}</span>
+                      {o.phone&&<span style={{fontSize:12,marginLeft:8}}>·
+                        <a href={`https://wa.me/${o.phone.replace(/\D/g,"")}`} target="_blank" rel="noopener noreferrer"
+                          style={{color:"#25D366",fontWeight:700,marginLeft:4}}>💬 {o.phone}</a>
+                      </span>}
                     </div>
-                    <div style={{display:"flex",alignItems:"center",gap:12}}>
+                    <div style={{display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
                       <span style={{fontWeight:700,fontSize:15}}>{formatPHP(o.total||0)}</span>
-                      <select value={o.status||"pending"} onChange={e=>updateOrderStatus(o.id,e.target.value)} style={{...selS,fontWeight:600,color:sc.color,background:sc.bg}}>
-                        {statuses.map(s=><option key={s} value={s} style={{color:ds.color.textDark,background:"#fff"}}>{s.charAt(0).toUpperCase()+s.slice(1)}</option>)}
+                      <select value={o.status||"pending"} onChange={e=>updateOrderStatus(o.id,e.target.value)}
+                        style={{...selS,fontWeight:600,color:sc.color,background:sc.bg,minWidth:140}}>
+                        {statuses.map(s=><option key={s} value={s} style={{color:ds.color.textDark,background:"#fff"}}>
+                          {ORDER_STATUS_LABELS[s]||s}
+                        </option>)}
                       </select>
                       <span style={{fontSize:12,color:ds.color.textMuted}}>{formatDate(o.createdAt)}</span>
                     </div>
                   </div>
+                  {isOOS&&(
+                    <div style={{background:"#FFF7ED",borderBottom:`1px solid #FED7AA`,padding:"8px 18px",fontSize:12.5,color:"#C2410C",display:"flex",alignItems:"center",gap:8}}>
+                      ⚠️ <strong>Out of Stock</strong> — Customer auto-notified by email. Contact them directly:
+                      {o.phone&&<a href={`https://wa.me/${o.phone.replace(/\D/g,"")}`} target="_blank" rel="noopener noreferrer"
+                        style={{background:"#25D366",color:"#fff",padding:"3px 10px",borderRadius:ds.radius.pill,fontWeight:700,fontSize:12,marginLeft:4}}>
+                        💬 WhatsApp {o.phone}
+                      </a>}
+                    </div>
+                  )}
                   <div style={{padding:"10px 18px"}}>
                     {o.items?.map((item,i)=><div key={i} style={{fontSize:12.5,color:ds.color.textBody,padding:"2px 0"}}>{item.name} × {item.qty} — {formatPHP(item.price*item.qty)}</div>)}
                     {o.address&&<div style={{fontSize:12,color:ds.color.textMuted,marginTop:6}}>📍 {o.address}</div>}
+                    {o.instructions&&<div style={{fontSize:12,color:ds.color.textMuted,marginTop:2}}>📝 {o.instructions}</div>}
                   </div>
                 </div>
               );
@@ -1737,6 +1896,7 @@ function CartPage({cart,removeFromCart,updateQty,setPage,user,onOrderComplete}){
   const [intlErr,setIntlErr]   = useState("");
   const [intlDone,setIntlDone] = useState(false);
   const [profileLoaded,setProfileLoaded] = useState(false);
+  const [confirmedOrderId,setConfirmedOrderId] = useState("");
   const cameraRef  = useRef(null);
   const uploadRef  = useRef(null);
 
@@ -1896,6 +2056,7 @@ function CartPage({cart,removeFromCart,updateQty,setPage,user,onOrderComplete}){
         console.warn("Email send failed (order still placed):", emailErr);
       }
 
+      setConfirmedOrderId("#"+orderRef.id.slice(-6).toUpperCase());
       if(onOrderComplete) onOrderComplete();
       setStep(5);
     } catch(err) {
@@ -1952,26 +2113,130 @@ function CartPage({cart,removeFromCart,updateQty,setPage,user,onOrderComplete}){
     </div>
   );
 
-  // ── Order success
+  // ── Order success — full printable confirmation
   if(step===5) return(
-    <div style={{paddingTop:67,minHeight:"80vh",display:"flex",alignItems:"center",justifyContent:"center",background:ds.color.canvas}}>
-      <div style={{textAlign:"center",maxWidth:460,padding:"0 24px"}}>
-        <div style={{width:76,height:76,borderRadius:"50%",background:ds.color.successBg,border:`2px solid ${ds.color.successBorder}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:28,margin:"0 auto 24px"}}>✓</div>
-        <div style={{fontFamily:ds.font.display,fontSize:26,color:ds.color.textDark,marginBottom:10}}>Order Placed!</div>
-        <p style={{fontSize:15,color:ds.color.textMuted,lineHeight:1.7,marginBottom:8}}>Thank you, <strong>{details.name}</strong>! A confirmation has been sent to <strong>{details.email}</strong>.</p>
-        {user&&<div style={{background:ds.color.goldLight,border:`1px solid ${ds.color.goldBorder}`,borderRadius:ds.radius.md,padding:"12px 16px",marginBottom:20,fontSize:13,color:ds.color.gold}}>⭐ You earned <strong>{Math.floor(total*POINTS_PER_PHP)} reward points</strong>!</div>}
-        <div style={{background:ds.color.goldLight,border:`1px solid ${ds.color.goldBorder}`,borderRadius:ds.radius.lg,padding:"16px 20px",marginBottom:28,textAlign:"left"}}>
-          <div style={{fontSize:12,fontWeight:700,color:ds.color.gold,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:8}}>What happens next</div>
-          {["Our team confirms your order and availability","We contact you to confirm payment details","Tracking info will be sent once your order is shipped","For Rx items: ensure your prescription is valid"].map((s,i)=>(
-            <div key={i} style={{display:"flex",gap:10,fontSize:13,color:ds.color.textBody,marginBottom:4}}>
-              <span style={{color:ds.color.gold,fontWeight:700,flexShrink:0}}>{i+1}.</span><span>{s}</span>
+    <div style={{paddingTop:67,background:ds.color.canvas,minHeight:"100vh"}}>
+      <div style={{maxWidth:680,margin:"0 auto",padding:"48px 24px"}}>
+
+        {/* Header */}
+        <div style={{textAlign:"center",marginBottom:36}}>
+          <div style={{width:80,height:80,borderRadius:"50%",background:ds.color.successBg,border:`3px solid ${ds.color.successBorder}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:32,margin:"0 auto 20px"}}>✓</div>
+          <div style={{fontFamily:ds.font.display,fontSize:30,color:ds.color.textDark,marginBottom:8}}>Order Confirmed!</div>
+          <p style={{fontSize:15,color:ds.color.textMuted,lineHeight:1.7}}>
+            Thank you, <strong>{details.name}</strong>! Your order has been received.<br/>
+            A confirmation email has been sent to <strong>{details.email}</strong>.
+          </p>
+        </div>
+
+        {/* Printable receipt card */}
+        <div id="dmeast-order-receipt" style={{background:"#fff",border:`1px solid ${ds.color.border}`,borderRadius:ds.radius.xl,padding:"32px 36px",boxShadow:ds.shadow.md,marginBottom:24}}>
+
+          {/* Order reference + status */}
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:24,paddingBottom:20,borderBottom:`2px solid ${ds.color.border}`}}>
+            <div>
+              <div style={{fontSize:11,fontWeight:700,color:ds.color.textMuted,textTransform:"uppercase",letterSpacing:"0.12em",marginBottom:4}}>Order Reference</div>
+              <div style={{fontFamily:ds.font.display,fontSize:26,color:ds.color.red,letterSpacing:"0.04em"}}>{confirmedOrderId||"—"}</div>
             </div>
-          ))}
+            <div style={{textAlign:"right"}}>
+              <span style={{fontSize:12,fontWeight:700,padding:"5px 14px",borderRadius:ds.radius.pill,background:"#FEF9C3",color:"#A16207"}}>⏳ Pending Confirmation</span>
+              <div style={{fontSize:11,color:ds.color.textMuted,marginTop:6}}>{new Date().toLocaleDateString("en-PH",{year:"numeric",month:"long",day:"numeric"})}</div>
+            </div>
+          </div>
+
+          {/* Customer details */}
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"16px 24px",marginBottom:24}}>
+            {[
+              {label:"Customer Name",  value:details.name},
+              {label:"Email",          value:details.email},
+              {label:"Phone",          value:fullPhone},
+              {label:"Payment Method", value:method},
+            ].map(f=>(
+              <div key={f.label}>
+                <div style={{fontSize:10,fontWeight:700,color:ds.color.textMuted,textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:4}}>{f.label}</div>
+                <div style={{fontSize:14,color:ds.color.textDark,fontWeight:500}}>{f.value||"—"}</div>
+              </div>
+            ))}
+            <div style={{gridColumn:"1/-1"}}>
+              <div style={{fontSize:10,fontWeight:700,color:ds.color.textMuted,textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:4}}>Delivery Address</div>
+              <div style={{fontSize:14,color:ds.color.textDark,fontWeight:500}}>{details.address}</div>
+              {details.instructions&&<div style={{fontSize:12,color:ds.color.textMuted,marginTop:3}}>📝 {details.instructions}</div>}
+            </div>
+          </div>
+
+          {/* Order items */}
+          <div style={{background:ds.color.canvas,borderRadius:ds.radius.lg,padding:"18px 20px",marginBottom:20}}>
+            <div style={{fontSize:11,fontWeight:700,color:ds.color.textMuted,textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:14}}>Order Items</div>
+            {cart.map(item=>(
+              <div key={item.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 0",borderBottom:`1px solid ${ds.color.borderLight}`}}>
+                <div>
+                  <div style={{fontSize:14,fontWeight:600,color:ds.color.textDark}}>{item.name}</div>
+                  <div style={{fontSize:12,color:ds.color.textMuted,marginTop:2}}>
+                    {formatPHP(item.price)} × {item.qty}
+                    {item.requiresPrescription&&<span style={{marginLeft:8,color:"#92400E",fontWeight:600}}>💊 Rx</span>}
+                  </div>
+                </div>
+                <div style={{fontSize:15,fontWeight:700,color:ds.color.textDark}}>{formatPHP(item.price*item.qty)}</div>
+              </div>
+            ))}
+            <div style={{display:"flex",justifyContent:"space-between",paddingTop:14,marginTop:4,fontSize:17,fontWeight:700,color:ds.color.textDark}}>
+              <span>Total Amount</span>
+              <span style={{color:ds.color.red}}>{formatPHP(total)}</span>
+            </div>
+          </div>
+
+          {/* Points earned */}
+          {user&&(
+            <div style={{background:ds.color.goldLight,border:`1px solid ${ds.color.goldBorder}`,borderRadius:ds.radius.md,padding:"12px 16px",marginBottom:20,display:"flex",alignItems:"center",gap:12}}>
+              <span style={{fontSize:22}}>⭐</span>
+              <div>
+                <div style={{fontSize:14,fontWeight:700,color:ds.color.gold}}>You earned {Math.floor(total*POINTS_PER_PHP)} reward points!</div>
+                <div style={{fontSize:12,color:ds.color.textMuted,marginTop:2}}>Worth {formatPHP(Math.floor(total*POINTS_PER_PHP)*POINT_VALUE)} in store credit. View in your portal.</div>
+              </div>
+            </div>
+          )}
+
+          {/* What happens next */}
+          <div style={{borderTop:`1px solid ${ds.color.borderLight}`,paddingTop:20}}>
+            <div style={{fontSize:12,fontWeight:700,color:ds.color.textDark,textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:14}}>What Happens Next</div>
+            {[
+              {step:"1",icon:"📞",title:"We confirm your order",desc:"Our team will review your order and contact you within 24 hours to confirm item availability."},
+              {step:"2",icon:"💳",title:"Payment instructions",desc:"We will send payment details to your email or contact you directly via phone or WhatsApp."},
+              {step:"3",icon:"📦",title:"We prepare your order",desc:"Once payment is confirmed, your order is prepared and dispatched from our supplier."},
+              {step:"4",icon:"🚚",title:"Delivery",desc:"Your order is delivered to your address. You will receive tracking information once shipped."},
+            ].map(s=>(
+              <div key={s.step} style={{display:"flex",gap:14,marginBottom:14}}>
+                <div style={{width:36,height:36,borderRadius:"50%",background:ds.color.redLight,border:`1px solid ${ds.color.redBorder}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,flexShrink:0}}>{s.icon}</div>
+                <div>
+                  <div style={{fontSize:13.5,fontWeight:700,color:ds.color.textDark,marginBottom:2}}>Step {s.step}: {s.title}</div>
+                  <div style={{fontSize:12.5,color:ds.color.textMuted,lineHeight:1.6}}>{s.desc}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Contact */}
+          <div style={{background:ds.color.canvas,borderRadius:ds.radius.md,padding:"14px 18px",marginTop:8,display:"flex",gap:16,flexWrap:"wrap",alignItems:"center"}}>
+            <div style={{fontSize:12,color:ds.color.textMuted,fontWeight:600}}>Need help? Contact us:</div>
+            <a href={CONTACT.whatsapp} target="_blank" rel="noopener noreferrer"
+              style={{display:"inline-flex",alignItems:"center",gap:6,background:"#25D366",color:"#fff",padding:"6px 14px",borderRadius:ds.radius.pill,fontSize:12,fontWeight:700,textDecoration:"none"}}>
+              💬 WhatsApp
+            </a>
+            <a href={"tel:"+CONTACT.phone1Raw}
+              style={{display:"inline-flex",alignItems:"center",gap:6,background:ds.color.redLight,color:ds.color.red,padding:"6px 14px",borderRadius:ds.radius.pill,fontSize:12,fontWeight:700,textDecoration:"none"}}>
+              📞 {CONTACT.phone1}
+            </a>
+          </div>
         </div>
-        <div style={{display:"flex",gap:10,justifyContent:"center",flexWrap:"wrap"}}>
+
+        {/* Action buttons */}
+        <div style={{display:"flex",gap:12,justifyContent:"center",flexWrap:"wrap",marginBottom:16}}>
+          <button onClick={()=>window.print()} style={{display:"inline-flex",alignItems:"center",gap:8,padding:"11px 22px",borderRadius:ds.radius.md,border:`1.5px solid ${ds.color.border}`,background:"#fff",cursor:"pointer",fontFamily:ds.font.body,fontSize:14,fontWeight:600,color:ds.color.textBody}}>
+            🖨️ Print / Save as PDF
+          </button>
+          {user&&<Btn variant="ghost" size="md" onClick={()=>setPage("portal")}>📋 View My Orders</Btn>}
           <Btn variant="primary" size="md" onClick={()=>setPage("home")}>Back to Home</Btn>
-          {user&&<Btn variant="ghost" size="md" onClick={()=>setPage("portal")}>View My Orders</Btn>}
         </div>
+        <p style={{textAlign:"center",fontSize:12,color:ds.color.textLight}}>Screenshot or print this page for your records. Your order reference is <strong>{confirmedOrderId||"—"}</strong>.</p>
       </div>
     </div>
   );
