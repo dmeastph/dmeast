@@ -14,16 +14,17 @@
  * - npm install firebase @emailjs/browser
  */
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, createContext, useContext, useMemo } from "react";
 import { initializeApp } from "firebase/app";
 import {
   getAuth, onAuthStateChanged, signInWithEmailAndPassword,
   createUserWithEmailAndPassword, signOut, sendPasswordResetEmail,
 } from "firebase/auth";
 import {
-  getFirestore, doc, getDoc, setDoc, updateDoc, addDoc,
-  collection, query, where, orderBy, getDocs, serverTimestamp,
+  getFirestore, doc, getDoc, setDoc, updateDoc, addDoc, deleteDoc,
+  collection, query, where, orderBy, getDocs, serverTimestamp, writeBatch,
 } from "firebase/firestore";
+import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
 
 const firebaseConfig = {
   apiKey: "AIzaSyAV30NWtnxAnj8jIjN4f5Pa6je43oM4rrw",
@@ -36,8 +37,9 @@ const firebaseConfig = {
   measurementId: "G-904XX7S1HY",
 };
 const firebaseApp = initializeApp(firebaseConfig);
-const auth = getAuth(firebaseApp);
-const db   = getFirestore(firebaseApp);
+const auth    = getAuth(firebaseApp);
+const db      = getFirestore(firebaseApp);
+const storage = getStorage(firebaseApp);
 const ADMIN_EMAILS = ["info@dmeastph.com", "admin@dmeastph.com"];
 
 // ─── EMAILJS — real implementation ───────────────────────────────────────────
@@ -188,7 +190,8 @@ const PAYMENT_METHODS = [
   {icon:"💜",label:"Maya"},{icon:"🏦",label:"Bank Transfer"},{icon:"📲",label:"QR Ph"},
 ];
 
-const PRODUCTS = [
+// Default seed products — used when Firestore is empty (auto-seeded on first admin load)
+const DEFAULT_PRODUCTS = [
   // MONITORING
   {id:"pm-01",category:"monitoring",name:"5-Parameter Patient Monitor",desc:"ECG, SpO₂, NIBP, Temp, RR. 12.1″ touchscreen.",price:null,cta:"sales",imageSrc:"/images/pm-5param.png",featured:true,tag:"Patient Monitoring"},
   {id:"pm-02",category:"monitoring",name:"3-Parameter Bedside Monitor",desc:"ECG, SpO₂, NIBP. For general wards and step-down units.",price:null,cta:"quote",imageSrc:"/images/pm-3param.png",featured:false,tag:"Patient Monitoring"},
@@ -301,6 +304,45 @@ const ORDER_STATUS_LABELS = {
   out_of_stock: "Out of Stock",
   international_inquiry: "International Inquiry",
 };
+
+// ─── PRODUCTS CONTEXT ────────────────────────────────────────────────────────
+// Provides the live products list (Firestore-backed) to all components.
+// Falls back to DEFAULT_PRODUCTS if Firestore is empty or unreachable.
+const ProductsContext = createContext({ products: DEFAULT_PRODUCTS, loading: false, refresh: ()=>{} });
+const useProducts = () => useContext(ProductsContext);
+
+function ProductsProvider({ children }){
+  const [products, setProducts] = useState(DEFAULT_PRODUCTS);
+  const [loading,  setLoading]  = useState(false);
+
+  const fetchProducts = useCallback(async () => {
+    setLoading(true);
+    try {
+      const snap = await getDocs(collection(db, "products"));
+      if (snap.size === 0) {
+        // Empty collection — keep defaults visible to public; will be seeded on admin load
+        setProducts(DEFAULT_PRODUCTS);
+      } else {
+        const live = snap.docs
+          .map(d => ({ ...d.data(), _docId: d.id }))
+          .filter(p => p.visible !== false); // hide products marked hidden
+        setProducts(live);
+      }
+    } catch (e) {
+      console.warn("Products fetch failed, using defaults:", e);
+      setProducts(DEFAULT_PRODUCTS);
+    }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { fetchProducts(); }, [fetchProducts]);
+
+  return (
+    <ProductsContext.Provider value={{ products, loading, refresh: fetchProducts }}>
+      {children}
+    </ProductsContext.Provider>
+  );
+}
 
 
 // ─── PRIMITIVE COMPONENTS ────────────────────────────────────────────────────
@@ -426,6 +468,7 @@ function ProductCard({product,addToCart,setPage,wishlist,toggleWishlist}){
 }
 
 function CategoryCard({cat,onClick}){
+  const { products: PRODUCTS } = useProducts();
   return(
     <button onClick={onClick} className="dm-card-hover" style={{background:ds.color.white,border:`1px solid ${ds.color.border}`,borderRadius:ds.radius.lg,overflow:"hidden",textAlign:"left",boxShadow:ds.shadow.xs,padding:0,width:"100%"}}>
       <div style={{height:5,background:`linear-gradient(90deg,${cat.color},${cat.accent})`}}/>
@@ -602,6 +645,7 @@ function Navbar({activePage,setPage,cartCount,user,isAdmin,onSignIn,onSignOut}){
 
 // ─── CUSTOMER PORTAL ─────────────────────────────────────────────────────────
 function CustomerPortal({user,setPage,addToCart,wishlist,toggleWishlist}){
+  const { products: PRODUCTS } = useProducts();
   const [tab,setTab]=useState("overview");
   const [profile,setProfile]=useState(null);
   const [orders,setOrders]=useState([]);
@@ -881,12 +925,274 @@ function CustomerPortal({user,setPage,addToCart,wishlist,toggleWishlist}){
 
 
 // ─── ADMIN DASHBOARD ─────────────────────────────────────────────────────────
+// ─── PRODUCT EDIT MODAL (Admin) ──────────────────────────────────────────────
+function ProductEditModal({ product, onSave, onClose }){
+  const [form, setForm] = useState({
+    id: product.id||"", name: product.name||"", desc: product.desc||"",
+    price: product.price ?? "", cta: product.cta||"buy",
+    category: product.category||"pharma", imageSrc: product.imageSrc||"",
+    featured: !!product.featured, requiresPrescription: !!product.requiresPrescription,
+    rxCategory: product.rxCategory||"", tag: product.tag||"",
+    visible: product.visible!==false,
+    available: product.available||"available",
+    _docId: product._docId,
+  });
+  const [imageMode, setImageMode] = useState("url"); // 'url' or 'upload'
+  const [uploading, setUploading] = useState(false);
+  const [uploadErr, setUploadErr] = useState("");
+  const [saving, setSaving] = useState(false);
+  const fileInputRef = useRef(null);
+  const isNew = product._new;
+
+  const set = (k) => (v) => setForm(p => ({ ...p, [k]: v }));
+
+  const handleFileUpload = async (file) => {
+    if (!file) return;
+    setUploading(true); setUploadErr("");
+    try {
+      const ext = file.name.split('.').pop() || 'jpg';
+      const filename = `products/${form.id||"new-"+Date.now()}-${Date.now()}.${ext}`;
+      const ref = storageRef(storage, filename);
+      await uploadBytes(ref, file);
+      const url = await getDownloadURL(ref);
+      set("imageSrc")(url);
+    } catch (e) {
+      setUploadErr("Upload failed: " + e.message);
+    }
+    setUploading(false);
+  };
+
+  const handleSave = async () => {
+    if (!form.name.trim()) { alert("Name is required."); return; }
+    if (!form.id.trim() && isNew) { alert("Product ID is required (e.g. 'pm-07' or 'custom-001')."); return; }
+    setSaving(true);
+    await onSave(form);
+    setSaving(false);
+  };
+
+  const inp = { width:"100%", padding:"10px 12px", border:`1.5px solid ${ds.color.border}`, borderRadius:ds.radius.md, fontSize:14, outline:"none", fontFamily:ds.font.body, color:ds.color.textDark, boxSizing:"border-box", background:"#fff" };
+  const lbl = { fontSize:12, fontWeight:600, color:ds.color.textDark, display:"block", marginBottom:5 };
+
+  return (
+    <div style={{position:"fixed",inset:0,zIndex:2000,display:"flex",alignItems:"center",justifyContent:"center",background:"rgba(26,20,16,0.55)",padding:20,overflowY:"auto"}} onClick={onClose}>
+      <div style={{background:"#fff",borderRadius:ds.radius.xl,padding:"32px 36px",maxWidth:640,width:"100%",maxHeight:"90vh",overflowY:"auto",boxShadow:ds.shadow.lg,animation:"modalIn .25s ease"}} onClick={e=>e.stopPropagation()}>
+
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:24}}>
+          <div style={{fontFamily:ds.font.display,fontSize:22,color:ds.color.textDark}}>{isNew?"Add New Product":"Edit Product"}</div>
+          <button onClick={onClose} style={{background:"none",border:"none",fontSize:22,color:ds.color.textMuted,cursor:"pointer",lineHeight:1}}>✕</button>
+        </div>
+
+        {/* Product ID (read-only when editing) */}
+        <div style={{marginBottom:14}}>
+          <label style={lbl}>Product ID *</label>
+          <input value={form.id} onChange={e=>set("id")(e.target.value)} disabled={!isNew} placeholder="e.g. pm-07, custom-001" style={{...inp,...(isNew?{}:{background:ds.color.canvas,color:ds.color.textMuted})}}/>
+          <div style={{fontSize:11,color:ds.color.textLight,marginTop:3}}>Lowercase, no spaces. {isNew?"Cannot be changed after creation.":"Cannot be edited."}</div>
+        </div>
+
+        {/* Name + Category */}
+        <div style={{display:"grid",gridTemplateColumns:"2fr 1fr",gap:14,marginBottom:14}}>
+          <div>
+            <label style={lbl}>Product Name *</label>
+            <input value={form.name} onChange={e=>set("name")(e.target.value)} placeholder="e.g. Paracetamol 500mg" style={inp}/>
+          </div>
+          <div>
+            <label style={lbl}>Category *</label>
+            <select value={form.category} onChange={e=>set("category")(e.target.value)} style={{...inp,cursor:"pointer"}}>
+              {CATEGORIES.map(c=><option key={c.id} value={c.id}>{c.icon} {c.label}</option>)}
+            </select>
+          </div>
+        </div>
+
+        {/* Description */}
+        <div style={{marginBottom:14}}>
+          <label style={lbl}>Description</label>
+          <textarea value={form.desc} onChange={e=>set("desc")(e.target.value)} rows={3} placeholder="Short product description shown on the card" style={{...inp,resize:"vertical",lineHeight:1.55}}/>
+        </div>
+
+        {/* Price + CTA */}
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14,marginBottom:14}}>
+          <div>
+            <label style={lbl}>Price (PHP)</label>
+            <input type="number" value={form.price} onChange={e=>set("price")(e.target.value)} placeholder="Leave blank for Quote/Sales" style={inp}/>
+            <div style={{fontSize:11,color:ds.color.textLight,marginTop:3}}>Leave empty for non-priced items.</div>
+          </div>
+          <div>
+            <label style={lbl}>CTA Button *</label>
+            <select value={form.cta} onChange={e=>set("cta")(e.target.value)} style={{...inp,cursor:"pointer"}}>
+              <option value="buy">Buy Now (add to cart)</option>
+              <option value="quote">Request Quote</option>
+              <option value="sales">Talk to Sales</option>
+            </select>
+          </div>
+        </div>
+
+        {/* Image */}
+        <div style={{marginBottom:14}}>
+          <label style={lbl}>Product Image</label>
+          <div style={{display:"flex",gap:0,marginBottom:10,background:ds.color.canvas,borderRadius:ds.radius.md,padding:3,border:`1px solid ${ds.color.border}`}}>
+            <button type="button" onClick={()=>setImageMode("url")} style={{flex:1,padding:"7px",background:imageMode==="url"?"#fff":"transparent",border:"none",borderRadius:ds.radius.sm,fontSize:12.5,fontWeight:600,color:imageMode==="url"?ds.color.red:ds.color.textMuted,cursor:"pointer",fontFamily:ds.font.body}}>🔗 Paste URL</button>
+            <button type="button" onClick={()=>setImageMode("upload")} style={{flex:1,padding:"7px",background:imageMode==="upload"?"#fff":"transparent",border:"none",borderRadius:ds.radius.sm,fontSize:12.5,fontWeight:600,color:imageMode==="upload"?ds.color.red:ds.color.textMuted,cursor:"pointer",fontFamily:ds.font.body}}>📤 Upload File</button>
+          </div>
+          {imageMode==="url" && (
+            <input value={form.imageSrc||""} onChange={e=>set("imageSrc")(e.target.value)} placeholder="https://example.com/image.png or /images/myproduct.png" style={inp}/>
+          )}
+          {imageMode==="upload" && (
+            <div>
+              <input ref={fileInputRef} type="file" accept="image/*" onChange={e=>handleFileUpload(e.target.files[0])} style={{display:"none"}}/>
+              <button type="button" onClick={()=>fileInputRef.current?.click()} disabled={uploading} style={{width:"100%",padding:"24px",border:`2px dashed ${ds.color.border}`,borderRadius:ds.radius.lg,background:ds.color.canvas,cursor:uploading?"wait":"pointer",fontFamily:ds.font.body}}>
+                <div style={{fontSize:24,marginBottom:6}}>{uploading?"⏳":"📤"}</div>
+                <div style={{fontSize:13,fontWeight:600,color:ds.color.textDark}}>{uploading?"Uploading…":"Click to choose image"}</div>
+                <div style={{fontSize:11,color:ds.color.textLight,marginTop:4}}>JPG, PNG, WebP · Max ~5MB</div>
+              </button>
+              {uploadErr && <div style={{marginTop:8,padding:"8px 12px",background:ds.color.redLight,borderRadius:ds.radius.sm,fontSize:12,color:ds.color.red}}>{uploadErr}</div>}
+            </div>
+          )}
+          {form.imageSrc && (
+            <div style={{marginTop:10,padding:"10px 12px",background:ds.color.canvas,borderRadius:ds.radius.md,display:"flex",alignItems:"center",gap:10}}>
+              <img src={form.imageSrc} alt="" style={{width:48,height:48,objectFit:"contain",borderRadius:4,background:"#fff",flexShrink:0}}/>
+              <div style={{flex:1,minWidth:0,fontSize:11,color:ds.color.textMuted,wordBreak:"break-all"}}>{form.imageSrc}</div>
+              <button type="button" onClick={()=>set("imageSrc")("")} style={{background:"none",border:"none",cursor:"pointer",fontSize:14,color:ds.color.textMuted}}>✕</button>
+            </div>
+          )}
+        </div>
+
+        {/* Stock + Visible */}
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14,marginBottom:14}}>
+          <div>
+            <label style={lbl}>Availability</label>
+            <select value={form.available} onChange={e=>set("available")(e.target.value)} style={{...inp,cursor:"pointer"}}>
+              <option value="available">✓ Available</option>
+              <option value="on_request">⚠ On Request</option>
+              <option value="out_of_stock">✗ Out of Stock</option>
+            </select>
+          </div>
+          <div>
+            <label style={lbl}>Visibility on Site</label>
+            <select value={form.visible?"true":"false"} onChange={e=>set("visible")(e.target.value==="true")} style={{...inp,cursor:"pointer"}}>
+              <option value="true">👁️ Visible</option>
+              <option value="false">🙈 Hidden</option>
+            </select>
+          </div>
+        </div>
+
+        {/* Flags */}
+        <div style={{background:ds.color.canvas,border:`1px solid ${ds.color.border}`,borderRadius:ds.radius.md,padding:"12px 16px",marginBottom:18,display:"flex",gap:24,flexWrap:"wrap"}}>
+          <label style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer",fontSize:13,color:ds.color.textBody}}>
+            <input type="checkbox" checked={form.featured} onChange={e=>set("featured")(e.target.checked)} style={{width:16,height:16,accentColor:ds.color.red,cursor:"pointer"}}/>
+            ⭐ Featured (show on homepage)
+          </label>
+          <label style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer",fontSize:13,color:ds.color.textBody}}>
+            <input type="checkbox" checked={form.requiresPrescription} onChange={e=>set("requiresPrescription")(e.target.checked)} style={{width:16,height:16,accentColor:ds.color.red,cursor:"pointer"}}/>
+            💊 Requires Prescription (Rx)
+          </label>
+        </div>
+
+        {form.requiresPrescription && (
+          <div style={{marginBottom:18}}>
+            <label style={lbl}>Rx Category (optional)</label>
+            <input value={form.rxCategory||""} onChange={e=>set("rxCategory")(e.target.value)} placeholder="e.g. Antibiotic, Antihypertensive" style={inp}/>
+          </div>
+        )}
+
+        {/* Footer buttons */}
+        <div style={{display:"flex",gap:10,justifyContent:"flex-end",paddingTop:16,borderTop:`1px solid ${ds.color.borderLight}`}}>
+          <Btn variant="outline" size="md" onClick={onClose}>Cancel</Btn>
+          <Btn variant="primary" size="md" onClick={handleSave} disabled={saving||uploading}>
+            {saving?"Saving…":(isNew?"Add Product":"Save Changes")}
+          </Btn>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function AdminDashboard(){
+  const { products: PRODUCTS, refresh: refreshProducts } = useProducts();
   const [tab,setTab]=useState("overview");
   const [orders,setOrders]=useState([]);
   const [customers,setCustomers]=useState([]);
   const [rxUps,setRxUps]=useState([]);
   const [loading,setLoading]=useState(true);
+  const [editingProduct,setEditingProduct]=useState(null);
+  const [seeding,setSeeding]=useState(false);
+  const [seedingMessage,setSeedingMessage]=useState("");
+
+  // Auto-seed Firestore from DEFAULT_PRODUCTS when admin loads and collection is empty
+  useEffect(()=>{
+    (async()=>{
+      try {
+        const snap = await getDocs(collection(db,"products"));
+        if (snap.size === 0) {
+          setSeedingMessage("⏳ Seeding default products…");
+          const batch = writeBatch(db);
+          DEFAULT_PRODUCTS.forEach(p => {
+            const ref = doc(db, "products", p.id);
+            batch.set(ref, { ...p, visible: true, available: "available", createdAt: serverTimestamp() });
+          });
+          await batch.commit();
+          setSeedingMessage("✓ "+DEFAULT_PRODUCTS.length+" products seeded successfully");
+          await refreshProducts();
+          setTimeout(()=>setSeedingMessage(""), 3500);
+        }
+      } catch (e) { console.warn("Auto-seed failed:", e); }
+    })();
+  }, [refreshProducts]);
+
+  const seedProductsFromDefaults = async () => {
+    if (!confirm("This will add the 63 default products to your Firestore. Continue?")) return;
+    setSeeding(true); setSeedingMessage("⏳ Seeding…");
+    try {
+      const batch = writeBatch(db);
+      DEFAULT_PRODUCTS.forEach(p => {
+        const ref = doc(db, "products", p.id);
+        batch.set(ref, { ...p, visible: true, available: "available", createdAt: serverTimestamp() });
+      });
+      await batch.commit();
+      setSeedingMessage("✓ "+DEFAULT_PRODUCTS.length+" products seeded");
+      await refreshProducts();
+    } catch (e) { setSeedingMessage("⚠ "+e.message); }
+    setSeeding(false);
+    setTimeout(()=>setSeedingMessage(""), 3500);
+  };
+
+  const saveProduct = async (productData) => {
+    try {
+      const id = productData.id?.trim() || ("custom-"+Date.now());
+      const dataToSave = {
+        id, name: productData.name||"", desc: productData.desc||"",
+        price: productData.price ? Number(productData.price) : null,
+        cta: productData.cta||"buy", category: productData.category||"pharma",
+        imageSrc: productData.imageSrc||null,
+        featured: !!productData.featured,
+        requiresPrescription: !!productData.requiresPrescription,
+        rxCategory: productData.rxCategory||null,
+        tag: productData.tag||CATEGORIES.find(c=>c.id===productData.category)?.label||"",
+        visible: productData.visible!==false,
+        available: productData.available||"available",
+        updatedAt: serverTimestamp(),
+      };
+      await setDoc(doc(db, "products", id), dataToSave, { merge: true });
+      setEditingProduct(null);
+      await refreshProducts();
+    } catch (e) { alert("Save failed: "+e.message); }
+  };
+
+  const deleteProduct = async (p) => {
+    if (!confirm("Delete \""+p.name+"\"? This cannot be undone.")) return;
+    try {
+      const docId = p._docId || p.id;
+      await deleteDoc(doc(db, "products", docId));
+      await refreshProducts();
+    } catch (e) { alert("Delete failed: "+e.message); }
+  };
+
+  const toggleProductVisibility = async (p) => {
+    try {
+      const docId = p._docId || p.id;
+      await updateDoc(doc(db, "products", docId), { visible: p.visible===false ? true : false });
+      await refreshProducts();
+    } catch (e) { alert("Toggle failed: "+e.message); }
+  };
 
   useEffect(()=>{
     (async()=>{
@@ -1130,39 +1436,76 @@ Thank you for choosing DM EAST!`,
         )}
 
         {tab==="products"&&(
-          <div style={{background:"#fff",border:`1px solid ${ds.color.border}`,borderRadius:ds.radius.lg,padding:"24px 28px",boxShadow:ds.shadow.xs}}>
-            <div style={{fontFamily:ds.font.display,fontSize:18,color:ds.color.textDark,marginBottom:6}}>Product Catalog</div>
-            <div style={{fontSize:13,color:ds.color.textMuted,marginBottom:24}}>To update prices or product details, edit the PRODUCTS array in the source code and redeploy.</div>
-            {CATEGORIES.map(cat=>{
-              const catProds=PRODUCTS.filter(p=>p.category===cat.id);
-              return(
-                <div key={cat.id} style={{marginBottom:32}}>
-                  <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12,paddingBottom:10,borderBottom:`2px solid ${cat.color}30`}}>
-                    <span style={{fontSize:18}}>{cat.icon}</span>
-                    <span style={{fontWeight:700,fontSize:15,color:ds.color.textDark}}>{cat.label}</span>
-                    <span style={{fontSize:12,color:ds.color.textMuted}}>({catProds.length} products)</span>
+          <div>
+            {/* Header bar */}
+            <div style={{background:"#fff",border:`1px solid ${ds.color.border}`,borderRadius:ds.radius.lg,padding:"20px 28px",boxShadow:ds.shadow.xs,marginBottom:18,display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:12}}>
+              <div>
+                <div style={{fontFamily:ds.font.display,fontSize:18,color:ds.color.textDark}}>Product Catalog</div>
+                <div style={{fontSize:13,color:ds.color.textMuted,marginTop:2}}>{PRODUCTS.length} products live · Changes appear on the site instantly.</div>
+              </div>
+              <div style={{display:"flex",gap:10,alignItems:"center",flexWrap:"wrap"}}>
+                {seedingMessage&&<span style={{fontSize:12,color:seedingMessage.startsWith("✓")?ds.color.success:ds.color.textMuted}}>{seedingMessage}</span>}
+                {PRODUCTS.length===0&&<Btn variant="gold" size="sm" onClick={seedProductsFromDefaults} disabled={seeding}>{seeding?"Seeding…":"🌱 Seed 63 Default Products"}</Btn>}
+                <Btn variant="primary" size="sm" onClick={()=>setEditingProduct({_new:true,id:"",name:"",desc:"",price:null,cta:"buy",imageSrc:"",category:"pharma",featured:false,requiresPrescription:false,rxCategory:null,tag:"",visible:true,available:"available"})}>+ Add New Product</Btn>
+              </div>
+            </div>
+            {/* Products by category */}
+            <div style={{background:"#fff",border:`1px solid ${ds.color.border}`,borderRadius:ds.radius.lg,padding:"24px 28px",boxShadow:ds.shadow.xs}}>
+              {CATEGORIES.map(cat=>{
+                const catProds=PRODUCTS.filter(p=>p.category===cat.id);
+                if(catProds.length===0) return null;
+                return(
+                  <div key={cat.id} style={{marginBottom:32}}>
+                    <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12,paddingBottom:10,borderBottom:`2px solid ${cat.color}30`}}>
+                      <span style={{fontSize:18}}>{cat.icon}</span>
+                      <span style={{fontWeight:700,fontSize:15,color:ds.color.textDark}}>{cat.label}</span>
+                      <span style={{fontSize:12,color:ds.color.textMuted}}>({catProds.length} products)</span>
+                    </div>
+                    <div style={{overflowX:"auto"}}>
+                      <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
+                        <thead><tr style={{borderBottom:`1px solid ${ds.color.border}`}}>
+                          {["Image","Name","Price","CTA","Stock","Rx","Visible","Actions"].map(h=><th key={h} style={{textAlign:"left",padding:"8px 10px",fontWeight:700,color:ds.color.textMuted,fontSize:11,textTransform:"uppercase"}}>{h}</th>)}
+                        </tr></thead>
+                        <tbody>
+                          {catProds.map(p=>(
+                            <tr key={p.id} style={{borderBottom:`1px solid ${ds.color.borderLight}`,opacity:p.visible===false?0.5:1}}>
+                              <td style={{padding:"9px 10px"}}>
+                                {p.imageSrc?<img src={p.imageSrc} alt="" style={{width:36,height:36,objectFit:"contain",borderRadius:4,background:"#F8F7F5"}}/>:<div style={{width:36,height:36,borderRadius:4,background:ds.color.canvas,display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,color:ds.color.textLight}}>📦</div>}
+                              </td>
+                              <td style={{padding:"9px 10px",fontWeight:600,color:ds.color.textDark}}>{p.name}<div style={{fontSize:10,color:ds.color.textLight,fontFamily:"monospace",marginTop:2}}>{p.id}</div></td>
+                              <td style={{padding:"9px 10px",color:p.price?ds.color.success:ds.color.textMuted,fontWeight:600}}>{p.price?formatPHP(p.price):"Quote"}</td>
+                              <td style={{padding:"9px 10px"}}><CtaBadge type={p.cta}/></td>
+                              <td style={{padding:"9px 10px"}}>
+                                <span style={{fontSize:10,fontWeight:700,padding:"2px 8px",borderRadius:ds.radius.pill,background:p.available==="out_of_stock"?"#FEE2E2":p.available==="on_request"?"#FEF9C3":ds.color.successBg,color:p.available==="out_of_stock"?ds.color.red:p.available==="on_request"?"#A16207":ds.color.success}}>
+                                  {p.available==="out_of_stock"?"Out":p.available==="on_request"?"On Req":"OK"}
+                                </span>
+                              </td>
+                              <td style={{padding:"9px 10px"}}>{p.requiresPrescription?<span style={{fontSize:10,color:"#92400E",background:"#FFF3CD",padding:"2px 6px",borderRadius:ds.radius.pill}}>Rx</span>:<span style={{fontSize:10,color:ds.color.success}}>OTC</span>}</td>
+                              <td style={{padding:"9px 10px"}}>
+                                <button onClick={()=>toggleProductVisibility(p)} style={{background:"none",border:"none",cursor:"pointer",fontSize:14}}>{p.visible===false?"🙈":"👁️"}</button>
+                              </td>
+                              <td style={{padding:"9px 10px"}}>
+                                <div style={{display:"flex",gap:6}}>
+                                  <button onClick={()=>setEditingProduct({...p})} style={{padding:"4px 10px",border:`1px solid ${ds.color.border}`,borderRadius:ds.radius.sm,background:"#fff",cursor:"pointer",fontSize:11,fontWeight:600,color:ds.color.textBody}}>Edit</button>
+                                  <button onClick={()=>deleteProduct(p)} style={{padding:"4px 10px",border:`1px solid ${ds.color.redBorder}`,borderRadius:ds.radius.sm,background:ds.color.redLight,cursor:"pointer",fontSize:11,fontWeight:600,color:ds.color.red}}>Delete</button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
-                  <div style={{overflowX:"auto"}}>
-                    <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
-                      <thead><tr style={{borderBottom:`1px solid ${ds.color.border}`}}>
-                        {["ID","Name","Price","CTA","Rx"].map(h=><th key={h} style={{textAlign:"left",padding:"8px 10px",fontWeight:700,color:ds.color.textMuted,fontSize:11,textTransform:"uppercase"}}>{h}</th>)}
-                      </tr></thead>
-                      <tbody>
-                        {catProds.map(p=>(
-                          <tr key={p.id} style={{borderBottom:`1px solid ${ds.color.borderLight}`}}>
-                            <td style={{padding:"9px 10px",color:ds.color.textLight,fontFamily:"monospace",fontSize:11}}>{p.id}</td>
-                            <td style={{padding:"9px 10px",fontWeight:600,color:ds.color.textDark}}>{p.name}</td>
-                            <td style={{padding:"9px 10px",color:p.price?ds.color.success:ds.color.textMuted,fontWeight:600}}>{p.price?formatPHP(p.price):"Quote / Sales"}</td>
-                            <td style={{padding:"9px 10px"}}><CtaBadge type={p.cta}/></td>
-                            <td style={{padding:"9px 10px"}}>{p.requiresPrescription?<span style={{fontSize:11,color:"#92400E",background:"#FFF3CD",padding:"2px 8px",borderRadius:ds.radius.pill}}>Rx</span>:<span style={{fontSize:11,color:ds.color.success}}>OTC</span>}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                );
+              })}
+              {PRODUCTS.length===0&&(
+                <div style={{textAlign:"center",padding:"60px 20px",color:ds.color.textMuted}}>
+                  <div style={{fontSize:36,marginBottom:12}}>📦</div>
+                  <div style={{fontSize:15,fontWeight:600,marginBottom:8}}>No products yet</div>
+                  <div style={{fontSize:13,marginBottom:20}}>Click "Seed 63 Default Products" above to populate, or add your own.</div>
                 </div>
-              );
-            })}
+              )}
+            </div>
           </div>
         )}
 
@@ -1210,6 +1553,7 @@ Thank you for choosing DM EAST!`,
           </div>
         )}
       </div>
+      {editingProduct && <ProductEditModal product={editingProduct} onSave={saveProduct} onClose={()=>setEditingProduct(null)}/>}
     </div>
   );
 }
@@ -1474,6 +1818,7 @@ function WhyChooseSection(){
 }
 
 function HomePage({setPage,setActiveCategory,addToCart}){
+  const { products: PRODUCTS } = useProducts();
   // Featured products: show OTC/standard buy-able items first (no institutional, no Rx-only)
   const featuredStandard = PRODUCTS.filter(p =>
     p.featured && p.cta === "buy" && !p.requiresPrescription &&
@@ -1550,6 +1895,7 @@ function AboutPage(){
 
 // ─── PRODUCTS PAGE (SHOP) ────────────────────────────────────────────────────
 function ProductsPage({setPage,addToCart,setActiveCategory,activeCategory,wishlist,toggleWishlist}){
+  const { products: PRODUCTS } = useProducts();
   const [search,setSearch]=useState("");
   const [cat,setCat]=useState(activeCategory||null);
   const [showAll,setShowAll]=useState(false);
@@ -1629,6 +1975,7 @@ function ProductsPage({setPage,addToCart,setActiveCategory,activeCategory,wishli
 
 // ─── INSTITUTIONAL ORDERS PAGE ───────────────────────────────────────────────
 function InstitutionalOrdersPage({setPage}){
+  const { products: PRODUCTS } = useProducts();
   const institutionalCats = CATEGORIES.filter(c=>c.institutional);
   const institutionalProducts = PRODUCTS.filter(p=>CATEGORIES.find(c=>c.id===p.category)?.institutional);
   return(
@@ -2831,6 +3178,7 @@ export default function App(){
   );
 
   return(
+    <ProductsProvider>
     <div style={{fontFamily:ds.font.body,minHeight:"100vh",background:ds.color.white,color:ds.color.textBody}}>
       <style>{GLOBAL_CSS}</style>
       <Navbar activePage={page} setPage={setPage} cartCount={cartCount} user={user} isAdmin={isAdmin} onSignIn={handleSignIn} onSignOut={handleSignOut}/>
@@ -2853,5 +3201,6 @@ export default function App(){
       <FloatingChat/>
       {showAuth&&<AuthModal onClose={()=>setShowAuth(false)} onSuccess={handleAuthSuccess}/>}
     </div>
+    </ProductsProvider>
   );
 }
