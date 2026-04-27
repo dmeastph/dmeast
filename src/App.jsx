@@ -11,6 +11,7 @@
  * - Rx camera trigger fixed
  * - Payment method styled badges (professional)
  * - About Us milestones corrected
+ * - Password reset: ensure dmeastph.com is in Firebase Auth > Settings > Authorized domains
  * - npm install firebase @emailjs/browser
  */
 
@@ -586,7 +587,7 @@ function Navbar({activePage,setPage,cartCount,user,isAdmin,onSignIn,onSignOut}){
     return()=>document.removeEventListener("mousedown",fn);
   },[]);
 
-  const links=[{id:"home",label:"Home"},{id:"about",label:"About Us"},{id:"products",label:"Shop"},{id:"institutional",label:"Institutional Orders"},{id:"quote",label:"Request Quote"},{id:"contact",label:"Contact"}];
+  const links=[{id:"home",label:"Home"},{id:"about",label:"About Us"},{id:"products",label:"Shop"},{id:"institutional",label:"Institutional Orders"},{id:"quote",label:"Request Quote"},{id:"track",label:"Track Order"},{id:"contact",label:"Contact"}];
   const nav=id=>{setPage(id);setMenuOpen(false);};
 
   return(
@@ -823,6 +824,15 @@ function CustomerPortal({user,setPage,addToCart,wishlist,toggleWishlist}){
                     </div>
                     {o.address&&<div style={{marginTop:8,fontSize:12,color:ds.color.textMuted}}>📍 {o.address}</div>}
                     {o.paymentMethod&&<div style={{fontSize:12,color:ds.color.textMuted,marginTop:2}}>💳 {o.paymentMethod}</div>}
+                    {/* Payment proof upload */}
+                    {o.status!=="delivered"&&o.status!=="cancelled"&&(
+                      <div style={{marginTop:12,paddingTop:12,borderTop:"1px solid "+ds.color.borderLight}}>
+                        <PaymentProofUpload orderId={o.id} existingUrl={o.paymentProofUrl}/>
+                      </div>
+                    )}
+                    {o.status==="delivered"&&o.paymentProofUrl&&(
+                      <div style={{marginTop:8,fontSize:12,color:ds.color.success}}>✅ Payment proof: <a href={o.paymentProofUrl} target="_blank" rel="noopener noreferrer" style={{color:ds.color.success}}>View →</a></div>
+                    )}
                   </div>
                 </div>
               );
@@ -1428,6 +1438,14 @@ Thank you for choosing DM EAST!`,
                     {o.items?.map((item,i)=><div key={i} style={{fontSize:12.5,color:ds.color.textBody,padding:"2px 0"}}>{item.name} × {item.qty} — {formatPHP(item.price*item.qty)}</div>)}
                     {o.address&&<div style={{fontSize:12,color:ds.color.textMuted,marginTop:6}}>📍 {o.address}</div>}
                     {o.instructions&&<div style={{fontSize:12,color:ds.color.textMuted,marginTop:2}}>📝 {o.instructions}</div>}
+                    {o.paymentProofUrl?(
+                      <div style={{marginTop:6,display:"flex",alignItems:"center",gap:8}}>
+                        <span style={{fontSize:11,fontWeight:700,padding:"3px 10px",borderRadius:ds.radius.pill,background:ds.color.successBg,color:ds.color.success}}>📎 Payment Proof Uploaded</span>
+                        <a href={o.paymentProofUrl} target="_blank" rel="noopener noreferrer" style={{fontSize:12,color:ds.color.success,textDecoration:"underline"}}>View →</a>
+                      </div>
+                    ):(
+                      <div style={{marginTop:6,fontSize:11,color:ds.color.textLight}}>📎 No payment proof uploaded yet</div>
+                    )}
                   </div>
                 </div>
               );
@@ -2403,7 +2421,7 @@ function CartPage({cart,removeFromCart,updateQty,setPage,user,onOrderComplete}){
         console.warn("Email send failed (order still placed):", emailErr);
       }
 
-      setConfirmedOrderId("#"+orderRef.id.slice(-6).toUpperCase());
+      setConfirmedOrderId(orderRef.id); // Full Firestore doc ID
       if(onOrderComplete) onOrderComplete();
       setStep(5);
     } catch(err) {
@@ -2482,7 +2500,7 @@ function CartPage({cart,removeFromCart,updateQty,setPage,user,onOrderComplete}){
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:24,paddingBottom:20,borderBottom:`2px solid ${ds.color.border}`}}>
             <div>
               <div style={{fontSize:11,fontWeight:700,color:ds.color.textMuted,textTransform:"uppercase",letterSpacing:"0.12em",marginBottom:4}}>Order Reference</div>
-              <div style={{fontFamily:ds.font.display,fontSize:26,color:ds.color.red,letterSpacing:"0.04em"}}>{confirmedOrderId||"—"}</div>
+              <div style={{fontFamily:ds.font.display,fontSize:26,color:ds.color.red,letterSpacing:"0.04em"}}>{confirmedOrderId ? "#"+confirmedOrderId.slice(-6).toUpperCase() : "—"}</div>
             </div>
             <div style={{textAlign:"right"}}>
               <span style={{fontSize:12,fontWeight:700,padding:"5px 14px",borderRadius:ds.radius.pill,background:"#FEF9C3",color:"#A16207"}}>⏳ Pending Confirmation</span>
@@ -2561,6 +2579,18 @@ function CartPage({cart,removeFromCart,updateQty,setPage,user,onOrderComplete}){
             ))}
           </div>
 
+          {/* Payment proof upload */}
+          <div style={{borderTop:"1px solid "+ds.color.borderLight,paddingTop:20,marginTop:4}}>
+            <div style={{fontSize:12,fontWeight:700,color:ds.color.textDark,textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:12}}>Upload Payment Proof</div>
+            <div style={{fontSize:13,color:ds.color.textMuted,marginBottom:14}}>Paid via GCash, Maya, or bank transfer? Upload your screenshot to speed up processing.</div>
+            {confirmedOrderId&&<PaymentProofUpload orderId={confirmedOrderId.replace("#","")} onUploaded={()=>{}}/>}
+          </div>
+
+          {/* Track order link */}
+          <div style={{background:ds.color.canvas,borderRadius:ds.radius.md,padding:"14px 18px",marginTop:16,textAlign:"center"}}>
+            <div style={{fontSize:13,color:ds.color.textMuted}}>Track your order anytime: <button onClick={()=>setPage("track")} style={{background:"none",border:"none",color:ds.color.red,fontWeight:700,cursor:"pointer",fontSize:13,fontFamily:ds.font.body}}>Track Order →</button></div>
+          </div>
+
           {/* Contact */}
           <div style={{background:ds.color.canvas,borderRadius:ds.radius.md,padding:"14px 18px",marginTop:8,display:"flex",gap:16,flexWrap:"wrap",alignItems:"center"}}>
             <div style={{fontSize:12,color:ds.color.textMuted,fontWeight:600}}>Need help? Contact us:</div>
@@ -2583,7 +2613,7 @@ function CartPage({cart,removeFromCart,updateQty,setPage,user,onOrderComplete}){
           {user&&<Btn variant="ghost" size="md" onClick={()=>setPage("portal")}>📋 View My Orders</Btn>}
           <Btn variant="primary" size="md" onClick={()=>setPage("home")}>Back to Home</Btn>
         </div>
-        <p style={{textAlign:"center",fontSize:12,color:ds.color.textLight}}>Screenshot or print this page for your records. Your order reference is <strong>{confirmedOrderId||"—"}</strong>.</p>
+        <p style={{textAlign:"center",fontSize:12,color:ds.color.textLight}}>Screenshot or print this page for your records. Your order reference is <strong>{confirmedOrderId ? "#"+confirmedOrderId.slice(-6).toUpperCase() : "—"}</strong>.</p>
       </div>
     </div>
   );
@@ -2937,6 +2967,199 @@ function CartPage({cart,removeFromCart,updateQty,setPage,user,onOrderComplete}){
   );
 }
 
+// ─── PAYMENT PROOF UPLOAD (reusable) ─────────────────────────────────────────
+function PaymentProofUpload({ orderId, existingUrl, onUploaded }){
+  const [uploading, setUploading] = useState(false);
+  const [err,       setErr]       = useState("");
+  const [url,       setUrl]       = useState(existingUrl||"");
+  const fileRef = useRef(null);
+
+  const handleUpload = async (file) => {
+    if (!file) return;
+    if (file.size > 10*1024*1024) { setErr("File too large. Max 10MB."); return; }
+    setUploading(true); setErr("");
+    try {
+      const ext = file.name.split(".").pop()||"jpg";
+      const path = "payment-proofs/"+orderId+"/proof-"+Date.now()+"."+ext;
+      const ref = storageRef(storage, path);
+      await uploadBytes(ref, file);
+      const downloadUrl = await getDownloadURL(ref);
+      // Save URL to order doc
+      await updateDoc(doc(db,"orders",orderId), { paymentProofUrl: downloadUrl, paymentProofAt: serverTimestamp() });
+      setUrl(downloadUrl);
+      if (onUploaded) onUploaded(downloadUrl);
+    } catch(e){
+      setErr("Upload failed: "+e.message);
+    }
+    setUploading(false);
+  };
+
+  if (url) return(
+    <div style={{background:ds.color.successBg,border:"1px solid "+ds.color.successBorder,borderRadius:ds.radius.md,padding:"12px 16px",display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
+      <span style={{fontSize:16}}>✅</span>
+      <div style={{flex:1}}>
+        <div style={{fontSize:13,fontWeight:600,color:ds.color.success}}>Payment proof uploaded</div>
+        <a href={url} target="_blank" rel="noopener noreferrer" style={{fontSize:12,color:ds.color.success,textDecoration:"underline"}}>View uploaded file →</a>
+      </div>
+      <button onClick={()=>{setUrl("");}} style={{background:"none",border:"none",cursor:"pointer",fontSize:12,color:ds.color.textMuted}}>Upload new</button>
+    </div>
+  );
+
+  return(
+    <div style={{border:"2px dashed "+ds.color.border,borderRadius:ds.radius.lg,padding:"20px",textAlign:"center",background:ds.color.canvas}}>
+      <input ref={fileRef} type="file" accept="image/*,application/pdf" onChange={e=>handleUpload(e.target.files[0])} style={{display:"none"}}/>
+      <div style={{fontSize:28,marginBottom:8}}>📎</div>
+      <div style={{fontSize:14,fontWeight:600,color:ds.color.textDark,marginBottom:4}}>Upload Payment Proof</div>
+      <div style={{fontSize:12,color:ds.color.textMuted,marginBottom:12}}>GCash screenshot, bank transfer receipt, or payment confirmation</div>
+      <button onClick={()=>fileRef.current?.click()} disabled={uploading}
+        style={{padding:"10px 24px",borderRadius:ds.radius.md,border:"2px solid "+ds.color.red,background:ds.color.redLight,cursor:uploading?"wait":"pointer",fontSize:13,fontWeight:700,color:ds.color.red,fontFamily:ds.font.body}}>
+        {uploading?"⏳ Uploading…":"📤 Choose File"}
+      </button>
+      <div style={{fontSize:11,color:ds.color.textLight,marginTop:8}}>JPG, PNG, PDF · Max 10MB</div>
+      {err&&<div style={{marginTop:8,fontSize:12,color:ds.color.red}}>{err}</div>}
+    </div>
+  );
+}
+
+// ─── TRACK ORDER PAGE ────────────────────────────────────────────────────────
+function TrackOrderPage(){
+  const [refInput, setRefInput] = useState("");
+  const [order,    setOrder]    = useState(null);
+  const [loading,  setLoading]  = useState(false);
+  const [error,    setError]    = useState("");
+  const [searched, setSearched] = useState(false);
+
+  const handleSearch = async () => {
+    const ref = refInput.trim().toUpperCase().replace("#","");
+    if (ref.length < 4) { setError("Please enter a valid order reference number."); return; }
+    setLoading(true); setError(""); setOrder(null); setSearched(true);
+    try {
+      // Search all orders and find by last 6 chars of ID
+      const snap = await getDocs(collection(db,"orders"));
+      const match = snap.docs.find(d => d.id.slice(-6).toUpperCase() === ref.slice(-6).toUpperCase());
+      if (match) {
+        setOrder({ id: match.id, ...match.data() });
+      } else {
+        setError("No order found with reference \""+ref+"\". Please check and try again.");
+      }
+    } catch(e) {
+      setError("Could not search orders. Please try again or contact us.");
+    }
+    setLoading(false);
+  };
+
+  const statusSteps = ["pending","confirmed","processing","shipped","delivered"];
+  const inp = {width:"100%",padding:"14px 18px",border:"2px solid "+ds.color.border,borderRadius:ds.radius.lg,fontSize:16,outline:"none",fontFamily:ds.font.body,color:ds.color.textDark,boxSizing:"border-box",background:"#fff",textAlign:"center",letterSpacing:"0.1em",fontWeight:700,textTransform:"uppercase"};
+
+  return(
+    <div style={{paddingTop:67}}>
+      <PageHero eyebrow="Order Tracking" title="Track Your Order" subtitle="Enter your order reference number to check the current status of your order."/>
+      <div style={{maxWidth:600,margin:"0 auto",padding:"48px 24px"}}>
+
+        {/* Search box */}
+        <div style={{background:"#fff",borderRadius:ds.radius.xl,padding:"32px 36px",boxShadow:ds.shadow.md,border:"1px solid "+ds.color.borderLight,marginBottom:32}}>
+          <div style={{fontSize:13,color:ds.color.textMuted,marginBottom:16,textAlign:"center"}}>Your order reference was shown on the confirmation screen and included in your confirmation email.</div>
+          <div style={{display:"flex",gap:10,marginBottom:16}}>
+            <input value={refInput} onChange={e=>setRefInput(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleSearch()} placeholder="e.g. A3F9C2" style={inp}/>
+            <Btn variant="primary" size="lg" onClick={handleSearch} disabled={loading}>{loading?"Searching…":"Track"}</Btn>
+          </div>
+          {error&&<div style={{background:ds.color.redLight,border:"1px solid "+ds.color.redBorder,borderRadius:ds.radius.md,padding:"10px 14px",fontSize:13,color:ds.color.red,textAlign:"center"}}>{error}</div>}
+        </div>
+
+        {/* Order result */}
+        {order&&(
+          <div style={{background:"#fff",borderRadius:ds.radius.xl,padding:"28px 32px",boxShadow:ds.shadow.sm,border:"1px solid "+ds.color.borderLight}}>
+            {/* Header */}
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:24,paddingBottom:18,borderBottom:"2px solid "+ds.color.border}}>
+              <div>
+                <div style={{fontSize:11,fontWeight:700,color:ds.color.textMuted,textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:4}}>Order Reference</div>
+                <div style={{fontFamily:ds.font.display,fontSize:24,color:ds.color.red}}>#{order.id.slice(-6).toUpperCase()}</div>
+              </div>
+              <div style={{textAlign:"right"}}>
+                <span style={{fontSize:12,fontWeight:700,padding:"5px 14px",borderRadius:ds.radius.pill,background:orderStatusColor(order.status||"pending").bg,color:orderStatusColor(order.status||"pending").color}}>{ORDER_STATUS_LABELS[order.status]||"Pending"}</span>
+                <div style={{fontSize:11,color:ds.color.textMuted,marginTop:6}}>{formatDate(order.createdAt)}</div>
+              </div>
+            </div>
+
+            {/* Status tracker */}
+            {order.status!=="cancelled"&&order.status!=="out_of_stock"&&(
+              <div style={{marginBottom:24}}>
+                <div style={{display:"flex",alignItems:"center",gap:0}}>
+                  {statusSteps.map((s,i)=>{
+                    const curIdx = statusSteps.indexOf(order.status||"pending");
+                    const done   = i<=curIdx;
+                    const active = i===curIdx;
+                    return(
+                      <div key={s} style={{display:"flex",alignItems:"center",flex:i<4?1:0}}>
+                        <div style={{textAlign:"center"}}>
+                          <div style={{width:32,height:32,borderRadius:"50%",background:done?ds.color.success:ds.color.borderLight,border:"2px solid "+(done?ds.color.success:ds.color.border),display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,color:done?"#fff":ds.color.textMuted,margin:"0 auto 6px",fontWeight:700}}>{done&&!active?"✓":i+1}</div>
+                          <div style={{fontSize:10,color:active?ds.color.success:ds.color.textMuted,fontWeight:active?700:400,whiteSpace:"nowrap",textTransform:"capitalize"}}>{ORDER_STATUS_LABELS[s]||s}</div>
+                        </div>
+                        {i<4&&<div style={{flex:1,height:2,background:i<curIdx?ds.color.success:ds.color.borderLight,margin:"0 4px 20px"}}/>}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {order.status==="out_of_stock"&&(
+              <div style={{background:"#FFF7ED",border:"1px solid #FED7AA",borderRadius:ds.radius.md,padding:"12px 16px",marginBottom:20,fontSize:13,color:"#C2410C"}}>
+                ⚠️ <strong>Item(s) unavailable.</strong> Our team has been notified and will contact you to discuss alternatives or arrange a refund. Call us: <strong>{CONTACT.phone1}</strong>
+              </div>
+            )}
+            {order.status==="cancelled"&&(
+              <div style={{background:ds.color.redLight,border:"1px solid "+ds.color.redBorder,borderRadius:ds.radius.md,padding:"12px 16px",marginBottom:20,fontSize:13,color:ds.color.red}}>
+                ❌ This order has been cancelled. If you have questions, contact us at <strong>{CONTACT.email}</strong>.
+              </div>
+            )}
+
+            {/* Items */}
+            <div style={{background:ds.color.canvas,borderRadius:ds.radius.md,padding:"14px 18px",marginBottom:20}}>
+              <div style={{fontSize:11,fontWeight:700,color:ds.color.textMuted,textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:12}}>Items Ordered</div>
+              {order.items?.map((item,i)=>(
+                <div key={i} style={{display:"flex",justifyContent:"space-between",fontSize:13,color:ds.color.textBody,padding:"6px 0",borderBottom:i<(order.items.length-1)?"1px solid "+ds.color.borderLight:"none"}}>
+                  <span>{item.name} x {item.qty}</span>
+                  <span style={{fontWeight:600}}>{formatPHP(item.price*item.qty)}</span>
+                </div>
+              ))}
+              <div style={{display:"flex",justifyContent:"space-between",paddingTop:10,marginTop:4,fontWeight:700,fontSize:15,borderTop:"1px solid "+ds.color.border}}>
+                <span>Total</span><span style={{color:ds.color.red}}>{formatPHP(order.total||0)}</span>
+              </div>
+            </div>
+
+            {/* Delivery info */}
+            {order.address&&<div style={{fontSize:13,color:ds.color.textMuted,marginBottom:6}}>📍 {order.address}</div>}
+            {order.paymentMethod&&<div style={{fontSize:13,color:ds.color.textMuted,marginBottom:16}}>💳 {order.paymentMethod}</div>}
+
+            {/* Payment proof upload */}
+            {order.status!=="delivered"&&order.status!=="cancelled"&&(
+              <div style={{marginBottom:16}}>
+                <div style={{fontSize:12,fontWeight:700,color:ds.color.textDark,marginBottom:8}}>Payment Proof</div>
+                <PaymentProofUpload orderId={order.id} existingUrl={order.paymentProofUrl} onUploaded={url=>setOrder(prev=>({...prev,paymentProofUrl:url}))}/>
+              </div>
+            )}
+
+            {/* Contact */}
+            <div style={{background:ds.color.canvas,borderRadius:ds.radius.md,padding:"14px 18px",display:"flex",gap:16,flexWrap:"wrap",alignItems:"center"}}>
+              <div style={{fontSize:12,color:ds.color.textMuted,fontWeight:600}}>Need help with this order?</div>
+              <a href={CONTACT.whatsapp} target="_blank" rel="noopener noreferrer" style={{display:"inline-flex",alignItems:"center",gap:6,background:"#25D366",color:"#fff",padding:"6px 14px",borderRadius:ds.radius.pill,fontSize:12,fontWeight:700,textDecoration:"none"}}>💬 WhatsApp</a>
+              <a href={"tel:"+CONTACT.phone1Raw} style={{display:"inline-flex",alignItems:"center",gap:6,background:ds.color.redLight,color:ds.color.red,padding:"6px 14px",borderRadius:ds.radius.pill,fontSize:12,fontWeight:700,textDecoration:"none"}}>📞 Call Us</a>
+            </div>
+          </div>
+        )}
+
+        {searched&&!order&&!loading&&!error&&(
+          <div style={{textAlign:"center",padding:"40px 0",color:ds.color.textMuted}}>
+            <div style={{fontSize:32,marginBottom:12}}>🔍</div>
+            <div style={{fontSize:14}}>No order found. Please double-check your reference number.</div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── POLICY PAGES ────────────────────────────────────────────────────────────
 function PrivacyPage(){
   const sections=[
@@ -3059,7 +3282,7 @@ function Footer({setPage}){
           </div>
           <div>
             <div style={{fontSize:11,fontWeight:700,color:"rgba(255,255,255,0.35)",textTransform:"uppercase",letterSpacing:"0.14em",marginBottom:16}}>Quick Links</div>
-            {[["home","Home"],["about","About Us"],["products","Shop"],["institutional","Institutional Orders"],["quote","Request Quote"],["contact","Contact"]].map(([id,label])=>(
+            {[["home","Home"],["about","About Us"],["products","Shop"],["institutional","Institutional Orders"],["quote","Request Quote"],["track","Track Order"],["contact","Contact"]].map(([id,label])=>(
               <button key={id} onClick={()=>setPage(id)} style={{display:"block",background:"none",border:"none",cursor:"pointer",fontSize:13.5,color:"rgba(255,255,255,0.6)",fontFamily:ds.font.body,padding:"4px 0",textAlign:"left"}}
                 onMouseEnter={e=>e.target.style.color="#F0A81C"} onMouseLeave={e=>e.target.style.color="rgba(255,255,255,0.6)"}>{label}</button>
             ))}
@@ -3196,6 +3419,7 @@ export default function App(){
         {page==="terms"        &&<TermsPage/>}
         {page==="refunds"      &&<RefundPage/>}
         {page==="shipping"     &&<ShippingPage/>}
+        {page==="track"        &&<TrackOrderPage/>}
       </main>
       <Footer setPage={setPage}/>
       <FloatingChat/>
