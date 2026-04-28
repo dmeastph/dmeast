@@ -1,5 +1,9 @@
 /**
- * DMEAST — Medical Solutions Platform  v11.1
+ * DMEAST — Medical Solutions Platform  v11.2
+ *
+ * v11.2 FIXES:
+ * - 💊 Rx files now actually upload to Firebase Storage (was missing!)
+ * - 👁️ Admin can now VIEW uploaded prescriptions with thumbnail + click-to-enlarge
  *
  * v11.1 FIXES:
  * - 🗺️ Map rendering FIXED — tiles now display correctly (was showing fragmented)
@@ -1879,9 +1883,30 @@ function AdminDashboard(){
             <div style={{fontFamily:ds.font.display,fontSize:18,color:ds.color.textDark,marginBottom:20}}>Prescription Uploads ({rxUps.length})</div>
             {rxUps.length===0?<div style={{textAlign:"center",padding:"40px 0",color:ds.color.textMuted}}>No prescription uploads yet.</div>:rxUps.map(r=>(
               <div key={r.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"14px 0",borderBottom:`1px solid ${ds.color.borderLight}`,flexWrap:"wrap",gap:10}}>
-                <div>
-                  <div style={{fontSize:14,fontWeight:600,color:ds.color.textDark}}>Order #{r.orderId?.slice(-6).toUpperCase()||"—"}</div>
-                  <div style={{fontSize:12,color:ds.color.textMuted,marginTop:2}}>{r.customerName||"Guest"} · {r.fileName||"Prescription"} · {formatDate(r.createdAt)}</div>
+                <div style={{display:"flex",alignItems:"center",gap:14,flex:1,minWidth:0}}>
+                  {/* V11.2: Show thumbnail/preview of uploaded Rx */}
+                  {r.fileUrl?(
+                    <a href={r.fileUrl} target="_blank" rel="noopener noreferrer" style={{flexShrink:0,width:60,height:60,borderRadius:ds.radius.sm,border:`1px solid ${ds.color.border}`,overflow:"hidden",background:"#fff",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}>
+                      {r.fileName?.toLowerCase().endsWith('.pdf')?(
+                        <span style={{fontSize:24}}>📄</span>
+                      ):(
+                        <img src={r.fileUrl} alt="Rx" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
+                      )}
+                    </a>
+                  ):(
+                    <div style={{flexShrink:0,width:60,height:60,borderRadius:ds.radius.sm,border:`1px dashed ${ds.color.border}`,background:ds.color.canvas,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,color:ds.color.textLight}}>📋</div>
+                  )}
+                  <div style={{minWidth:0}}>
+                    <div style={{fontSize:14,fontWeight:600,color:ds.color.textDark}}>Order #{r.orderId?.slice(-6).toUpperCase()||"—"}</div>
+                    <div style={{fontSize:12,color:ds.color.textMuted,marginTop:2}}>{r.customerName||"Guest"} · {r.fileName||"Prescription"} · {formatDate(r.createdAt)}</div>
+                    {r.fileUrl?(
+                      <a href={r.fileUrl} target="_blank" rel="noopener noreferrer" style={{fontSize:12,color:ds.color.red,fontWeight:700,textDecoration:"underline",marginTop:4,display:"inline-block"}}>
+                        🔍 View Full Prescription →
+                      </a>
+                    ):(
+                      <div style={{fontSize:11,color:ds.color.textLight,marginTop:4,fontStyle:"italic"}}>⚠ No file attached (uploaded before v11.2 fix)</div>
+                    )}
+                  </div>
                 </div>
                 <select value={r.status||"pending"} onChange={e=>updateRxStatus(r.id,e.target.value)} style={selS}>
                   {["pending","verified","rejected"].map(s=><option key={s} value={s}>{s.charAt(0).toUpperCase()+s.slice(1)}</option>)}
@@ -2569,9 +2594,10 @@ function CartPage({cart,removeFromCart,updateQty,setPage,user,onOrderComplete}){
   const handleRxUpload = e => {
     const file = e.target.files[0];
     if(!file) return;
+    if(file.size > 10*1024*1024){ alert("File too large. Max 10MB."); return; }
     e.target.value = "";
     const r = new FileReader();
-    r.onload = ev => setPrescription({preview:ev.target.result, name:file.name});
+    r.onload = ev => setPrescription({preview:ev.target.result, name:file.name, file: file});
     r.readAsDataURL(file);
   };
 
@@ -2644,9 +2670,24 @@ function CartPage({cart,removeFromCart,updateQty,setPage,user,onOrderComplete}){
         } catch(_){}
         if(hasRx && prescription){
           try {
+            // V11.2 FIX: Upload the actual Rx file to Storage so admin can view it
+            let rxFileUrl = null;
+            if(prescription.file){
+              try {
+                const ext = prescription.name.split(".").pop()||"jpg";
+                const path = "rx-uploads/"+orderRef.id+"/rx-"+Date.now()+"."+ext;
+                const fileRef = storageRef(storage, path);
+                await uploadBytes(fileRef, prescription.file);
+                rxFileUrl = await getDownloadURL(fileRef);
+              } catch(uploadErr){
+                console.warn("Rx file upload failed:", uploadErr);
+              }
+            }
             await addDoc(collection(db,"rxUploads"),{
               uid:user.uid, customerName:details.name, orderId:orderRef.id,
-              fileName:prescription.name, status:"pending", createdAt:serverTimestamp(),
+              fileName:prescription.name,
+              fileUrl: rxFileUrl,
+              status:"pending", createdAt:serverTimestamp(),
             });
           } catch(_){}
         }
