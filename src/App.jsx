@@ -1,5 +1,12 @@
 /**
- * DMEAST — Medical Solutions Platform  v13.0c
+ * DMEAST — Medical Solutions Platform  v13.0d
+ *
+ * v13.0d EMAIL FIXES:
+ * - 🔧 NewOrderModal (admin "+ New Order") now sends order confirmation
+ *   to BOTH admin AND customer (was missing!)
+ * - 🔧 OrderEditorModal now sends update email when status changes
+ * - 🔧 More status transitions now trigger emails (processing, delivered, cancelled)
+ * - 🔧 Helper function unifies email sending logic across all places
  *
  * v13.0c NEW FEATURES:
  * - ✏️ Order Editor — full edit modal for any existing order
@@ -72,11 +79,74 @@ const ADMIN_EMAILS = ["info@dmeastph.com", "admin@dmeastph.com"];
 import emailjs from "@emailjs/browser";
 const EMAILJS_CONFIG = {
   serviceId:           "service_0hvjrv6",
-  orderTemplateId:     "template_udt3wjn",
-  templateId:          "template_5r24wue",
-  receiptTemplateId:   "template_adb2so7",
+  orderTemplateId:     "template_udt3wjn",  // To: admin (info@dmeastph.com) — order received notification
+  templateId:          "template_5r24wue",  // To: {{to_email}} — universal customer notifications
+  receiptTemplateId:   "template_adb2so7",  // To: {{to_email}} — customer order receipt
   publicKey:           "gV5OXqbN2PHond86B",
 };
+
+// v13.0d: Unified email sender for status updates + general customer notifications
+async function sendCustomerStatusEmail({ order, subject, bodyText }) {
+  if (!order || !order.email) return { ok: false, reason: "no email on order" };
+  try {
+    await emailjs.send(EMAILJS_CONFIG.serviceId, EMAILJS_CONFIG.templateId, {
+      from_name: "DM EAST Team",
+      company: "DM EAST",
+      from_email: CONTACT.email,
+      phone: CONTACT.phone1,
+      product: subject,
+      quantity: "N/A",
+      budget: order.total ? formatPHP(order.total) : "N/A",
+      timeline: "Update",
+      location: order.address || "",
+      details: bodyText,
+      reply_to: CONTACT.email,
+      to_email: order.email,
+    }, EMAILJS_CONFIG.publicKey);
+    return { ok: true };
+  } catch (e) {
+    console.warn("Customer email failed:", e);
+    return { ok: false, reason: e.message };
+  }
+}
+
+async function sendAdminNewOrderNotification(order) {
+  try {
+    await emailjs.send(EMAILJS_CONFIG.serviceId, EMAILJS_CONFIG.orderTemplateId, {
+      customer_name:    order.name || "Customer",
+      customer_email:   order.email || "Not provided",
+      customer_phone:   order.phone || "Not provided",
+      customer_address: order.address || "Not provided",
+      order_items:      (order.items||[]).map(i=>`${i.name} x${i.qty} — ${formatPHP(i.price*i.qty)}`).join("\n"),
+      order_total:      order.total ? formatPHP(order.total) : "—",
+      payment_method:   order.paymentMethod || order.paymentTerms || "—",
+    }, EMAILJS_CONFIG.publicKey);
+    return { ok: true };
+  } catch(e) {
+    console.warn("Admin notification email failed:", e);
+    return { ok: false, reason: e.message };
+  }
+}
+
+async function sendCustomerReceiptEmail(order) {
+  if (!order || !order.email) return { ok: false, reason: "no email" };
+  try {
+    await emailjs.send(EMAILJS_CONFIG.serviceId, EMAILJS_CONFIG.receiptTemplateId, {
+      customer_name:    order.name || "Customer",
+      customer_email:   order.email,
+      customer_phone:   order.phone || "—",
+      customer_address: order.address || "—",
+      order_items:      (order.items||[]).map(i=>`${i.name} x${i.qty} — ${formatPHP(i.price*i.qty)}`).join("\n"),
+      order_total:      order.total ? formatPHP(order.total) : "—",
+      payment_method:   order.paymentMethod || order.paymentTerms || "—",
+      to_email:         order.email,
+    }, EMAILJS_CONFIG.publicKey);
+    return { ok: true };
+  } catch(e) {
+    console.warn("Customer receipt email failed:", e);
+    return { ok: false, reason: e.message };
+  }
+}
 
 const POINTS_PER_PHP = 1 / 200;
 const POINT_VALUE    = 0.50;
@@ -1693,6 +1763,23 @@ function NewOrderModal({ onClose, onSaved, customers: existingCustomers, product
         });
       } catch(_){}
       
+      // v13.0d: Send email notifications for admin-created orders
+      const fullOrder = { id: orderRef.id, ...orderData };
+      // Notify admin
+      sendAdminNewOrderNotification(fullOrder);
+      // Notify customer if they have an email
+      if (fullOrder.email) {
+        const sourceLabel = findSource(fullOrder.source)?.label || "Direct";
+        const termsLabel  = findTerms(fullOrder.paymentTerms)?.label || fullOrder.paymentMethod || "—";
+        sendCustomerStatusEmail({
+          order: fullOrder,
+          subject: `ORDER #${orderRef.id.slice(-6).toUpperCase()} — Order Received`,
+          bodyText: `Dear ${fullOrder.name || "Customer"},\n\nThank you! We have received your order via ${sourceLabel}.\n\nOrder Reference: #${orderRef.id.slice(-6).toUpperCase()}\n\nOrder Items:\n${(fullOrder.items||[]).map(i=>`${i.name} x${i.qty} — ${formatPHP(i.price*i.qty)}`).join("\n")}\n\nTotal: ${formatPHP(fullOrder.total||0)}\nPayment Terms: ${termsLabel}\n\nOur team will be in touch shortly with delivery details and payment instructions if applicable.\n\nIf you have any questions, contact us:\n📱 ${CONTACT.phone1}\n💬 WhatsApp: ${CONTACT.whatsapp}\n✉️ ${CONTACT.email}\n\nThank you for choosing DM EAST!`
+        });
+        // Also send a receipt
+        sendCustomerReceiptEmail(fullOrder);
+      }
+      
       onSaved && onSaved({ id: orderRef.id, ...orderData });
       onClose();
     } catch(e) {
@@ -3236,6 +3323,25 @@ function OrderEditorModal({ order, products: existingProducts, onClose, onSaved,
       
       await updateDoc(doc(db, "orders", order.id), payload);
       
+      // v13.0d: Send email if status changed
+      const statusChanged = order.status !== orderStatus;
+      const paymentChanged = order.paymentStatus !== paymentStatusValue;
+      if ((statusChanged || paymentChanged) && payload.email) {
+        const orderRef = order.id.slice(-6).toUpperCase();
+        const updatedOrder = { ...order, ...payload };
+        let subject = `ORDER #${orderRef} — Updated`;
+        let body = `Dear ${updatedOrder.name||"Customer"},\n\nYour order #${orderRef} has been updated.\n\n`;
+        if (statusChanged) {
+          subject = `ORDER #${orderRef} — Status: ${ORDER_STATUS_LABELS[orderStatus]||orderStatus}`;
+          body += `Order Status: ${ORDER_STATUS_LABELS[orderStatus]||orderStatus}\n`;
+        }
+        if (paymentChanged) {
+          body += `Payment Status: ${PAYMENT_STATUS_LABELS[paymentStatusValue]||paymentStatusValue}\n`;
+        }
+        body += `\nOrder Items:\n${(payload.items||[]).map(i=>`${i.name} x${i.qty} — ${formatPHP(i.price*i.qty)}`).join("\n")}\n\nTotal: ${formatPHP(payload.total||0)}\n\nIf you have any questions, contact us:\n📱 ${CONTACT.phone1}\n💬 WhatsApp: ${CONTACT.whatsapp}\n✉️ ${CONTACT.email}\n\nThank you for choosing DM EAST!`;
+        sendCustomerStatusEmail({ order: updatedOrder, subject, bodyText: body });
+      }
+      
       onSaved && onSaved({ id: order.id, ...order, ...payload });
       onClose();
     } catch(e) {
@@ -3659,6 +3765,30 @@ function AdminDashboard(){
           to_email: customerEmail,
         }, EMAILJS_CONFIG.publicKey);
       } catch(e){ console.warn("Shipped email failed:", e); }
+    }
+    // v13.0d: Email for "processing" status
+    if(status==="processing"){
+      sendCustomerStatusEmail({
+        order, 
+        subject: `ORDER #${orderRef} — Now Processing`,
+        bodyText: `Dear ${customerName},\n\nYour order #${orderRef} is now being processed and prepared for shipment.\n\nWe'll send another update once it's been shipped.\n\nIf you have any questions, contact us:\n📱 ${CONTACT.phone1}\n💬 WhatsApp: ${CONTACT.whatsapp}\n\nThank you for choosing DM EAST!`
+      });
+    }
+    // v13.0d: Email for "delivered" status
+    if(status==="delivered"){
+      sendCustomerStatusEmail({
+        order,
+        subject: `ORDER #${orderRef} — Delivered ✓`,
+        bodyText: `Dear ${customerName},\n\n🎉 Your order #${orderRef} has been delivered!\n\nWe hope you're satisfied with your purchase. If you have any concerns, please don't hesitate to contact us within 7 days.\n\n📱 ${CONTACT.phone1}\n💬 WhatsApp: ${CONTACT.whatsapp}\n✉️ ${CONTACT.email}\n\nThank you for choosing DM EAST!`
+      });
+    }
+    // v13.0d: Email for "cancelled" status
+    if(status==="cancelled"){
+      sendCustomerStatusEmail({
+        order,
+        subject: `ORDER #${orderRef} — Cancelled`,
+        bodyText: `Dear ${customerName},\n\nYour order #${orderRef} has been cancelled.\n\nIf you didn't request this cancellation or have questions, please contact us immediately:\n📱 ${CONTACT.phone1}\n💬 WhatsApp: ${CONTACT.whatsapp}\n✉️ ${CONTACT.email}\n\nIf any payment was made, our team will arrange a refund.\n\nThank you for your understanding.`
+      });
     }
   };
 
