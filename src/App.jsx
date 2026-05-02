@@ -1,5 +1,11 @@
 /**
- * DMEAST — Medical Solutions Platform  v13.0a
+ * DMEAST — Medical Solutions Platform  v13.0b
+ *
+ * v13.0b NEW FEATURES:
+ * - 🏢 Expenses + COGS Tracking (with receipt photo upload)
+ * - 📝 Manual Billings (off-system invoices for verbal/special clients)
+ * - 📈 Margin Dashboard (P&L, top customers/products, source breakdown)
+ * - 💸 Other Charges support (delivery/service fees as line items)
  *
  * v13.0a NEW FEATURES:
  * - 🆕 Internal Order Entry (admin "+ New Order" button for offline orders)
@@ -1077,6 +1083,14 @@ function CustomerPortal({user,setPage,addToCart,wishlist,toggleWishlist}){
       setOrders(oSnap.docs.map(d=>({id:d.id,...d.data()})));
       const cSnap=await getDocs(collection(db,"customers"));
       setCustomers(cSnap.docs.map(d=>({id:d.id,...d.data()})));
+      try {
+        const eSnap=await getDocs(query(collection(db,"expenses"),orderBy("date","desc")));
+        setExpenses(eSnap.docs.map(d=>({id:d.id,...d.data()})));
+      } catch(_){}
+      try {
+        const bSnap=await getDocs(query(collection(db,"manualBillings"),orderBy("date","desc")));
+        setManualBillings(bSnap.docs.map(d=>({id:d.id,...d.data()})));
+      } catch(_){}
     } catch(_){}
   };
   const tabs=[{id:"overview",label:"Overview",icon:"📊"},{id:"orders",label:"Orders",icon:"📦"},{id:"wishlist",label:"Wishlist",icon:"❤️"},{id:"address",label:"My Address",icon:"📍"},{id:"rx",label:"Rx History",icon:"💊"},{id:"rewards",label:"Rewards",icon:"⭐"}];
@@ -1524,6 +1538,8 @@ function NewOrderModal({ onClose, onSaved, customers: existingCustomers, product
   // Items
   const [productSearch, setProductSearch] = useState("");
   const [items, setItems] = useState([]); // [{productId, name, qty, unitPrice, total}]
+  // v13.0b: Other Charges (delivery, service fees, etc)
+  const [otherCharges, setOtherCharges] = useState([]); // [{description, amount}]
   
   // Order details
   const [source, setSource]               = useState("phone");
@@ -1553,7 +1569,9 @@ function NewOrderModal({ onClose, onSaved, customers: existingCustomers, product
       }).slice(0, 6)
     : [];
   
-  const total = items.reduce((s, i) => s + (i.qty * i.unitPrice), 0);
+  const itemsTotal = items.reduce((s, i) => s + (i.qty * i.unitPrice), 0);
+  const chargesTotal = otherCharges.reduce((s, c) => s + (Number(c.amount)||0), 0);
+  const total = itemsTotal + chargesTotal;
   const margin = supplierCost ? total - Number(supplierCost) : null;
   
   const customerValid = selectedCustomer || (newCustomer.name && newCustomer.phone);
@@ -1629,6 +1647,8 @@ function NewOrderModal({ onClose, onSaved, customers: existingCustomers, product
           price: i.unitPrice, qty: i.qty,
           requiresPrescription: !!i.requiresPrescription,
         })),
+        // v13.0b: Other charges (delivery, service fees, etc)
+        otherCharges: otherCharges.filter(c => c.description && c.amount),
         total,
         // v13.0a fields
         source: source, // phone/messenger/whatsapp/walkin/email/website
@@ -1802,10 +1822,41 @@ function NewOrderModal({ onClose, onSaved, customers: existingCustomers, product
                       <button onClick={()=>removeItem(idx)} style={{background:"none",border:"none",cursor:"pointer",fontSize:14,color:ds.color.textLight}}>✕</button>
                     </div>
                   ))}
-                  <div style={{padding:"12px 14px",background:ds.color.canvas,borderTop:`1px solid ${ds.color.border}`,display:"flex",justifyContent:"space-between",fontSize:15,fontWeight:700}}>
-                    <span>Total ({items.length} item{items.length!==1?"s":""})</span>
-                    <span style={{color:ds.color.red}}>{formatPHP(total)}</span>
+                  <div style={{padding:"12px 14px",background:ds.color.canvas,borderTop:`1px solid ${ds.color.border}`,display:"flex",justifyContent:"space-between",fontSize:13,color:ds.color.textBody}}>
+                    <span>Items Subtotal ({items.length} item{items.length!==1?"s":""})</span>
+                    <span style={{fontWeight:700}}>{formatPHP(itemsTotal)}</span>
                   </div>
+                </div>
+              )}
+              
+              {/* v13.0b: Other Charges */}
+              {items.length > 0 && (
+                <div style={{marginTop:14,border:`1px solid ${ds.color.border}`,borderRadius:ds.radius.md,padding:"12px 14px",background:ds.color.canvas}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:otherCharges.length>0?10:0}}>
+                    <div style={{fontSize:12,fontWeight:700,color:ds.color.textDark}}>💸 Other Charges <span style={{color:ds.color.textMuted,fontWeight:400,fontSize:11}}>(optional — delivery, service fees, etc.)</span></div>
+                    <button onClick={()=>setOtherCharges([...otherCharges,{description:"",amount:""}])} style={{padding:"4px 10px",borderRadius:ds.radius.sm,border:`1px solid ${ds.color.red}`,background:ds.color.redLight,cursor:"pointer",fontSize:11.5,fontWeight:700,color:ds.color.red,fontFamily:ds.font.body}}>+ Add Charge</button>
+                  </div>
+                  {otherCharges.map((c,idx)=>(
+                    <div key={idx} style={{display:"grid",gridTemplateColumns:"1fr 120px 32px",gap:8,marginBottom:6,alignItems:"center"}}>
+                      <input value={c.description} onChange={e=>{const arr=[...otherCharges];arr[idx].description=e.target.value;setOtherCharges(arr);}} placeholder="e.g. Delivery to Cavite" style={{...inp,padding:"7px 10px",fontSize:12.5}}/>
+                      <input type="number" min="0" value={c.amount} onChange={e=>{const arr=[...otherCharges];arr[idx].amount=e.target.value;setOtherCharges(arr);}} placeholder="Amount" style={{...inp,padding:"7px 10px",fontSize:12.5}}/>
+                      <button onClick={()=>setOtherCharges(otherCharges.filter((_,i)=>i!==idx))} style={{background:"none",border:"none",cursor:"pointer",fontSize:14,color:ds.color.textLight}}>✕</button>
+                    </div>
+                  ))}
+                  {otherCharges.length>0 && (
+                    <div style={{display:"flex",justifyContent:"space-between",fontSize:12,color:ds.color.textMuted,paddingTop:8,borderTop:`1px dashed ${ds.color.border}`,marginTop:6}}>
+                      <span>Charges Subtotal</span>
+                      <span style={{fontWeight:700}}>{formatPHP(chargesTotal)}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+              
+              {/* Grand Total */}
+              {items.length > 0 && (
+                <div style={{marginTop:14,padding:"14px 16px",background:ds.color.redLight,border:`2px solid ${ds.color.redBorder}`,borderRadius:ds.radius.md,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                  <span style={{fontSize:14,fontWeight:700,color:ds.color.red}}>GRAND TOTAL</span>
+                  <span style={{fontSize:18,fontWeight:700,color:ds.color.red,fontFamily:ds.font.display}}>{formatPHP(total)}</span>
                 </div>
               )}
             </div>
@@ -2117,7 +2168,7 @@ function CustomerEditorModal({ customer, onClose, onSaved }){
 // ─── v13.0a: BACKUP UTILITY ──────────────────────────────────────────────────
 async function performFullBackup(){
   try {
-    const collections = ["orders","customers","products","rxUploads"];
+    const collections = ["orders","customers","products","rxUploads","expenses","manualBillings"];
     const backup = { exportedAt: new Date().toISOString(), exportedBy: "DMEAST Admin" };
     for (const col of collections) {
       const snap = await getDocs(collection(db, col));
@@ -2191,6 +2242,863 @@ function BackupReminder(){
 }
 
 
+
+// ─── v13.0b CONSTANTS ────────────────────────────────────────────────────────
+// Expense categories
+const EXPENSE_CATEGORIES = [
+  { id: "cogs",       label: "Cost of Goods (COGS)", icon: "📦", color: "#EF4444" },
+  { id: "office",     label: "Office Expenses",      icon: "🏢", color: "#3B82F6" },
+  { id: "transport",  label: "Transportation",       icon: "🚚", color: "#F59E0B" },
+  { id: "utilities",  label: "Utilities",            icon: "💡", color: "#8B5CF6" },
+  { id: "marketing",  label: "Marketing",            icon: "📢", color: "#EC4899" },
+  { id: "salary",     label: "Salaries / Payroll",   icon: "👥", color: "#10B981" },
+  { id: "rent",       label: "Rent / Lease",         icon: "🏠", color: "#06B6D4" },
+  { id: "tax",        label: "Tax / Government",     icon: "📋", color: "#6B7280" },
+  { id: "other",      label: "Other",                icon: "📝", color: "#84CC16" },
+];
+
+const EXPENSE_PAYMENT_STATUS = [
+  { id: "paid",    label: "Paid",    color: "#10B981", bg: "#D1FAE5" },
+  { id: "unpaid",  label: "Unpaid",  color: "#EF4444", bg: "#FEE2E2" },
+  { id: "partial", label: "Partial", color: "#F59E0B", bg: "#FEF3C7" },
+];
+
+const findExpenseCategory = (id) => EXPENSE_CATEGORIES.find(c => c.id === id) || EXPENSE_CATEGORIES[8];
+
+// ─── v13.0b: EXPENSE EDITOR MODAL ────────────────────────────────────────────
+function ExpenseEditorModal({ expense, orders, onClose, onSaved }){
+  const [data, setData] = useState({
+    date: expense?.date ? (expense.date.toDate ? expense.date.toDate().toISOString().slice(0,10) : new Date(expense.date).toISOString().slice(0,10)) : new Date().toISOString().slice(0,10),
+    vendor: expense?.vendor || "",
+    category: expense?.category || "cogs",
+    amount: expense?.amount || "",
+    description: expense?.description || "",
+    linkedOrderId: expense?.linkedOrderId || "",
+    paymentStatus: expense?.paymentStatus || "paid",
+    paymentMethod: expense?.paymentMethod || "",
+    notes: expense?.notes || "",
+    receiptUrl: expense?.receiptUrl || null,
+  });
+  const [receiptFile, setReceiptFile] = useState(null);
+  const [receiptPreview, setReceiptPreview] = useState(expense?.receiptUrl || null);
+  const [saving, setSaving] = useState(false);
+  const [errMsg, setErrMsg] = useState("");
+  const [orderSearch, setOrderSearch] = useState("");
+  
+  const handleReceiptUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024) { alert("File too large. Max 10MB."); return; }
+    e.target.value = "";
+    setReceiptFile(file);
+    const r = new FileReader();
+    r.onload = ev => setReceiptPreview(ev.target.result);
+    r.readAsDataURL(file);
+  };
+  
+  const filteredOrders = orderSearch.trim()
+    ? orders.filter(o => {
+        const q = orderSearch.toLowerCase();
+        return o.id.toLowerCase().includes(q) || (o.name||"").toLowerCase().includes(q);
+      }).slice(0, 5)
+    : [];
+
+  const linkedOrder = data.linkedOrderId ? orders.find(o => o.id === data.linkedOrderId) : null;
+
+  const handleSave = async () => {
+    if (!data.vendor || !data.amount || !data.category) { setErrMsg("Vendor, amount, and category are required."); return; }
+    setSaving(true); setErrMsg("");
+    try {
+      let receiptUrl = data.receiptUrl;
+      // Upload receipt file if new one selected
+      if (receiptFile) {
+        try {
+          const ext = receiptFile.name.split(".").pop() || "jpg";
+          const path = "expenses/" + Date.now() + "-" + Math.random().toString(36).slice(2,8) + "." + ext;
+          const fileRef = storageRef(storage, path);
+          await uploadBytes(fileRef, receiptFile);
+          receiptUrl = await getDownloadURL(fileRef);
+        } catch(uploadErr) {
+          console.warn("Receipt upload failed:", uploadErr);
+          setErrMsg("Receipt upload failed but expense will be saved. " + uploadErr.message);
+        }
+      }
+
+      const payload = {
+        date: new Date(data.date),
+        vendor: data.vendor,
+        category: data.category,
+        amount: Number(data.amount),
+        description: data.description || null,
+        linkedOrderId: data.linkedOrderId || null,
+        paymentStatus: data.paymentStatus,
+        paymentMethod: data.paymentMethod || null,
+        notes: data.notes || null,
+        receiptUrl: receiptUrl,
+        updatedAt: serverTimestamp(),
+      };
+
+      if (expense?.id) {
+        await updateDoc(doc(db, "expenses", expense.id), payload);
+      } else {
+        payload.createdAt = serverTimestamp();
+        await addDoc(collection(db, "expenses"), payload);
+      }
+      onSaved && onSaved();
+      onClose();
+    } catch(e) {
+      setErrMsg("Failed to save: " + e.message);
+    }
+    setSaving(false);
+  };
+
+  const handleDelete = async () => {
+    if (!expense?.id) return;
+    if (!confirm("Delete this expense entry? This cannot be undone.")) return;
+    try {
+      await deleteDoc(doc(db, "expenses", expense.id));
+      onSaved && onSaved();
+      onClose();
+    } catch(e) {
+      setErrMsg("Delete failed: " + e.message);
+    }
+  };
+
+  const inp = {width:"100%",padding:"10px 14px",border:`1.5px solid ${ds.color.border}`,borderRadius:ds.radius.md,fontSize:14,fontFamily:ds.font.body,outline:"none",boxSizing:"border-box"};
+  const lbl = {fontSize:12,fontWeight:600,color:ds.color.textDark,display:"block",marginBottom:5};
+
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center",padding:20,overflowY:"auto"}}>
+      <div style={{background:"#fff",borderRadius:ds.radius.xl,maxWidth:720,width:"100%",maxHeight:"90vh",display:"flex",flexDirection:"column",boxShadow:ds.shadow.xl}}>
+        <div style={{padding:"20px 28px",borderBottom:`1px solid ${ds.color.border}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          <div style={{fontFamily:ds.font.display,fontSize:18,color:ds.color.textDark}}>{expense?.id?"Edit Expense":"+ New Expense"}</div>
+          <button onClick={onClose} style={{background:"none",border:"none",cursor:"pointer",fontSize:22,color:ds.color.textMuted}}>✕</button>
+        </div>
+        <div style={{flex:1,overflowY:"auto",padding:"24px 28px"}}>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"14px 18px"}}>
+            <div><label style={lbl}>Date *</label><input type="date" value={data.date} onChange={e=>setData({...data,date:e.target.value})} style={inp}/></div>
+            <div><label style={lbl}>Vendor / Supplier *</label><input value={data.vendor} onChange={e=>setData({...data,vendor:e.target.value})} placeholder="e.g. MedSupply Inc" style={inp}/></div>
+            <div><label style={lbl}>Category *</label>
+              <select value={data.category} onChange={e=>setData({...data,category:e.target.value})} style={{...inp,cursor:"pointer"}}>
+                {EXPENSE_CATEGORIES.map(c=><option key={c.id} value={c.id}>{c.icon} {c.label}</option>)}
+              </select>
+            </div>
+            <div><label style={lbl}>Amount *</label><input type="number" min="0" step="0.01" value={data.amount} onChange={e=>setData({...data,amount:e.target.value})} placeholder="e.g. 35000" style={inp}/></div>
+            <div style={{gridColumn:"1/-1"}}><label style={lbl}>Description</label><input value={data.description} onChange={e=>setData({...data,description:e.target.value})} placeholder="What was this expense for?" style={inp}/></div>
+            <div><label style={lbl}>Payment Status</label>
+              <select value={data.paymentStatus} onChange={e=>setData({...data,paymentStatus:e.target.value})} style={{...inp,cursor:"pointer"}}>
+                {EXPENSE_PAYMENT_STATUS.map(s=><option key={s.id} value={s.id}>{s.label}</option>)}
+              </select>
+            </div>
+            <div><label style={lbl}>Payment Method</label>
+              <input value={data.paymentMethod} onChange={e=>setData({...data,paymentMethod:e.target.value})} placeholder="Cash / Bank / GCash / Check" style={inp}/>
+            </div>
+            
+            {/* Link to order (for COGS) */}
+            {data.category === "cogs" && (
+              <div style={{gridColumn:"1/-1",background:ds.color.canvas,padding:"12px 14px",borderRadius:ds.radius.md,border:`1px solid ${ds.color.border}`}}>
+                <label style={lbl}>🔗 Link to Order (for COGS / margin tracking)</label>
+                {linkedOrder ? (
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 12px",background:"#fff",borderRadius:ds.radius.sm,border:`1px solid ${ds.color.border}`}}>
+                    <div>
+                      <span style={{fontSize:13,fontWeight:700}}>#{linkedOrder.id.slice(-6).toUpperCase()}</span>
+                      <span style={{fontSize:12,color:ds.color.textMuted,marginLeft:10}}>{linkedOrder.name} · {formatPHP(linkedOrder.total||0)}</span>
+                    </div>
+                    <button onClick={()=>setData({...data,linkedOrderId:""})} style={{background:"none",border:"none",cursor:"pointer",fontSize:14,color:ds.color.red}}>✕ Unlink</button>
+                  </div>
+                ) : (
+                  <>
+                    <input value={orderSearch} onChange={e=>setOrderSearch(e.target.value)} placeholder="🔍 Search order # or customer name…" style={{...inp,padding:"8px 12px",fontSize:13}}/>
+                    {filteredOrders.length>0 && (
+                      <div style={{marginTop:6,maxHeight:140,overflowY:"auto",border:`1px solid ${ds.color.border}`,borderRadius:ds.radius.sm,background:"#fff"}}>
+                        {filteredOrders.map(o=>(
+                          <button key={o.id} onClick={()=>{setData({...data,linkedOrderId:o.id});setOrderSearch("");}} style={{display:"block",width:"100%",padding:"8px 12px",border:"none",borderBottom:`1px solid ${ds.color.borderLight}`,background:"#fff",cursor:"pointer",textAlign:"left",fontFamily:ds.font.body}}>
+                            <div style={{fontSize:12.5,fontWeight:600}}>#{o.id.slice(-6).toUpperCase()} · {o.name}</div>
+                            <div style={{fontSize:11,color:ds.color.textMuted}}>{formatPHP(o.total||0)}</div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
+            
+            {/* Receipt upload */}
+            <div style={{gridColumn:"1/-1"}}>
+              <label style={lbl}>📎 Receipt / Invoice Photo</label>
+              <div style={{border:`2px dashed ${receiptPreview?ds.color.success:ds.color.border}`,borderRadius:ds.radius.md,padding:16,background:receiptPreview?ds.color.successBg:ds.color.canvas,textAlign:"center"}}>
+                {receiptPreview ? (
+                  <div>
+                    {receiptPreview.startsWith("data:application/pdf")||receiptPreview.toLowerCase().endsWith(".pdf") ? (
+                      <div style={{fontSize:32,marginBottom:8}}>📄</div>
+                    ) : (
+                      <img src={receiptPreview} alt="Receipt" style={{maxWidth:200,maxHeight:160,objectFit:"contain",borderRadius:ds.radius.sm,margin:"0 auto",display:"block"}}/>
+                    )}
+                    <div style={{fontSize:12,color:ds.color.success,marginTop:8,fontWeight:600}}>✓ Receipt attached</div>
+                    <button onClick={()=>{setReceiptFile(null);setReceiptPreview(null);setData({...data,receiptUrl:null});}} style={{marginTop:6,background:"none",border:"none",color:ds.color.red,cursor:"pointer",fontSize:12,fontFamily:ds.font.body}}>Remove</button>
+                  </div>
+                ) : (
+                  <div>
+                    <div style={{fontSize:24,marginBottom:6}}>📎</div>
+                    <label htmlFor="exp-receipt-input" style={{display:"inline-block",padding:"8px 16px",borderRadius:ds.radius.sm,border:`1.5px solid ${ds.color.red}`,background:ds.color.redLight,cursor:"pointer",fontSize:12,fontWeight:700,color:ds.color.red,fontFamily:ds.font.body}}>📷 Upload Receipt</label>
+                    <input id="exp-receipt-input" type="file" accept="image/*,application/pdf" onChange={handleReceiptUpload} style={{display:"none"}}/>
+                    <div style={{fontSize:11,color:ds.color.textLight,marginTop:8}}>JPG, PNG, PDF · Max 10MB</div>
+                  </div>
+                )}
+              </div>
+            </div>
+            
+            <div style={{gridColumn:"1/-1"}}>
+              <label style={lbl}>Notes</label>
+              <textarea value={data.notes} onChange={e=>setData({...data,notes:e.target.value})} rows={2} placeholder="Optional notes…" style={{...inp,resize:"vertical"}}/>
+            </div>
+            
+            {errMsg && <div style={{gridColumn:"1/-1",padding:"10px 14px",background:ds.color.redLight,borderRadius:ds.radius.md,fontSize:13,color:ds.color.red}}>{errMsg}</div>}
+          </div>
+        </div>
+        <div style={{padding:"16px 28px",borderTop:`1px solid ${ds.color.border}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          <div>
+            {expense?.id && <button onClick={handleDelete} style={{background:"none",border:`1px solid ${ds.color.red}`,color:ds.color.red,padding:"6px 12px",borderRadius:ds.radius.sm,cursor:"pointer",fontSize:12,fontWeight:600,fontFamily:ds.font.body}}>🗑️ Delete</button>}
+          </div>
+          <div style={{display:"flex",gap:8}}>
+            <Btn variant="outline" size="md" onClick={onClose}>Cancel</Btn>
+            <Btn variant="primary" size="md" disabled={saving} onClick={handleSave}>{saving?"Saving…":"💾 Save Expense"}</Btn>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── v13.0b: EXPENSES TAB ────────────────────────────────────────────────────
+function ExpensesTab({ expenses, orders, onEdit, onNew, onRefresh }){
+  const [filter, setFilter] = useState("all");
+  const [searchQ, setSearchQ] = useState("");
+  const [dateRange, setDateRange] = useState("month"); // month/year/all
+  
+  // Apply date filter
+  const now = new Date();
+  const filterByDate = (exp) => {
+    if (dateRange === "all") return true;
+    const expDate = exp.date?.toDate ? exp.date.toDate() : new Date(exp.date);
+    if (dateRange === "month") {
+      return expDate.getMonth() === now.getMonth() && expDate.getFullYear() === now.getFullYear();
+    }
+    if (dateRange === "year") {
+      return expDate.getFullYear() === now.getFullYear();
+    }
+    return true;
+  };
+
+  const filtered = expenses.filter(e => {
+    if (!filterByDate(e)) return false;
+    if (filter !== "all" && e.category !== filter) return false;
+    if (searchQ.trim()) {
+      const q = searchQ.toLowerCase();
+      return (e.vendor||"").toLowerCase().includes(q) ||
+             (e.description||"").toLowerCase().includes(q);
+    }
+    return true;
+  });
+  
+  // Sort: most recent first
+  filtered.sort((a,b) => {
+    const aD = a.date?.toDate ? a.date.toDate().getTime() : new Date(a.date).getTime();
+    const bD = b.date?.toDate ? b.date.toDate().getTime() : new Date(b.date).getTime();
+    return bD - aD;
+  });
+
+  const totalAmount = filtered.reduce((s,e) => s + (Number(e.amount)||0), 0);
+  const cogsTotal = filtered.filter(e => e.category === "cogs").reduce((s,e) => s + (Number(e.amount)||0), 0);
+  const opexTotal = filtered.filter(e => e.category !== "cogs").reduce((s,e) => s + (Number(e.amount)||0), 0);
+  const unpaidTotal = filtered.filter(e => e.paymentStatus === "unpaid").reduce((s,e) => s + (Number(e.amount)||0), 0);
+
+  // Category breakdown
+  const byCategory = EXPENSE_CATEGORIES.map(cat => {
+    const items = filtered.filter(e => e.category === cat.id);
+    return { ...cat, count: items.length, total: items.reduce((s,e)=>s+(Number(e.amount)||0),0) };
+  }).filter(c => c.count > 0).sort((a,b) => b.total - a.total);
+
+  const exportCSV = () => {
+    const headers = ["Date","Vendor","Category","Amount","Description","Linked Order","Status","Method","Notes"];
+    const rows = filtered.map(e => {
+      const cat = findExpenseCategory(e.category);
+      const linkedOrder = e.linkedOrderId ? orders.find(o=>o.id===e.linkedOrderId) : null;
+      return [
+        formatDate(e.date),
+        (e.vendor||"").replace(/,/g," "),
+        cat.label,
+        e.amount||0,
+        (e.description||"").replace(/,/g," "),
+        linkedOrder ? "#"+linkedOrder.id.slice(-6).toUpperCase() : "",
+        e.paymentStatus||"",
+        (e.paymentMethod||"").replace(/,/g," "),
+        (e.notes||"").replace(/,/g," "),
+      ];
+    });
+    const csv = [headers, ...rows].map(r=>r.join(",")).join("\n");
+    const blob = new Blob([csv], {type:"text/csv"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = "expenses-"+new Date().toISOString().slice(0,10)+".csv";
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  return (
+    <div style={{background:"#fff",border:`1px solid ${ds.color.border}`,borderRadius:ds.radius.lg,padding:"24px 28px",boxShadow:ds.shadow.xs}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20,flexWrap:"wrap",gap:12}}>
+        <div>
+          <div style={{fontFamily:ds.font.display,fontSize:18,color:ds.color.textDark}}>🏢 Expenses ({filtered.length})</div>
+          <div style={{fontSize:12.5,color:ds.color.textMuted,marginTop:3}}>Track DMEAST's costs — supplier bills, office, transport, utilities</div>
+        </div>
+        <div style={{display:"flex",gap:8}}>
+          <Btn variant="primary" size="sm" onClick={onNew}>+ New Expense</Btn>
+          <Btn variant="outline" size="sm" onClick={exportCSV}>⬇️ CSV</Btn>
+        </div>
+      </div>
+      
+      {/* Summary cards */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12,marginBottom:20}}>
+        <div style={{padding:"14px 16px",background:ds.color.canvas,borderRadius:ds.radius.md,borderTop:`3px solid ${ds.color.red}`}}>
+          <div style={{fontSize:10,fontWeight:700,color:ds.color.textMuted,textTransform:"uppercase",letterSpacing:"0.06em"}}>Total Spent</div>
+          <div style={{fontSize:18,fontWeight:700,color:ds.color.red,marginTop:4}}>{formatPHP(totalAmount)}</div>
+        </div>
+        <div style={{padding:"14px 16px",background:ds.color.canvas,borderRadius:ds.radius.md,borderTop:`3px solid #EF4444`}}>
+          <div style={{fontSize:10,fontWeight:700,color:ds.color.textMuted,textTransform:"uppercase",letterSpacing:"0.06em"}}>COGS</div>
+          <div style={{fontSize:18,fontWeight:700,color:"#EF4444",marginTop:4}}>{formatPHP(cogsTotal)}</div>
+        </div>
+        <div style={{padding:"14px 16px",background:ds.color.canvas,borderRadius:ds.radius.md,borderTop:`3px solid #3B82F6`}}>
+          <div style={{fontSize:10,fontWeight:700,color:ds.color.textMuted,textTransform:"uppercase",letterSpacing:"0.06em"}}>OpEx</div>
+          <div style={{fontSize:18,fontWeight:700,color:"#3B82F6",marginTop:4}}>{formatPHP(opexTotal)}</div>
+        </div>
+        <div style={{padding:"14px 16px",background:unpaidTotal>0?"#FEE2E2":ds.color.canvas,borderRadius:ds.radius.md,borderTop:`3px solid ${unpaidTotal>0?ds.color.red:"#10B981"}`}}>
+          <div style={{fontSize:10,fontWeight:700,color:ds.color.textMuted,textTransform:"uppercase",letterSpacing:"0.06em"}}>Unpaid Bills</div>
+          <div style={{fontSize:18,fontWeight:700,color:unpaidTotal>0?ds.color.red:"#10B981",marginTop:4}}>{formatPHP(unpaidTotal)}</div>
+        </div>
+      </div>
+      
+      {/* Filters */}
+      <div style={{display:"flex",gap:8,marginBottom:14,flexWrap:"wrap",alignItems:"center"}}>
+        <input value={searchQ} onChange={e=>setSearchQ(e.target.value)} placeholder="🔍 Search vendor/description…" style={{padding:"6px 10px",borderRadius:ds.radius.sm,border:`1px solid ${ds.color.border}`,fontSize:12,fontFamily:ds.font.body,outline:"none",width:200}}/>
+        <select value={dateRange} onChange={e=>setDateRange(e.target.value)} style={{padding:"6px 10px",borderRadius:ds.radius.sm,border:`1px solid ${ds.color.border}`,fontSize:12,fontFamily:ds.font.body,outline:"none",cursor:"pointer"}}>
+          <option value="month">This Month</option>
+          <option value="year">This Year</option>
+          <option value="all">All Time</option>
+        </select>
+        <button onClick={()=>setFilter("all")} style={{padding:"5px 10px",borderRadius:ds.radius.pill,border:`1px solid ${filter==="all"?ds.color.red:ds.color.border}`,background:filter==="all"?ds.color.redLight:"#fff",color:filter==="all"?ds.color.red:ds.color.textBody,cursor:"pointer",fontSize:11.5,fontWeight:600,fontFamily:ds.font.body}}>All Categories</button>
+        {EXPENSE_CATEGORIES.map(c=>(
+          <button key={c.id} onClick={()=>setFilter(c.id)} style={{padding:"5px 10px",borderRadius:ds.radius.pill,border:`1px solid ${filter===c.id?c.color:ds.color.border}`,background:filter===c.id?c.color+"22":"#fff",color:filter===c.id?c.color:ds.color.textBody,cursor:"pointer",fontSize:11.5,fontWeight:600,fontFamily:ds.font.body}}>{c.icon} {c.label}</button>
+        ))}
+      </div>
+      
+      {/* Category breakdown */}
+      {byCategory.length > 0 && (
+        <div style={{padding:"12px 16px",background:ds.color.canvas,borderRadius:ds.radius.md,marginBottom:16}}>
+          <div style={{fontSize:10,fontWeight:700,color:ds.color.textMuted,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:8}}>Breakdown by Category</div>
+          <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+            {byCategory.map(c=>(
+              <div key={c.id} style={{padding:"4px 10px",background:c.color+"22",borderRadius:ds.radius.pill,fontSize:11.5,color:c.color,fontWeight:600}}>
+                {c.icon} {c.label}: {formatPHP(c.total)} ({c.count})
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      
+      {/* List */}
+      {filtered.length===0 ? (
+        <div style={{textAlign:"center",padding:"40px 0",color:ds.color.textMuted,fontSize:14}}>
+          {expenses.length===0 ? "No expenses yet. Click \"+ New Expense\" to add one." : "No expenses match the current filter."}
+        </div>
+      ) : (
+        <div style={{overflowX:"auto"}}>
+          <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
+            <thead><tr style={{borderBottom:`2px solid ${ds.color.border}`}}>
+              {["Date","Vendor","Category","Description","Linked","Amount","Status","",""].map(h=><th key={h} style={{textAlign:"left",padding:"10px 12px",fontWeight:700,color:ds.color.textDark,fontSize:11,textTransform:"uppercase",letterSpacing:"0.08em"}}>{h}</th>)}
+            </tr></thead>
+            <tbody>
+              {filtered.map(e=>{
+                const cat = findExpenseCategory(e.category);
+                const status = EXPENSE_PAYMENT_STATUS.find(s=>s.id===e.paymentStatus) || EXPENSE_PAYMENT_STATUS[0];
+                const linkedOrder = e.linkedOrderId ? orders.find(o=>o.id===e.linkedOrderId) : null;
+                return(
+                  <tr key={e.id} style={{borderBottom:`1px solid ${ds.color.borderLight}`}}>
+                    <td style={{padding:"10px 12px",color:ds.color.textBody,fontSize:12}}>{formatDate(e.date)}</td>
+                    <td style={{padding:"10px 12px",fontWeight:600,color:ds.color.textDark}}>{e.vendor||"—"}</td>
+                    <td style={{padding:"10px 12px"}}><span style={{fontSize:11,padding:"3px 8px",borderRadius:ds.radius.pill,background:cat.color+"22",color:cat.color,fontWeight:600}}>{cat.icon} {cat.label}</span></td>
+                    <td style={{padding:"10px 12px",color:ds.color.textMuted,fontSize:12,maxWidth:200}}>{e.description||"—"}</td>
+                    <td style={{padding:"10px 12px",fontSize:11.5}}>{linkedOrder ? <span style={{color:ds.color.red,fontWeight:600}}>#{linkedOrder.id.slice(-6).toUpperCase()}</span> : <span style={{color:ds.color.textLight}}>—</span>}</td>
+                    <td style={{padding:"10px 12px",fontWeight:700,color:ds.color.textDark}}>{formatPHP(e.amount||0)}</td>
+                    <td style={{padding:"10px 12px"}}><span style={{fontSize:10,padding:"2px 7px",borderRadius:ds.radius.pill,background:status.bg,color:status.color,fontWeight:700,textTransform:"uppercase"}}>{status.label}</span></td>
+                    <td style={{padding:"10px 12px"}}>{e.receiptUrl?<a href={e.receiptUrl} target="_blank" rel="noopener noreferrer" style={{fontSize:11,color:ds.color.red,fontWeight:600,textDecoration:"underline"}}>📎 View</a>:<span style={{color:ds.color.textLight,fontSize:11}}>—</span>}</td>
+                    <td style={{padding:"10px 12px"}}><button onClick={()=>onEdit(e)} style={{padding:"4px 10px",borderRadius:ds.radius.sm,border:`1px solid ${ds.color.border}`,background:"#fff",cursor:"pointer",fontSize:11,fontWeight:600,color:ds.color.textBody,fontFamily:ds.font.body}}>✏️ Edit</button></td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── v13.0b: MANUAL BILLING EDITOR ───────────────────────────────────────────
+const MANUAL_BILLING_STATUS = [
+  { id: "draft",     label: "Draft",     color: "#6B7280", bg: "#F3F4F6" },
+  { id: "sent",      label: "Sent",      color: "#3B82F6", bg: "#DBEAFE" },
+  { id: "paid",      label: "Paid",      color: "#10B981", bg: "#D1FAE5" },
+  { id: "cancelled", label: "Cancelled", color: "#EF4444", bg: "#FEE2E2" },
+];
+
+function ManualBillingEditorModal({ billing, onClose, onSaved }){
+  const [data, setData] = useState({
+    date: billing?.date ? (billing.date.toDate ? billing.date.toDate().toISOString().slice(0,10) : new Date(billing.date).toISOString().slice(0,10)) : new Date().toISOString().slice(0,10),
+    billTo: billing?.billTo || "",
+    contactInfo: billing?.contactInfo || "",
+    description: billing?.description || "",
+    amount: billing?.amount || "",
+    status: billing?.status || "draft",
+    notes: billing?.notes || "",
+  });
+  const [saving, setSaving] = useState(false);
+  const [errMsg, setErrMsg] = useState("");
+
+  const handleSave = async () => {
+    if (!data.billTo || !data.amount || !data.description) {
+      setErrMsg("Bill To, description, and amount are required.");
+      return;
+    }
+    setSaving(true); setErrMsg("");
+    try {
+      const payload = {
+        date: new Date(data.date),
+        billTo: data.billTo,
+        contactInfo: data.contactInfo || null,
+        description: data.description,
+        amount: Number(data.amount),
+        status: data.status,
+        notes: data.notes || null,
+        paidAt: data.status === "paid" ? serverTimestamp() : (billing?.paidAt || null),
+        updatedAt: serverTimestamp(),
+      };
+
+      if (billing?.id) {
+        await updateDoc(doc(db, "manualBillings", billing.id), payload);
+      } else {
+        payload.createdAt = serverTimestamp();
+        await addDoc(collection(db, "manualBillings"), payload);
+      }
+      onSaved && onSaved();
+      onClose();
+    } catch(e) {
+      setErrMsg("Failed to save: " + e.message);
+    }
+    setSaving(false);
+  };
+
+  const handleDelete = async () => {
+    if (!billing?.id) return;
+    if (!confirm("Delete this manual billing? This cannot be undone.")) return;
+    try {
+      await deleteDoc(doc(db, "manualBillings", billing.id));
+      onSaved && onSaved();
+      onClose();
+    } catch(e) {
+      setErrMsg("Delete failed: " + e.message);
+    }
+  };
+
+  const inp = {width:"100%",padding:"10px 14px",border:`1.5px solid ${ds.color.border}`,borderRadius:ds.radius.md,fontSize:14,fontFamily:ds.font.body,outline:"none",boxSizing:"border-box"};
+  const lbl = {fontSize:12,fontWeight:600,color:ds.color.textDark,display:"block",marginBottom:5};
+
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center",padding:20,overflowY:"auto"}}>
+      <div style={{background:"#fff",borderRadius:ds.radius.xl,maxWidth:600,width:"100%",maxHeight:"90vh",display:"flex",flexDirection:"column",boxShadow:ds.shadow.xl}}>
+        <div style={{padding:"20px 28px",borderBottom:`1px solid ${ds.color.border}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          <div style={{fontFamily:ds.font.display,fontSize:18,color:ds.color.textDark}}>{billing?.id?"Edit Manual Billing":"+ New Manual Billing"}</div>
+          <button onClick={onClose} style={{background:"none",border:"none",cursor:"pointer",fontSize:22,color:ds.color.textMuted}}>✕</button>
+        </div>
+        <div style={{flex:1,overflowY:"auto",padding:"24px 28px",display:"grid",gridTemplateColumns:"1fr 1fr",gap:"14px 18px"}}>
+          <div><label style={lbl}>Date *</label><input type="date" value={data.date} onChange={e=>setData({...data,date:e.target.value})} style={inp}/></div>
+          <div><label style={lbl}>Status</label>
+            <select value={data.status} onChange={e=>setData({...data,status:e.target.value})} style={{...inp,cursor:"pointer"}}>
+              {MANUAL_BILLING_STATUS.map(s=><option key={s.id} value={s.id}>{s.label}</option>)}
+            </select>
+          </div>
+          <div style={{gridColumn:"1/-1"}}><label style={lbl}>Bill To *</label><input value={data.billTo} onChange={e=>setData({...data,billTo:e.target.value})} placeholder="Customer/client name" style={inp}/></div>
+          <div style={{gridColumn:"1/-1"}}><label style={lbl}>Contact Info</label><input value={data.contactInfo} onChange={e=>setData({...data,contactInfo:e.target.value})} placeholder="Phone or email" style={inp}/></div>
+          <div style={{gridColumn:"1/-1"}}><label style={lbl}>Description *</label><textarea value={data.description} onChange={e=>setData({...data,description:e.target.value})} rows={2} placeholder="What is being billed?" style={{...inp,resize:"vertical"}}/></div>
+          <div style={{gridColumn:"1/-1"}}><label style={lbl}>Amount *</label><input type="number" min="0" step="0.01" value={data.amount} onChange={e=>setData({...data,amount:e.target.value})} placeholder="e.g. 5000" style={inp}/></div>
+          <div style={{gridColumn:"1/-1"}}><label style={lbl}>Notes</label><textarea value={data.notes} onChange={e=>setData({...data,notes:e.target.value})} rows={2} placeholder="Optional notes…" style={{...inp,resize:"vertical"}}/></div>
+          {errMsg && <div style={{gridColumn:"1/-1",padding:"10px 14px",background:ds.color.redLight,borderRadius:ds.radius.md,fontSize:13,color:ds.color.red}}>{errMsg}</div>}
+        </div>
+        <div style={{padding:"16px 28px",borderTop:`1px solid ${ds.color.border}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          <div>
+            {billing?.id && <button onClick={handleDelete} style={{background:"none",border:`1px solid ${ds.color.red}`,color:ds.color.red,padding:"6px 12px",borderRadius:ds.radius.sm,cursor:"pointer",fontSize:12,fontWeight:600,fontFamily:ds.font.body}}>🗑️ Delete</button>}
+          </div>
+          <div style={{display:"flex",gap:8}}>
+            <Btn variant="outline" size="md" onClick={onClose}>Cancel</Btn>
+            <Btn variant="primary" size="md" disabled={saving} onClick={handleSave}>{saving?"Saving…":"💾 Save"}</Btn>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── v13.0b: MANUAL BILLINGS TAB ─────────────────────────────────────────────
+function ManualBillingsTab({ billings, onEdit, onNew }){
+  const [filter, setFilter] = useState("all");
+  const [searchQ, setSearchQ] = useState("");
+  
+  const filtered = billings.filter(b => {
+    if (filter !== "all" && b.status !== filter) return false;
+    if (searchQ.trim()) {
+      const q = searchQ.toLowerCase();
+      return (b.billTo||"").toLowerCase().includes(q) ||
+             (b.description||"").toLowerCase().includes(q);
+    }
+    return true;
+  }).sort((a,b)=>{
+    const aD = a.date?.toDate ? a.date.toDate().getTime() : new Date(a.date).getTime();
+    const bD = b.date?.toDate ? b.date.toDate().getTime() : new Date(b.date).getTime();
+    return bD - aD;
+  });
+
+  const totalBilled = filtered.reduce((s,b) => s + (Number(b.amount)||0), 0);
+  const totalPaid = filtered.filter(b=>b.status==="paid").reduce((s,b) => s + (Number(b.amount)||0), 0);
+  const totalOutstanding = filtered.filter(b=>b.status==="sent" || b.status==="draft").reduce((s,b) => s + (Number(b.amount)||0), 0);
+
+  const exportCSV = () => {
+    const headers = ["Date","Bill To","Description","Amount","Status","Contact","Notes"];
+    const rows = filtered.map(b => [
+      formatDate(b.date),
+      (b.billTo||"").replace(/,/g," "),
+      (b.description||"").replace(/,/g," "),
+      b.amount||0,
+      b.status||"",
+      (b.contactInfo||"").replace(/,/g," "),
+      (b.notes||"").replace(/,/g," "),
+    ]);
+    const csv = [headers, ...rows].map(r=>r.join(",")).join("\n");
+    const blob = new Blob([csv], {type:"text/csv"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = "manual-billings-"+new Date().toISOString().slice(0,10)+".csv";
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  return (
+    <div style={{background:"#fff",border:`1px solid ${ds.color.border}`,borderRadius:ds.radius.lg,padding:"24px 28px",boxShadow:ds.shadow.xs}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20,flexWrap:"wrap",gap:12}}>
+        <div>
+          <div style={{fontFamily:ds.font.display,fontSize:18,color:ds.color.textDark}}>📝 Manual Billings ({filtered.length})</div>
+          <div style={{fontSize:12.5,color:ds.color.textMuted,marginTop:3}}>Off-system invoices for special clients (verbal agreements, services, etc)</div>
+        </div>
+        <div style={{display:"flex",gap:8}}>
+          <Btn variant="primary" size="sm" onClick={onNew}>+ New Billing</Btn>
+          <Btn variant="outline" size="sm" onClick={exportCSV}>⬇️ CSV</Btn>
+        </div>
+      </div>
+
+      {/* Summary cards */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12,marginBottom:20}}>
+        <div style={{padding:"14px 16px",background:ds.color.canvas,borderRadius:ds.radius.md,borderTop:`3px solid ${ds.color.red}`}}>
+          <div style={{fontSize:10,fontWeight:700,color:ds.color.textMuted,textTransform:"uppercase",letterSpacing:"0.06em"}}>Total Billed</div>
+          <div style={{fontSize:18,fontWeight:700,color:ds.color.red,marginTop:4}}>{formatPHP(totalBilled)}</div>
+        </div>
+        <div style={{padding:"14px 16px",background:ds.color.successBg,borderRadius:ds.radius.md,borderTop:`3px solid ${ds.color.success}`}}>
+          <div style={{fontSize:10,fontWeight:700,color:ds.color.textMuted,textTransform:"uppercase",letterSpacing:"0.06em"}}>Paid</div>
+          <div style={{fontSize:18,fontWeight:700,color:ds.color.success,marginTop:4}}>{formatPHP(totalPaid)}</div>
+        </div>
+        <div style={{padding:"14px 16px",background:totalOutstanding>0?"#FEF3C7":ds.color.canvas,borderRadius:ds.radius.md,borderTop:`3px solid #F59E0B`}}>
+          <div style={{fontSize:10,fontWeight:700,color:ds.color.textMuted,textTransform:"uppercase",letterSpacing:"0.06em"}}>Outstanding</div>
+          <div style={{fontSize:18,fontWeight:700,color:"#F59E0B",marginTop:4}}>{formatPHP(totalOutstanding)}</div>
+        </div>
+      </div>
+
+      <div style={{display:"flex",gap:8,marginBottom:14,flexWrap:"wrap",alignItems:"center"}}>
+        <input value={searchQ} onChange={e=>setSearchQ(e.target.value)} placeholder="🔍 Search billings…" style={{padding:"6px 10px",borderRadius:ds.radius.sm,border:`1px solid ${ds.color.border}`,fontSize:12,fontFamily:ds.font.body,outline:"none",width:200}}/>
+        <button onClick={()=>setFilter("all")} style={{padding:"5px 10px",borderRadius:ds.radius.pill,border:`1px solid ${filter==="all"?ds.color.red:ds.color.border}`,background:filter==="all"?ds.color.redLight:"#fff",color:filter==="all"?ds.color.red:ds.color.textBody,cursor:"pointer",fontSize:11.5,fontWeight:600,fontFamily:ds.font.body}}>All</button>
+        {MANUAL_BILLING_STATUS.map(s=>(
+          <button key={s.id} onClick={()=>setFilter(s.id)} style={{padding:"5px 10px",borderRadius:ds.radius.pill,border:`1px solid ${filter===s.id?s.color:ds.color.border}`,background:filter===s.id?s.bg:"#fff",color:filter===s.id?s.color:ds.color.textBody,cursor:"pointer",fontSize:11.5,fontWeight:600,fontFamily:ds.font.body}}>{s.label}</button>
+        ))}
+      </div>
+
+      {filtered.length===0 ? (
+        <div style={{textAlign:"center",padding:"40px 0",color:ds.color.textMuted,fontSize:14}}>
+          {billings.length===0?"No manual billings yet. Click \"+ New Billing\" to add one.":"No billings match the current filter."}
+        </div>
+      ) : (
+        <div style={{overflowX:"auto"}}>
+          <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
+            <thead><tr style={{borderBottom:`2px solid ${ds.color.border}`}}>
+              {["Date","Bill To","Description","Amount","Status","Contact",""].map(h=><th key={h} style={{textAlign:"left",padding:"10px 12px",fontWeight:700,color:ds.color.textDark,fontSize:11,textTransform:"uppercase",letterSpacing:"0.08em"}}>{h}</th>)}
+            </tr></thead>
+            <tbody>
+              {filtered.map(b=>{
+                const status = MANUAL_BILLING_STATUS.find(s=>s.id===b.status) || MANUAL_BILLING_STATUS[0];
+                return(
+                  <tr key={b.id} style={{borderBottom:`1px solid ${ds.color.borderLight}`}}>
+                    <td style={{padding:"10px 12px",color:ds.color.textBody,fontSize:12}}>{formatDate(b.date)}</td>
+                    <td style={{padding:"10px 12px",fontWeight:600,color:ds.color.textDark}}>{b.billTo||"—"}</td>
+                    <td style={{padding:"10px 12px",color:ds.color.textMuted,fontSize:12,maxWidth:240}}>{b.description||"—"}</td>
+                    <td style={{padding:"10px 12px",fontWeight:700,color:ds.color.textDark}}>{formatPHP(b.amount||0)}</td>
+                    <td style={{padding:"10px 12px"}}><span style={{fontSize:10,padding:"2px 7px",borderRadius:ds.radius.pill,background:status.bg,color:status.color,fontWeight:700,textTransform:"uppercase"}}>{status.label}</span></td>
+                    <td style={{padding:"10px 12px",fontSize:12,color:ds.color.textMuted}}>{b.contactInfo||"—"}</td>
+                    <td style={{padding:"10px 12px"}}><button onClick={()=>onEdit(b)} style={{padding:"4px 10px",borderRadius:ds.radius.sm,border:`1px solid ${ds.color.border}`,background:"#fff",cursor:"pointer",fontSize:11,fontWeight:600,color:ds.color.textBody,fontFamily:ds.font.body}}>✏️ Edit</button></td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── v13.0b: MARGIN DASHBOARD ────────────────────────────────────────────────
+function MarginDashboardTab({ orders, expenses }){
+  const [dateRange, setDateRange] = useState("month"); // month/year/all
+  
+  const now = new Date();
+  const filterByDate = (item) => {
+    if (dateRange === "all") return true;
+    const d = item.createdAt?.toDate ? item.createdAt.toDate() : (item.date?.toDate ? item.date.toDate() : new Date(item.createdAt || item.date));
+    if (dateRange === "month") return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+    if (dateRange === "year") return d.getFullYear() === now.getFullYear();
+    return true;
+  };
+  
+  // Filter only paid/confirmed orders with revenue
+  const validOrders = orders.filter(o => 
+    filterByDate(o) && 
+    o.status !== "cancelled" && 
+    o.status !== "out_of_stock" &&
+    (o.total || 0) > 0
+  );
+  
+  const totalRevenue = validOrders.reduce((s,o) => s + (o.total||0), 0);
+  
+  // COGS — sum of:
+  //   1. Order's supplierCost field (manual entry from NewOrderModal)
+  //   2. Expenses linked to orders via linkedOrderId
+  const orderCOGSMap = {};
+  validOrders.forEach(o => {
+    if (o.supplierCost) orderCOGSMap[o.id] = (orderCOGSMap[o.id] || 0) + Number(o.supplierCost);
+  });
+  expenses.filter(filterByDate).forEach(e => {
+    if (e.linkedOrderId && e.category === "cogs") {
+      orderCOGSMap[e.linkedOrderId] = (orderCOGSMap[e.linkedOrderId] || 0) + Number(e.amount || 0);
+    }
+  });
+  
+  const totalCOGS = Object.values(orderCOGSMap).reduce((s,v) => s + v, 0);
+  
+  // OpEx (operating expenses, not COGS)
+  const totalOpEx = expenses.filter(e => filterByDate(e) && e.category !== "cogs")
+    .reduce((s,e) => s + (Number(e.amount)||0), 0);
+  
+  const grossMargin = totalRevenue - totalCOGS;
+  const netProfit = grossMargin - totalOpEx;
+  const grossMarginPct = totalRevenue > 0 ? (grossMargin / totalRevenue * 100) : 0;
+  const netMarginPct = totalRevenue > 0 ? (netProfit / totalRevenue * 100) : 0;
+  
+  // Per-order breakdown (orders with COGS data)
+  const ordersWithMargin = validOrders.map(o => {
+    const cogs = orderCOGSMap[o.id] || 0;
+    const margin = (o.total || 0) - cogs;
+    const marginPct = (o.total||0) > 0 ? (margin / (o.total||0) * 100) : 0;
+    return { ...o, cogs, margin, marginPct, hasCOGS: cogs > 0 };
+  }).filter(o => o.hasCOGS).sort((a,b) => b.margin - a.margin);
+  
+  // Top customers by revenue
+  const customerMap = {};
+  validOrders.forEach(o => {
+    const key = o.customerId || o.uid || o.email || o.name || "unknown";
+    if (!customerMap[key]) customerMap[key] = { name: o.name||"Unknown", revenue: 0, cogs: 0, orders: 0 };
+    customerMap[key].revenue += (o.total || 0);
+    customerMap[key].cogs += orderCOGSMap[o.id] || 0;
+    customerMap[key].orders += 1;
+  });
+  const topCustomers = Object.values(customerMap)
+    .map(c => ({ ...c, margin: c.revenue - c.cogs, marginPct: c.revenue > 0 ? ((c.revenue - c.cogs)/c.revenue*100) : 0 }))
+    .sort((a,b) => b.revenue - a.revenue)
+    .slice(0, 10);
+    
+  // Top products by revenue
+  const productMap = {};
+  validOrders.forEach(o => {
+    (o.items||[]).forEach(item => {
+      const key = item.id || item.name;
+      if (!productMap[key]) productMap[key] = { name: item.name, revenue: 0, qty: 0 };
+      productMap[key].revenue += (item.price * item.qty);
+      productMap[key].qty += item.qty;
+    });
+  });
+  const topProducts = Object.values(productMap).sort((a,b) => b.revenue - a.revenue).slice(0, 10);
+  
+  // Source breakdown
+  const sourceMap = {};
+  ORDER_SOURCES.forEach(s => sourceMap[s.id] = { ...s, revenue: 0, count: 0 });
+  validOrders.forEach(o => {
+    const src = o.source || "website";
+    if (sourceMap[src]) {
+      sourceMap[src].revenue += (o.total || 0);
+      sourceMap[src].count += 1;
+    }
+  });
+  const sourceBreakdown = Object.values(sourceMap).filter(s => s.count > 0).sort((a,b) => b.revenue - a.revenue);
+
+  return (
+    <div>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20,flexWrap:"wrap",gap:12}}>
+        <div>
+          <div style={{fontFamily:ds.font.display,fontSize:20,color:ds.color.textDark}}>📈 Margin Dashboard</div>
+          <div style={{fontSize:12.5,color:ds.color.textMuted,marginTop:3}}>Profit analysis — revenue, COGS, operating expenses, and net margin</div>
+        </div>
+        <select value={dateRange} onChange={e=>setDateRange(e.target.value)} style={{padding:"8px 14px",borderRadius:ds.radius.md,border:`1px solid ${ds.color.border}`,fontSize:13,fontFamily:ds.font.body,outline:"none",cursor:"pointer",background:"#fff"}}>
+          <option value="month">This Month</option>
+          <option value="year">This Year</option>
+          <option value="all">All Time</option>
+        </select>
+      </div>
+      
+      {/* Big numbers */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:14,marginBottom:24}}>
+        <div style={{background:"#fff",border:`1px solid ${ds.color.border}`,borderTop:`3px solid ${ds.color.red}`,borderRadius:ds.radius.lg,padding:"18px 22px",boxShadow:ds.shadow.xs}}>
+          <div style={{fontSize:11,fontWeight:700,color:ds.color.textMuted,textTransform:"uppercase",letterSpacing:"0.06em"}}>Revenue</div>
+          <div style={{fontSize:22,fontWeight:700,color:ds.color.red,marginTop:6,fontFamily:ds.font.display}}>{formatPHP(totalRevenue)}</div>
+          <div style={{fontSize:11,color:ds.color.textMuted,marginTop:2}}>{validOrders.length} orders</div>
+        </div>
+        <div style={{background:"#fff",border:`1px solid ${ds.color.border}`,borderTop:`3px solid #EF4444`,borderRadius:ds.radius.lg,padding:"18px 22px",boxShadow:ds.shadow.xs}}>
+          <div style={{fontSize:11,fontWeight:700,color:ds.color.textMuted,textTransform:"uppercase",letterSpacing:"0.06em"}}>Cost of Goods</div>
+          <div style={{fontSize:22,fontWeight:700,color:"#EF4444",marginTop:6,fontFamily:ds.font.display}}>{formatPHP(totalCOGS)}</div>
+          <div style={{fontSize:11,color:ds.color.textMuted,marginTop:2}}>Direct product costs</div>
+        </div>
+        <div style={{background:"#fff",border:`1px solid ${ds.color.border}`,borderTop:`3px solid ${grossMargin>=0?ds.color.success:ds.color.red}`,borderRadius:ds.radius.lg,padding:"18px 22px",boxShadow:ds.shadow.xs}}>
+          <div style={{fontSize:11,fontWeight:700,color:ds.color.textMuted,textTransform:"uppercase",letterSpacing:"0.06em"}}>Gross Margin</div>
+          <div style={{fontSize:22,fontWeight:700,color:grossMargin>=0?ds.color.success:ds.color.red,marginTop:6,fontFamily:ds.font.display}}>{formatPHP(grossMargin)}</div>
+          <div style={{fontSize:11,color:ds.color.textMuted,marginTop:2}}>{grossMarginPct.toFixed(1)}% of revenue</div>
+        </div>
+        <div style={{background:"#fff",border:`1px solid ${ds.color.border}`,borderTop:`3px solid ${netProfit>=0?ds.color.success:ds.color.red}`,borderRadius:ds.radius.lg,padding:"18px 22px",boxShadow:ds.shadow.xs}}>
+          <div style={{fontSize:11,fontWeight:700,color:ds.color.textMuted,textTransform:"uppercase",letterSpacing:"0.06em"}}>Net Profit</div>
+          <div style={{fontSize:22,fontWeight:700,color:netProfit>=0?ds.color.success:ds.color.red,marginTop:6,fontFamily:ds.font.display}}>{formatPHP(netProfit)}</div>
+          <div style={{fontSize:11,color:ds.color.textMuted,marginTop:2}}>After OpEx ({formatPHP(totalOpEx)})</div>
+        </div>
+      </div>
+      
+      {/* P&L summary */}
+      <div style={{background:"#fff",border:`1px solid ${ds.color.border}`,borderRadius:ds.radius.lg,padding:"24px 28px",boxShadow:ds.shadow.xs,marginBottom:20}}>
+        <div style={{fontFamily:ds.font.display,fontSize:16,color:ds.color.textDark,marginBottom:16}}>Profit & Loss Summary</div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr auto",gap:"8px 16px"}}>
+          <div style={{fontSize:13,color:ds.color.textBody}}>Revenue</div>
+          <div style={{fontSize:13,fontWeight:700,color:ds.color.textDark,textAlign:"right"}}>{formatPHP(totalRevenue)}</div>
+          <div style={{fontSize:13,color:ds.color.textMuted,paddingLeft:16}}>Less: Cost of Goods Sold</div>
+          <div style={{fontSize:13,color:"#EF4444",textAlign:"right"}}>({formatPHP(totalCOGS)})</div>
+          <div style={{fontSize:13,fontWeight:700,color:ds.color.textDark,paddingTop:8,borderTop:`1px solid ${ds.color.border}`}}>Gross Margin</div>
+          <div style={{fontSize:13,fontWeight:700,color:grossMargin>=0?ds.color.success:ds.color.red,textAlign:"right",paddingTop:8,borderTop:`1px solid ${ds.color.border}`}}>{formatPHP(grossMargin)} ({grossMarginPct.toFixed(1)}%)</div>
+          <div style={{fontSize:13,color:ds.color.textMuted,paddingLeft:16}}>Less: Operating Expenses</div>
+          <div style={{fontSize:13,color:"#EF4444",textAlign:"right"}}>({formatPHP(totalOpEx)})</div>
+          <div style={{fontSize:14,fontWeight:700,color:ds.color.textDark,paddingTop:8,borderTop:`2px solid ${ds.color.textDark}`}}>Net Profit</div>
+          <div style={{fontSize:15,fontWeight:700,color:netProfit>=0?ds.color.success:ds.color.red,textAlign:"right",paddingTop:8,borderTop:`2px solid ${ds.color.textDark}`}}>{formatPHP(netProfit)} ({netMarginPct.toFixed(1)}%)</div>
+        </div>
+        {totalCOGS === 0 && validOrders.length > 0 && (
+          <div style={{marginTop:14,padding:"10px 14px",background:ds.color.goldLight,border:`1px solid ${ds.color.goldBorder}`,borderRadius:ds.radius.md,fontSize:12,color:ds.color.gold}}>
+            💡 No COGS data yet. Add supplier costs when creating orders, or link expenses to specific orders to see your true profit margins.
+          </div>
+        )}
+      </div>
+      
+      {/* Two-column: Top Customers + Top Products */}
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:18,marginBottom:20}}>
+        <div style={{background:"#fff",border:`1px solid ${ds.color.border}`,borderRadius:ds.radius.lg,padding:"20px 22px",boxShadow:ds.shadow.xs}}>
+          <div style={{fontFamily:ds.font.display,fontSize:15,color:ds.color.textDark,marginBottom:14}}>👑 Top Customers</div>
+          {topCustomers.length===0?(
+            <div style={{textAlign:"center",padding:"20px 0",color:ds.color.textLight,fontSize:13}}>No data for this period</div>
+          ):topCustomers.map((c,i)=>(
+            <div key={i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 0",borderBottom:i<topCustomers.length-1?`1px solid ${ds.color.borderLight}`:"none"}}>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:13,fontWeight:600,color:ds.color.textDark,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{i+1}. {c.name}</div>
+                <div style={{fontSize:11,color:ds.color.textMuted,marginTop:2}}>{c.orders} order{c.orders!==1?"s":""}{c.cogs>0?` · ${c.marginPct.toFixed(0)}% margin`:""}</div>
+              </div>
+              <div style={{fontSize:13,fontWeight:700,color:ds.color.red}}>{formatPHP(c.revenue)}</div>
+            </div>
+          ))}
+        </div>
+        <div style={{background:"#fff",border:`1px solid ${ds.color.border}`,borderRadius:ds.radius.lg,padding:"20px 22px",boxShadow:ds.shadow.xs}}>
+          <div style={{fontFamily:ds.font.display,fontSize:15,color:ds.color.textDark,marginBottom:14}}>🥇 Top Products</div>
+          {topProducts.length===0?(
+            <div style={{textAlign:"center",padding:"20px 0",color:ds.color.textLight,fontSize:13}}>No data for this period</div>
+          ):topProducts.map((p,i)=>(
+            <div key={i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 0",borderBottom:i<topProducts.length-1?`1px solid ${ds.color.borderLight}`:"none"}}>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:13,fontWeight:600,color:ds.color.textDark,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{i+1}. {p.name}</div>
+                <div style={{fontSize:11,color:ds.color.textMuted,marginTop:2}}>{p.qty} unit{p.qty!==1?"s":""}</div>
+              </div>
+              <div style={{fontSize:13,fontWeight:700,color:ds.color.red}}>{formatPHP(p.revenue)}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+      
+      {/* Source breakdown */}
+      <div style={{background:"#fff",border:`1px solid ${ds.color.border}`,borderRadius:ds.radius.lg,padding:"20px 22px",boxShadow:ds.shadow.xs,marginBottom:20}}>
+        <div style={{fontFamily:ds.font.display,fontSize:15,color:ds.color.textDark,marginBottom:14}}>🌐 Revenue by Source Channel</div>
+        {sourceBreakdown.length===0?(
+          <div style={{textAlign:"center",padding:"20px 0",color:ds.color.textLight,fontSize:13}}>No data for this period</div>
+        ):sourceBreakdown.map(s=>{
+          const pct = totalRevenue > 0 ? (s.revenue / totalRevenue * 100) : 0;
+          return(
+            <div key={s.id} style={{marginBottom:10}}>
+              <div style={{display:"flex",justifyContent:"space-between",fontSize:12,marginBottom:4}}>
+                <span style={{color:ds.color.textBody,fontWeight:600}}>{s.icon} {s.label} <span style={{color:ds.color.textMuted,fontWeight:400,marginLeft:4}}>({s.count} order{s.count!==1?"s":""})</span></span>
+                <span style={{color:ds.color.textDark,fontWeight:700}}>{formatPHP(s.revenue)} · {pct.toFixed(1)}%</span>
+              </div>
+              <div style={{height:6,background:ds.color.borderLight,borderRadius:3,overflow:"hidden"}}>
+                <div style={{height:"100%",width:pct+"%",background:s.color,borderRadius:3,transition:"width 0.3s"}}/>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      
+      {/* Per-order margins (orders with COGS) */}
+      {ordersWithMargin.length > 0 && (
+        <div style={{background:"#fff",border:`1px solid ${ds.color.border}`,borderRadius:ds.radius.lg,padding:"20px 22px",boxShadow:ds.shadow.xs}}>
+          <div style={{fontFamily:ds.font.display,fontSize:15,color:ds.color.textDark,marginBottom:14}}>💼 Top Margin Orders ({ordersWithMargin.length} orders with COGS data)</div>
+          <div style={{overflowX:"auto"}}>
+            <table style={{width:"100%",borderCollapse:"collapse",fontSize:12.5}}>
+              <thead><tr style={{borderBottom:`2px solid ${ds.color.border}`}}>
+                {["Order","Customer","Revenue","COGS","Margin","Margin %"].map(h=><th key={h} style={{textAlign:"left",padding:"8px 10px",fontWeight:700,fontSize:10.5,color:ds.color.textDark,textTransform:"uppercase",letterSpacing:"0.06em"}}>{h}</th>)}
+              </tr></thead>
+              <tbody>
+                {ordersWithMargin.slice(0,15).map(o=>(
+                  <tr key={o.id} style={{borderBottom:`1px solid ${ds.color.borderLight}`}}>
+                    <td style={{padding:"8px 10px",fontWeight:600,color:ds.color.red}}>#{o.id.slice(-6).toUpperCase()}</td>
+                    <td style={{padding:"8px 10px",color:ds.color.textBody}}>{o.name}</td>
+                    <td style={{padding:"8px 10px",color:ds.color.textDark,fontWeight:600}}>{formatPHP(o.total||0)}</td>
+                    <td style={{padding:"8px 10px",color:"#EF4444"}}>{formatPHP(o.cogs)}</td>
+                    <td style={{padding:"8px 10px",color:o.margin>=0?ds.color.success:ds.color.red,fontWeight:700}}>{formatPHP(o.margin)}</td>
+                    <td style={{padding:"8px 10px"}}>
+                      <span style={{fontSize:11,padding:"2px 7px",borderRadius:ds.radius.pill,background:o.marginPct>=20?ds.color.successBg:o.marginPct>=10?"#FEF3C7":"#FEE2E2",color:o.marginPct>=20?ds.color.success:o.marginPct>=10?"#92400E":ds.color.red,fontWeight:700}}>{o.marginPct.toFixed(1)}%</span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function AdminDashboard(){
   const { products: PRODUCTS, refresh: refreshProducts } = useProducts();
   const [tab,setTab]=useState("overview");
@@ -2203,11 +3111,16 @@ function AdminDashboard(){
   const [seedingMessage,setSeedingMessage]=useState("");
   // v13.0a state
   const [showNewOrderModal,setShowNewOrderModal]=useState(false);
-  const [showCustomerEditor,setShowCustomerEditor]=useState(null); // null or customer obj
+  const [showCustomerEditor,setShowCustomerEditor]=useState(null);
   const [orderSourceFilter,setOrderSourceFilter]=useState("all");
   const [orderSearch,setOrderSearch]=useState("");
   const [customerSearch,setCustomerSearch]=useState("");
   const [customerTagFilter,setCustomerTagFilter]=useState("all");
+  // v13.0b state
+  const [expenses,setExpenses]=useState([]);
+  const [showExpenseEditor,setShowExpenseEditor]=useState(null);
+  const [manualBillings,setManualBillings]=useState([]);
+  const [showBillingEditor,setShowBillingEditor]=useState(null);
 
   useEffect(()=>{
     (async()=>{
@@ -2294,6 +3207,15 @@ function AdminDashboard(){
         setCustomers(cSnap.docs.map(d=>({id:d.id,...d.data()})));
         const rSnap=await getDocs(query(collection(db,"rxUploads"),orderBy("createdAt","desc")));
         setRxUps(rSnap.docs.map(d=>({id:d.id,...d.data()})));
+        // v13.0b: Load expenses and manual billings
+        try {
+          const eSnap=await getDocs(query(collection(db,"expenses"),orderBy("date","desc")));
+          setExpenses(eSnap.docs.map(d=>({id:d.id,...d.data()})));
+        } catch(_){ /* collection may not exist yet */ }
+        try {
+          const bSnap=await getDocs(query(collection(db,"manualBillings"),orderBy("date","desc")));
+          setManualBillings(bSnap.docs.map(d=>({id:d.id,...d.data()})));
+        } catch(_){ /* collection may not exist yet */ }
       }catch(_){}
       setLoading(false);
     })();
@@ -2458,9 +3380,17 @@ function AdminDashboard(){
       setOrders(oSnap.docs.map(d=>({id:d.id,...d.data()})));
       const cSnap=await getDocs(collection(db,"customers"));
       setCustomers(cSnap.docs.map(d=>({id:d.id,...d.data()})));
+      try {
+        const eSnap=await getDocs(query(collection(db,"expenses"),orderBy("date","desc")));
+        setExpenses(eSnap.docs.map(d=>({id:d.id,...d.data()})));
+      } catch(_){}
+      try {
+        const bSnap=await getDocs(query(collection(db,"manualBillings"),orderBy("date","desc")));
+        setManualBillings(bSnap.docs.map(d=>({id:d.id,...d.data()})));
+      } catch(_){}
     } catch(_){}
   };
-  const tabs=[{id:"overview",label:"Overview",icon:"📊"},{id:"orders",label:`Orders${pendingPaymentCount>0?" 🔔":""}`,icon:"📦"},{id:"receivables",label:"Receivables",icon:"💰"},{id:"products",label:"Products",icon:"🗂️"},{id:"customers",label:"Customers",icon:"👥"},{id:"rx",label:"Rx Uploads",icon:"💊"}];
+  const tabs=[{id:"overview",label:"Overview",icon:"📊"},{id:"orders",label:`Orders${pendingPaymentCount>0?" 🔔":""}`,icon:"📦"},{id:"receivables",label:"Receivables",icon:"💰"},{id:"expenses",label:"Expenses",icon:"🏢"},{id:"billings",label:"Billings",icon:"📝"},{id:"margin",label:"Margin",icon:"📈"},{id:"products",label:"Products",icon:"🗂️"},{id:"customers",label:"Customers",icon:"👥"},{id:"rx",label:"Rx Uploads",icon:"💊"}];
 
   return(
     <div style={{paddingTop:67,background:ds.color.canvas,minHeight:"100vh"}}>
@@ -2640,6 +3570,29 @@ function AdminDashboard(){
         {tab==="receivables"&&(
           <ReceivablesTab orders={orders} onMarkPaid={markOrderPaid}/>
         )}
+
+        {tab==="expenses"&&(
+          <ExpensesTab
+            expenses={expenses}
+            orders={orders}
+            onEdit={(e)=>setShowExpenseEditor(e)}
+            onNew={()=>setShowExpenseEditor({})}
+            onRefresh={refreshData}
+          />
+        )}
+
+        {tab==="billings"&&(
+          <ManualBillingsTab
+            billings={manualBillings}
+            onEdit={(b)=>setShowBillingEditor(b)}
+            onNew={()=>setShowBillingEditor({})}
+          />
+        )}
+
+        {tab==="margin"&&(
+          <MarginDashboardTab orders={orders} expenses={expenses}/>
+        )}
+
 
         {tab==="products"&&(
           <div>
@@ -2837,6 +3790,21 @@ function AdminDashboard(){
         <CustomerEditorModal
           customer={showCustomerEditor}
           onClose={()=>setShowCustomerEditor(null)}
+          onSaved={refreshData}
+        />
+      )}
+      {showExpenseEditor !== null && (
+        <ExpenseEditorModal
+          expense={showExpenseEditor}
+          orders={orders}
+          onClose={()=>setShowExpenseEditor(null)}
+          onSaved={refreshData}
+        />
+      )}
+      {showBillingEditor !== null && (
+        <ManualBillingEditorModal
+          billing={showBillingEditor}
+          onClose={()=>setShowBillingEditor(null)}
           onSaved={refreshData}
         />
       )}
