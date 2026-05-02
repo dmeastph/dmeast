@@ -1,5 +1,12 @@
 /**
- * DMEAST — Medical Solutions Platform  v11.2
+ * DMEAST — Medical Solutions Platform  v13.0a
+ *
+ * v13.0a NEW FEATURES:
+ * - 🆕 Internal Order Entry (admin "+ New Order" button for offline orders)
+ * - 👥 Customer Database upgraded (tags, internal notes, search, filters)
+ * - 💰 Receivables tab (track unpaid credit orders + aging)
+ * - 📥 Backup button + weekly reminder
+ * - 💼 Margin tracking (optional supplier cost field per order)
  *
  * v11.2 FIXES:
  * - 💊 Rx files now actually upload to Firebase Storage (was missing!)
@@ -61,6 +68,87 @@ const EMAILJS_CONFIG = {
 
 const POINTS_PER_PHP = 1 / 200;
 const POINT_VALUE    = 0.50;
+
+// ─── v13.0a CONSTANTS ────────────────────────────────────────────────────────
+// Business registration info (BIR documents)
+const DMEAST_BUSINESS_INFO = {
+  legalName: "DECON MEDICAL EQUIPMENT AND SUPPLIES TRADING",
+  proprietor: "EDILBERTO B. CONDE",
+  vatRegTIN: "417-877-476-00000",
+  registeredAddress: "1146 M. Natividad St., Cor. Mayhaligue St., Brgy 316 Zone 032, 1014 Sta. Cruz NCR, City of Manila, First District Philippines",
+};
+
+// v13.0a: Order source channels
+const ORDER_SOURCES = [
+  { id: "website",   label: "Website",    icon: "🌐", color: "#3B82F6" },
+  { id: "phone",     label: "Phone",      icon: "📞", color: "#10B981" },
+  { id: "messenger", label: "Messenger",  icon: "💬", color: "#0084FF" },
+  { id: "whatsapp",  label: "WhatsApp",   icon: "📱", color: "#25D366" },
+  { id: "walkin",    label: "Walk-in",    icon: "🚶", color: "#F59E0B" },
+  { id: "email",     label: "Email",      icon: "✉️", color: "#6366F1" },
+];
+
+// v13.0a: Payment terms
+const PAYMENT_TERMS_OPTIONS = [
+  { id: "cod",          label: "Cash on Delivery",   creditDays: 0  },
+  { id: "gcash",        label: "GCash",              creditDays: 0  },
+  { id: "maya",         label: "Maya",               creditDays: 0  },
+  { id: "bank_transfer",label: "Bank Transfer",      creditDays: 0  },
+  { id: "credit_15",    label: "Credit 15 days",     creditDays: 15 },
+  { id: "credit_30",    label: "Credit 30 days",     creditDays: 30 },
+  { id: "credit_60",    label: "Credit 60 days",     creditDays: 60 },
+  { id: "credit_90",    label: "Credit 90 days",     creditDays: 90 },
+  { id: "custom",       label: "Custom Terms",       creditDays: 0  },
+];
+
+// v13.0a: Customer tags
+const CUSTOMER_TAGS = [
+  { id: "vip",         label: "VIP",         color: "#F59E0B" },
+  { id: "lgu",         label: "LGU",         color: "#3B82F6" },
+  { id: "hospital",    label: "Hospital",    color: "#EF4444" },
+  { id: "clinic",      label: "Clinic",      color: "#10B981" },
+  { id: "pharmacy",    label: "Pharmacy",    color: "#8B5CF6" },
+  { id: "bpo",         label: "BPO",         color: "#06B6D4" },
+  { id: "distributor", label: "Distributor", color: "#EC4899" },
+  { id: "walkin",      label: "Walk-in",     color: "#6B7280" },
+  { id: "individual",  label: "Individual",  color: "#84CC16" },
+];
+
+// v13.0a: Receivables aging buckets (days overdue)
+const AGING_BUCKETS = [
+  { label: "Current",    min: -999, max: 0,    color: "#10B981", bg: "#D1FAE5" },
+  { label: "1-30 days",  min: 1,    max: 30,   color: "#F59E0B", bg: "#FEF3C7" },
+  { label: "31-60 days", min: 31,   max: 60,   color: "#F97316", bg: "#FED7AA" },
+  { label: "61-90 days", min: 61,   max: 90,   color: "#EF4444", bg: "#FECACA" },
+  { label: "90+ days",   min: 91,   max: 9999, color: "#991B1B", bg: "#FEE2E2" },
+];
+
+// v13.0a: Helper to compute days overdue
+const daysOverdue = (dueDate) => {
+  if (!dueDate) return 0;
+  const due = dueDate.toDate ? dueDate.toDate() : new Date(dueDate);
+  const now = new Date();
+  return Math.floor((now - due) / (1000 * 60 * 60 * 24));
+};
+
+// v13.0a: Helper to find aging bucket
+const getAgingBucket = (days) => AGING_BUCKETS.find(b => days >= b.min && days <= b.max) || AGING_BUCKETS[0];
+
+// v13.0a: Helper to find tag/source/term by id
+const findTag    = (id) => CUSTOMER_TAGS.find(t => t.id === id);
+const findSource = (id) => ORDER_SOURCES.find(s => s.id === id) || ORDER_SOURCES[0];
+const findTerms  = (id) => PAYMENT_TERMS_OPTIONS.find(t => t.id === id);
+
+// v13.0a: Calculate due date based on payment terms
+const calculateDueDate = (orderDate, paymentTermsId) => {
+  const term = findTerms(paymentTermsId);
+  if (!term || term.creditDays === 0) return null;
+  const due = orderDate ? new Date(orderDate.toDate ? orderDate.toDate() : orderDate) : new Date();
+  due.setDate(due.getDate() + term.creditDays);
+  return due;
+};
+
+
 
 const ds = {
   color: {
@@ -968,6 +1056,29 @@ function CustomerPortal({user,setPage,addToCart,wishlist,toggleWishlist}){
     </div>
   );
 
+
+  // v13.0a: Mark a credit order as paid
+  const markOrderPaid = async (orderId) => {
+    try {
+      await updateDoc(doc(db,"orders",orderId), {
+        paymentStatus: "confirmed",
+        paidAt: serverTimestamp(),
+        status: "confirmed",
+      });
+      // Refresh
+      setOrders(prev => prev.map(o => o.id===orderId ? {...o, paymentStatus:"confirmed", status:"confirmed"} : o));
+    } catch(e) { alert("Failed: "+e.message); }
+  };
+
+  // v13.0a: Refresh data (after creating new order/customer)
+  const refreshData = async () => {
+    try {
+      const oSnap=await getDocs(query(collection(db,"orders"),orderBy("createdAt","desc")));
+      setOrders(oSnap.docs.map(d=>({id:d.id,...d.data()})));
+      const cSnap=await getDocs(collection(db,"customers"));
+      setCustomers(cSnap.docs.map(d=>({id:d.id,...d.data()})));
+    } catch(_){}
+  };
   const tabs=[{id:"overview",label:"Overview",icon:"📊"},{id:"orders",label:"Orders",icon:"📦"},{id:"wishlist",label:"Wishlist",icon:"❤️"},{id:"address",label:"My Address",icon:"📍"},{id:"rx",label:"Rx History",icon:"💊"},{id:"rewards",label:"Rewards",icon:"⭐"}];
 
   return(
@@ -1396,6 +1507,690 @@ function ProductEditModal({ product, onSave, onClose }){
 }
 
 // ─── ADMIN DASHBOARD ─────────────────────────────────────────────────────────
+
+// ─── v13.0a: NEW ORDER MODAL (Admin Internal Order Entry) ────────────────────
+function NewOrderModal({ onClose, onSaved, customers: existingCustomers, products: existingProducts }){
+  const [step, setStep] = useState(1); // 1=customer, 2=items, 3=details
+  
+  // Customer selection
+  const [customerMode, setCustomerMode] = useState("existing"); // "existing" or "new"
+  const [customerSearch, setCustomerSearch] = useState("");
+  const [selectedCustomer, setSelectedCustomer] = useState(null);
+  const [newCustomer, setNewCustomer] = useState({
+    name: "", email: "", phone: "", address: "",
+    customerType: "individual", tags: [], internalNotes: ""
+  });
+  
+  // Items
+  const [productSearch, setProductSearch] = useState("");
+  const [items, setItems] = useState([]); // [{productId, name, qty, unitPrice, total}]
+  
+  // Order details
+  const [source, setSource]               = useState("phone");
+  const [paymentTerms, setPaymentTerms]   = useState("cod");
+  const [paymentTermsNotes, setTermsNotes]= useState("");
+  const [internalNotes, setInternalNotes] = useState("");
+  const [supplierCost, setSupplierCost]   = useState(""); // optional margin tracking
+  const [supplierName, setSupplierName]   = useState("");
+  
+  const [saving, setSaving] = useState(false);
+  const [errMsg, setErrMsg] = useState("");
+  
+  const filteredCustomers = customerSearch.trim()
+    ? existingCustomers.filter(c => {
+        const q = customerSearch.toLowerCase();
+        return (c.name||"").toLowerCase().includes(q) ||
+               (c.email||"").toLowerCase().includes(q) ||
+               (c.phone||"").toLowerCase().includes(q);
+      }).slice(0, 8)
+    : existingCustomers.slice(0, 8);
+
+  const filteredProducts = productSearch.trim()
+    ? existingProducts.filter(p => {
+        const q = productSearch.toLowerCase();
+        return (p.name||"").toLowerCase().includes(q) ||
+               (p.tag||"").toLowerCase().includes(q);
+      }).slice(0, 6)
+    : [];
+  
+  const total = items.reduce((s, i) => s + (i.qty * i.unitPrice), 0);
+  const margin = supplierCost ? total - Number(supplierCost) : null;
+  
+  const customerValid = selectedCustomer || (newCustomer.name && newCustomer.phone);
+  const itemsValid    = items.length > 0;
+  const canSave       = customerValid && itemsValid && source && paymentTerms;
+  
+  const addProduct = (p) => {
+    const existing = items.find(i => i.productId === p.id);
+    if (existing) {
+      setItems(items.map(i => i.productId === p.id ? {...i, qty: i.qty + 1} : i));
+    } else {
+      setItems([...items, {
+        productId: p.id, name: p.name,
+        qty: 1, unitPrice: p.price || 0,
+        requiresPrescription: !!p.requiresPrescription,
+      }]);
+    }
+    setProductSearch("");
+  };
+  
+  const updateItem = (idx, field, value) => {
+    const newItems = [...items];
+    if (field === "qty") newItems[idx].qty = Math.max(1, Number(value) || 1);
+    else if (field === "unitPrice") newItems[idx].unitPrice = Math.max(0, Number(value) || 0);
+    setItems(newItems);
+  };
+  
+  const removeItem = (idx) => setItems(items.filter((_,i) => i !== idx));
+  
+  const handleSave = async () => {
+    if (!canSave) return;
+    setSaving(true); setErrMsg("");
+    try {
+      // Step 1: Create or get customer
+      let customerId, customerData;
+      if (selectedCustomer) {
+        customerId = selectedCustomer.id;
+        customerData = selectedCustomer;
+      } else {
+        // Create new offline customer (no auth, no uid)
+        const ref = await addDoc(collection(db, "customers"), {
+          name: newCustomer.name,
+          email: newCustomer.email || null,
+          phone: newCustomer.phone,
+          savedAddress: newCustomer.address || null,
+          customerType: newCustomer.customerType,
+          tags: newCustomer.tags,
+          internalNotes: newCustomer.internalNotes || null,
+          source: "manual", // admin-created (vs "registered")
+          totalOrders: 0,
+          totalSpent: 0,
+          points: 0,
+          createdAt: serverTimestamp(),
+        });
+        customerId = ref.id;
+        customerData = { id: customerId, ...newCustomer };
+      }
+      
+      // Step 2: Create order
+      const orderDate = serverTimestamp();
+      const dueDate = calculateDueDate(new Date(), paymentTerms);
+      const orderData = {
+        // Customer info (denormalized for fast display)
+        name: customerData.name || newCustomer.name,
+        email: customerData.email || newCustomer.email || null,
+        phone: customerData.phone || newCustomer.phone,
+        address: customerData.savedAddress || newCustomer.address || null,
+        uid: customerData.uid || null,
+        customerId: customerId,
+        // Order
+        items: items.map(i => ({
+          id: i.productId, name: i.name,
+          price: i.unitPrice, qty: i.qty,
+          requiresPrescription: !!i.requiresPrescription,
+        })),
+        total,
+        // v13.0a fields
+        source: source, // phone/messenger/whatsapp/walkin/email/website
+        paymentMethod: findTerms(paymentTerms)?.label || paymentTerms,
+        paymentTerms: paymentTerms,
+        paymentTermsNotes: paymentTermsNotes || null,
+        internalNotes: internalNotes || null,
+        createdByAdmin: true,
+        dueDate: dueDate,
+        // Margin tracking (optional)
+        supplierCost: supplierCost ? Number(supplierCost) : null,
+        supplierName: supplierName || null,
+        margin: margin,
+        // Status
+        status: "confirmed", // admin-created orders skip "pending" status
+        paymentStatus: paymentTerms.startsWith("credit_") ? "awaiting" : "awaiting",
+        createdAt: orderDate,
+      };
+      const orderRef = await addDoc(collection(db, "orders"), orderData);
+      
+      // Step 3: Update customer stats
+      try {
+        await updateDoc(doc(db, "customers", customerId), {
+          totalOrders: (customerData.totalOrders || 0) + 1,
+          totalSpent: (customerData.totalSpent || 0) + total,
+        });
+      } catch(_){}
+      
+      onSaved && onSaved({ id: orderRef.id, ...orderData });
+      onClose();
+    } catch(e) {
+      console.error("Failed to save order:", e);
+      setErrMsg("Failed to save order: " + e.message);
+    }
+    setSaving(false);
+  };
+  
+  const inp = {width:"100%",padding:"10px 14px",border:`1.5px solid ${ds.color.border}`,borderRadius:ds.radius.md,fontSize:14,fontFamily:ds.font.body,outline:"none",boxSizing:"border-box"};
+  const lbl = {fontSize:12,fontWeight:600,color:ds.color.textDark,display:"block",marginBottom:5};
+  
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center",padding:20,overflowY:"auto"}}>
+      <div style={{background:"#fff",borderRadius:ds.radius.xl,maxWidth:880,width:"100%",maxHeight:"90vh",display:"flex",flexDirection:"column",boxShadow:ds.shadow.xl}}>
+        
+        {/* Header */}
+        <div style={{padding:"20px 28px",borderBottom:`1px solid ${ds.color.border}`,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+          <div>
+            <div style={{fontFamily:ds.font.display,fontSize:20,color:ds.color.textDark}}>+ New Internal Order</div>
+            <div style={{fontSize:12,color:ds.color.textMuted,marginTop:2}}>Manually create an order for phone/Messenger/walk-in customers</div>
+          </div>
+          <button onClick={onClose} style={{background:"none",border:"none",cursor:"pointer",fontSize:24,color:ds.color.textMuted,padding:4}}>✕</button>
+        </div>
+        
+        {/* Step indicator */}
+        <div style={{padding:"12px 28px",background:ds.color.canvas,display:"flex",gap:0,alignItems:"center"}}>
+          {[[1,"Customer"],[2,"Items"],[3,"Details"]].map(([n,label],i)=>(
+            <div key={n} style={{display:"flex",alignItems:"center",flex:i<2?1:0}}>
+              <div style={{display:"flex",alignItems:"center",gap:8}}>
+                <div style={{width:26,height:26,borderRadius:"50%",background:step>=n?ds.color.red:ds.color.border,color:step>=n?"#fff":ds.color.textMuted,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700}}>{step>n?"✓":n}</div>
+                <span style={{fontSize:12,fontWeight:500,color:step===n?ds.color.textDark:ds.color.textMuted}}>{label}</span>
+              </div>
+              {i<2&&<div style={{flex:1,height:2,background:step>n?ds.color.success:ds.color.borderLight,margin:"0 12px"}}/>}
+            </div>
+          ))}
+        </div>
+        
+        {/* Body */}
+        <div style={{flex:1,overflowY:"auto",padding:"24px 28px"}}>
+          
+          {/* STEP 1: CUSTOMER */}
+          {step===1&&(
+            <div>
+              <div style={{display:"flex",gap:8,marginBottom:16}}>
+                <button onClick={()=>setCustomerMode("existing")} style={{flex:1,padding:"10px",borderRadius:ds.radius.md,border:`1.5px solid ${customerMode==="existing"?ds.color.red:ds.color.border}`,background:customerMode==="existing"?ds.color.redLight:"#fff",cursor:"pointer",fontSize:13,fontWeight:600,color:customerMode==="existing"?ds.color.red:ds.color.textBody,fontFamily:ds.font.body}}>
+                  🔍 Existing Customer
+                </button>
+                <button onClick={()=>setCustomerMode("new")} style={{flex:1,padding:"10px",borderRadius:ds.radius.md,border:`1.5px solid ${customerMode==="new"?ds.color.red:ds.color.border}`,background:customerMode==="new"?ds.color.redLight:"#fff",cursor:"pointer",fontSize:13,fontWeight:600,color:customerMode==="new"?ds.color.red:ds.color.textBody,fontFamily:ds.font.body}}>
+                  ➕ New Customer
+                </button>
+              </div>
+              
+              {customerMode==="existing"?(
+                <div>
+                  <input value={customerSearch} onChange={e=>setCustomerSearch(e.target.value)} placeholder="🔍 Search by name, email, or phone…" style={{...inp,marginBottom:12}}/>
+                  <div style={{maxHeight:320,overflowY:"auto",border:`1px solid ${ds.color.border}`,borderRadius:ds.radius.md}}>
+                    {filteredCustomers.length===0?(
+                      <div style={{padding:"24px",textAlign:"center",fontSize:13,color:ds.color.textMuted}}>No customers found. Try a different search or create new.</div>
+                    ):filteredCustomers.map(c=>{
+                      const active = selectedCustomer?.id===c.id;
+                      return(
+                        <button key={c.id} onClick={()=>setSelectedCustomer(c)} style={{display:"block",width:"100%",padding:"12px 16px",border:"none",borderBottom:`1px solid ${ds.color.borderLight}`,background:active?ds.color.redLight:"#fff",cursor:"pointer",textAlign:"left",fontFamily:ds.font.body}}>
+                          <div style={{fontSize:13.5,fontWeight:600,color:ds.color.textDark}}>{c.name||"Unnamed"} {active&&<span style={{color:ds.color.red}}>✓ Selected</span>}</div>
+                          <div style={{fontSize:12,color:ds.color.textMuted,marginTop:2}}>
+                            {c.email||"No email"} · {c.phone||"No phone"}
+                            {c.tags&&c.tags.length>0&&<span> · {c.tags.map(t=>findTag(t)?.label).filter(Boolean).join(", ")}</span>}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ):(
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"12px 16px"}}>
+                  <div><label style={lbl}>Name *</label><input value={newCustomer.name} onChange={e=>setNewCustomer({...newCustomer,name:e.target.value})} placeholder="Customer name" style={inp}/></div>
+                  <div><label style={lbl}>Phone *</label><input value={newCustomer.phone} onChange={e=>setNewCustomer({...newCustomer,phone:e.target.value})} placeholder="+63 9XX XXX XXXX" style={inp}/></div>
+                  <div><label style={lbl}>Email</label><input value={newCustomer.email} onChange={e=>setNewCustomer({...newCustomer,email:e.target.value})} placeholder="email@example.com" style={inp}/></div>
+                  <div><label style={lbl}>Customer Type</label>
+                    <select value={newCustomer.customerType} onChange={e=>setNewCustomer({...newCustomer,customerType:e.target.value})} style={{...inp,cursor:"pointer"}}>
+                      <option value="individual">Individual</option>
+                      <option value="institution">Institution</option>
+                      <option value="walkin">Walk-in</option>
+                    </select>
+                  </div>
+                  <div style={{gridColumn:"1/-1"}}>
+                    <label style={lbl}>Address</label>
+                    <textarea value={newCustomer.address} onChange={e=>setNewCustomer({...newCustomer,address:e.target.value})} rows={2} placeholder="Delivery address" style={{...inp,resize:"vertical"}}/>
+                  </div>
+                  <div style={{gridColumn:"1/-1"}}>
+                    <label style={lbl}>Tags (click to toggle)</label>
+                    <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+                      {CUSTOMER_TAGS.map(tag=>{
+                        const active = newCustomer.tags.includes(tag.id);
+                        return(
+                          <button key={tag.id} type="button" onClick={()=>{
+                            const newTags = active ? newCustomer.tags.filter(t=>t!==tag.id) : [...newCustomer.tags, tag.id];
+                            setNewCustomer({...newCustomer,tags:newTags});
+                          }} style={{padding:"4px 10px",borderRadius:ds.radius.pill,border:`1px solid ${active?tag.color:ds.color.border}`,background:active?tag.color:"#fff",color:active?"#fff":ds.color.textBody,cursor:"pointer",fontSize:11.5,fontWeight:600,fontFamily:ds.font.body}}>{tag.label}</button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                  <div style={{gridColumn:"1/-1"}}>
+                    <label style={lbl}>Internal Notes (admin only)</label>
+                    <textarea value={newCustomer.internalNotes} onChange={e=>setNewCustomer({...newCustomer,internalNotes:e.target.value})} rows={2} placeholder="e.g. 'Always pays late', 'Refers other clinics'" style={{...inp,resize:"vertical"}}/>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+          
+          {/* STEP 2: ITEMS */}
+          {step===2&&(
+            <div>
+              <input value={productSearch} onChange={e=>setProductSearch(e.target.value)} placeholder="🔍 Search products to add…" style={{...inp,marginBottom:12}}/>
+              {filteredProducts.length>0&&(
+                <div style={{border:`1px solid ${ds.color.border}`,borderRadius:ds.radius.md,marginBottom:16,maxHeight:200,overflowY:"auto"}}>
+                  {filteredProducts.map(p=>(
+                    <button key={p.id} onClick={()=>addProduct(p)} style={{display:"block",width:"100%",padding:"10px 14px",border:"none",borderBottom:`1px solid ${ds.color.borderLight}`,background:"#fff",cursor:"pointer",textAlign:"left",fontFamily:ds.font.body}}>
+                      <div style={{fontSize:13,fontWeight:600,color:ds.color.textDark}}>{p.name} {p.requiresPrescription&&<span style={{color:"#92400E",fontSize:11}}>💊</span>}</div>
+                      <div style={{fontSize:11,color:ds.color.textMuted}}>{formatPHP(p.price||0)} · {p.tag}</div>
+                    </button>
+                  ))}
+                </div>
+              )}
+              
+              {items.length===0?(
+                <div style={{padding:"40px",textAlign:"center",border:`2px dashed ${ds.color.border}`,borderRadius:ds.radius.lg,color:ds.color.textMuted,fontSize:13}}>
+                  No items added yet. Search and click a product to add.
+                </div>
+              ):(
+                <div style={{border:`1px solid ${ds.color.border}`,borderRadius:ds.radius.md,overflow:"hidden"}}>
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 80px 110px 110px 40px",gap:8,padding:"10px 14px",background:ds.color.canvas,fontSize:11,fontWeight:700,color:ds.color.textMuted,textTransform:"uppercase",letterSpacing:"0.06em"}}>
+                    <div>Product</div><div>Qty</div><div>Unit Price</div><div style={{textAlign:"right"}}>Total</div><div></div>
+                  </div>
+                  {items.map((item,idx)=>(
+                    <div key={idx} style={{display:"grid",gridTemplateColumns:"1fr 80px 110px 110px 40px",gap:8,padding:"10px 14px",borderTop:`1px solid ${ds.color.borderLight}`,alignItems:"center"}}>
+                      <div style={{fontSize:13,color:ds.color.textDark}}>{item.name} {item.requiresPrescription&&<span style={{color:"#92400E",fontSize:10}}>💊</span>}</div>
+                      <input type="number" min="1" value={item.qty} onChange={e=>updateItem(idx,"qty",e.target.value)} style={{...inp,padding:"6px 8px",fontSize:13}}/>
+                      <input type="number" min="0" value={item.unitPrice} onChange={e=>updateItem(idx,"unitPrice",e.target.value)} style={{...inp,padding:"6px 8px",fontSize:13}}/>
+                      <div style={{textAlign:"right",fontSize:13,fontWeight:700}}>{formatPHP(item.qty*item.unitPrice)}</div>
+                      <button onClick={()=>removeItem(idx)} style={{background:"none",border:"none",cursor:"pointer",fontSize:14,color:ds.color.textLight}}>✕</button>
+                    </div>
+                  ))}
+                  <div style={{padding:"12px 14px",background:ds.color.canvas,borderTop:`1px solid ${ds.color.border}`,display:"flex",justifyContent:"space-between",fontSize:15,fontWeight:700}}>
+                    <span>Total ({items.length} item{items.length!==1?"s":""})</span>
+                    <span style={{color:ds.color.red}}>{formatPHP(total)}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+          
+          {/* STEP 3: DETAILS */}
+          {step===3&&(
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"16px 20px"}}>
+              <div>
+                <label style={lbl}>Order Source *</label>
+                <select value={source} onChange={e=>setSource(e.target.value)} style={{...inp,cursor:"pointer"}}>
+                  {ORDER_SOURCES.map(s=><option key={s.id} value={s.id}>{s.icon} {s.label}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={lbl}>Payment Terms *</label>
+                <select value={paymentTerms} onChange={e=>setPaymentTerms(e.target.value)} style={{...inp,cursor:"pointer"}}>
+                  {PAYMENT_TERMS_OPTIONS.map(t=><option key={t.id} value={t.id}>{t.label}</option>)}
+                </select>
+              </div>
+              {paymentTerms==="custom"&&(
+                <div style={{gridColumn:"1/-1"}}>
+                  <label style={lbl}>Custom Terms Description</label>
+                  <input value={paymentTermsNotes} onChange={e=>setTermsNotes(e.target.value)} placeholder="e.g. 50% deposit, balance on delivery" style={inp}/>
+                </div>
+              )}
+              {paymentTerms.startsWith("credit_")&&(
+                <div style={{gridColumn:"1/-1",background:ds.color.goldLight,border:`1px solid ${ds.color.goldBorder}`,padding:"10px 14px",borderRadius:ds.radius.md,fontSize:12.5,color:ds.color.gold}}>
+                  💳 Due Date: <strong>{calculateDueDate(new Date(),paymentTerms)?.toLocaleDateString("en-PH",{year:"numeric",month:"long",day:"numeric"})}</strong> · This will appear in Receivables.
+                </div>
+              )}
+              <div style={{gridColumn:"1/-1"}}>
+                <label style={lbl}>Internal Notes (admin only)</label>
+                <textarea value={internalNotes} onChange={e=>setInternalNotes(e.target.value)} rows={2} placeholder="e.g. 'Special handling required', 'Customer requested rush'" style={{...inp,resize:"vertical"}}/>
+              </div>
+              <div style={{gridColumn:"1/-1",borderTop:`1px dashed ${ds.color.border}`,paddingTop:16,marginTop:4}}>
+                <div style={{fontSize:11,fontWeight:700,color:ds.color.textMuted,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:10}}>Margin Tracking (Optional)</div>
+              </div>
+              <div>
+                <label style={lbl}>Supplier Cost (optional)</label>
+                <input type="number" min="0" value={supplierCost} onChange={e=>setSupplierCost(e.target.value)} placeholder="e.g. 35000" style={inp}/>
+              </div>
+              <div>
+                <label style={lbl}>Supplier Name (optional)</label>
+                <input value={supplierName} onChange={e=>setSupplierName(e.target.value)} placeholder="e.g. MedSupply Inc" style={inp}/>
+              </div>
+              {margin!==null&&supplierCost&&(
+                <div style={{gridColumn:"1/-1",background:margin>=0?ds.color.successBg:ds.color.redLight,border:`1px solid ${margin>=0?ds.color.successBorder:ds.color.redBorder}`,padding:"10px 14px",borderRadius:ds.radius.md,fontSize:12.5,color:margin>=0?ds.color.success:ds.color.red}}>
+                  💰 Margin: <strong>{formatPHP(margin)}</strong> ({total>0?((margin/total)*100).toFixed(1):0}% of revenue)
+                </div>
+              )}
+            </div>
+          )}
+          
+          {errMsg&&<div style={{marginTop:16,padding:"10px 14px",background:ds.color.redLight,borderRadius:ds.radius.md,fontSize:13,color:ds.color.red}}>{errMsg}</div>}
+        </div>
+        
+        {/* Footer */}
+        <div style={{padding:"16px 28px",borderTop:`1px solid ${ds.color.border}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          <div style={{fontSize:13,color:ds.color.textMuted}}>
+            {step===1&&!customerValid&&"Select or create a customer to continue"}
+            {step===2&&!itemsValid&&"Add at least one item"}
+            {step===3&&canSave&&<span style={{color:ds.color.success,fontWeight:600}}>✓ Ready to save</span>}
+            {step===3&&items.length>0&&<span style={{marginLeft:12,fontWeight:700,color:ds.color.textDark}}>Total: {formatPHP(total)}</span>}
+          </div>
+          <div style={{display:"flex",gap:8}}>
+            {step>1&&<Btn variant="outline" size="md" onClick={()=>setStep(s=>s-1)}>← Back</Btn>}
+            {step<3?(
+              <Btn variant="primary" size="md" disabled={(step===1&&!customerValid)||(step===2&&!itemsValid)} onClick={()=>setStep(s=>s+1)}>Next →</Btn>
+            ):(
+              <Btn variant="primary" size="md" disabled={!canSave||saving} onClick={handleSave}>{saving?"Saving…":"💾 Save Order"}</Btn>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+// ─── v13.0a: RECEIVABLES TAB ─────────────────────────────────────────────────
+function ReceivablesTab({ orders, onMarkPaid }){
+  const [filter, setFilter] = useState("all"); // all/current/overdue
+  const [searchQ, setSearchQ] = useState("");
+  
+  // Filter to credit-term orders that aren't fully paid
+  const receivables = orders.filter(o => {
+    const isCreditOrder = o.paymentTerms && o.paymentTerms.startsWith("credit_");
+    const isCustomTerms = o.paymentTerms === "custom";
+    const isUnpaid      = o.paymentStatus !== "confirmed" && o.status !== "cancelled";
+    return (isCreditOrder || isCustomTerms) && isUnpaid;
+  });
+  
+  // Add aging info
+  const enriched = receivables.map(o => {
+    const days = daysOverdue(o.dueDate);
+    return { ...o, days, bucket: getAgingBucket(days) };
+  });
+  
+  // Apply filters
+  const filtered = enriched.filter(o => {
+    if (filter === "current"  && o.days >  0) return false;
+    if (filter === "overdue"  && o.days <= 0) return false;
+    if (searchQ.trim()) {
+      const q = searchQ.toLowerCase();
+      return (o.name||"").toLowerCase().includes(q) ||
+             (o.id||"").toLowerCase().includes(q);
+    }
+    return true;
+  });
+  
+  // Sort: most overdue first
+  filtered.sort((a,b) => b.days - a.days);
+  
+  const totalOutstanding = filtered.reduce((s,o) => s + (o.total||0), 0);
+  const overdueCount     = enriched.filter(o => o.days > 0).length;
+  const currentCount     = enriched.filter(o => o.days <= 0).length;
+  
+  // Aging buckets summary
+  const agingSummary = AGING_BUCKETS.map(b => {
+    const ordersInBucket = enriched.filter(o => o.days >= b.min && o.days <= b.max);
+    const total = ordersInBucket.reduce((s,o) => s + (o.total||0), 0);
+    return { ...b, count: ordersInBucket.length, total };
+  });
+
+  const exportReceivablesCSV = () => {
+    const headers = ["Order #","Customer","Phone","Email","Amount","Due Date","Days Overdue","Status","Payment Terms"];
+    const rows = filtered.map(o => [
+      "#"+o.id.slice(-6).toUpperCase(),
+      (o.name||"").replace(/,/g," "),
+      o.phone||"",
+      o.email||"",
+      o.total||0,
+      o.dueDate ? formatDate(o.dueDate) : "—",
+      o.days,
+      o.bucket.label,
+      findTerms(o.paymentTerms)?.label || o.paymentTerms || "—",
+    ]);
+    const csv = [headers, ...rows].map(r => r.join(",")).join("\n");
+    const blob = new Blob([csv], {type:"text/csv"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = "receivables-"+new Date().toISOString().slice(0,10)+".csv";
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+  
+  return (
+    <div style={{background:"#fff",border:`1px solid ${ds.color.border}`,borderRadius:ds.radius.lg,padding:"24px 28px",boxShadow:ds.shadow.xs}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20,flexWrap:"wrap",gap:12}}>
+        <div>
+          <div style={{fontFamily:ds.font.display,fontSize:18,color:ds.color.textDark}}>💰 Receivables ({filtered.length})</div>
+          <div style={{fontSize:12.5,color:ds.color.textMuted,marginTop:3}}>Outstanding balances from credit-term orders</div>
+        </div>
+        <Btn variant="outline" size="sm" onClick={exportReceivablesCSV}>⬇️ Export CSV</Btn>
+      </div>
+      
+      {/* Aging summary */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:8,marginBottom:20}}>
+        {agingSummary.map(b=>(
+          <div key={b.label} style={{padding:"12px 14px",background:b.bg,border:`1px solid ${b.color}40`,borderRadius:ds.radius.md,textAlign:"center"}}>
+            <div style={{fontSize:10,fontWeight:700,color:b.color,textTransform:"uppercase",letterSpacing:"0.06em"}}>{b.label}</div>
+            <div style={{fontSize:18,fontWeight:700,color:b.color,marginTop:4}}>{b.count}</div>
+            <div style={{fontSize:11,color:b.color,marginTop:2}}>{formatPHP(b.total)}</div>
+          </div>
+        ))}
+      </div>
+      
+      {/* Total + Filters */}
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,flexWrap:"wrap",padding:"12px 16px",background:ds.color.canvas,borderRadius:ds.radius.md,marginBottom:16}}>
+        <div>
+          <span style={{fontSize:11,fontWeight:700,color:ds.color.textMuted,textTransform:"uppercase",letterSpacing:"0.08em"}}>Total Outstanding</span>
+          <span style={{fontSize:18,fontWeight:700,color:ds.color.red,marginLeft:10}}>{formatPHP(totalOutstanding)}</span>
+        </div>
+        <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+          {[
+            {id:"all",     label:`All (${enriched.length})`},
+            {id:"current", label:`Current (${currentCount})`},
+            {id:"overdue", label:`Overdue (${overdueCount})`},
+          ].map(f=>(
+            <button key={f.id} onClick={()=>setFilter(f.id)} style={{padding:"5px 12px",borderRadius:ds.radius.pill,border:`1px solid ${filter===f.id?ds.color.red:ds.color.border}`,background:filter===f.id?ds.color.redLight:"#fff",color:filter===f.id?ds.color.red:ds.color.textBody,cursor:"pointer",fontSize:11.5,fontWeight:600,fontFamily:ds.font.body}}>{f.label}</button>
+          ))}
+          <input value={searchQ} onChange={e=>setSearchQ(e.target.value)} placeholder="🔍 Search…" style={{padding:"5px 10px",borderRadius:ds.radius.sm,border:`1px solid ${ds.color.border}`,fontSize:12,fontFamily:ds.font.body,outline:"none",width:140}}/>
+        </div>
+      </div>
+      
+      {/* Receivables list */}
+      {filtered.length===0?(
+        <div style={{textAlign:"center",padding:"40px 0",color:ds.color.textMuted,fontSize:14}}>
+          {enriched.length===0?"🎉 No outstanding receivables. All credit orders are paid!":"No receivables match the current filter."}
+        </div>
+      ):filtered.map(o=>(
+        <div key={o.id} style={{border:`1px solid ${o.bucket.color}40`,borderLeft:`4px solid ${o.bucket.color}`,borderRadius:ds.radius.md,padding:"14px 18px",marginBottom:10,display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10,background:"#fff"}}>
+          <div style={{flex:1,minWidth:200}}>
+            <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
+              <span style={{fontSize:13.5,fontWeight:700,color:ds.color.textDark}}>#{o.id.slice(-6).toUpperCase()}</span>
+              <span style={{fontSize:13,color:ds.color.textBody}}>{o.name||"Unknown"}</span>
+              <span style={{fontSize:10,fontWeight:700,padding:"2px 8px",borderRadius:ds.radius.pill,background:o.bucket.bg,color:o.bucket.color,textTransform:"uppercase",letterSpacing:"0.04em"}}>
+                {o.days<=0?o.bucket.label:`${o.days} days overdue`}
+              </span>
+            </div>
+            <div style={{fontSize:11.5,color:ds.color.textMuted,marginTop:4}}>
+              {o.phone||"—"} · {o.email||"—"} · Due: {o.dueDate?formatDate(o.dueDate):"—"} · Terms: {findTerms(o.paymentTerms)?.label||"—"}
+            </div>
+          </div>
+          <div style={{textAlign:"right"}}>
+            <div style={{fontSize:16,fontWeight:700,color:o.bucket.color}}>{formatPHP(o.total||0)}</div>
+            <button onClick={()=>{
+              if(!confirm("Mark this order as paid?")) return;
+              onMarkPaid(o.id);
+            }} style={{marginTop:6,padding:"5px 12px",borderRadius:ds.radius.sm,border:`1px solid ${ds.color.success}`,background:ds.color.successBg,color:ds.color.success,cursor:"pointer",fontSize:11,fontWeight:700,fontFamily:ds.font.body}}>✓ Mark Paid</button>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ─── v13.0a: CUSTOMER EDITOR MODAL ───────────────────────────────────────────
+function CustomerEditorModal({ customer, onClose, onSaved }){
+  const [data, setData] = useState({
+    name: customer?.name || "",
+    email: customer?.email || "",
+    phone: customer?.phone || "",
+    savedAddress: customer?.savedAddress || "",
+    customerType: customer?.customerType || "individual",
+    tags: customer?.tags || [],
+    internalNotes: customer?.internalNotes || "",
+  });
+  const [saving, setSaving] = useState(false);
+  const [errMsg, setErrMsg] = useState("");
+  
+  const handleSave = async () => {
+    if (!data.name || !data.phone) { setErrMsg("Name and phone are required."); return; }
+    setSaving(true); setErrMsg("");
+    try {
+      if (customer?.id) {
+        await updateDoc(doc(db,"customers",customer.id), {
+          ...data,
+          updatedAt: serverTimestamp(),
+        });
+      } else {
+        await addDoc(collection(db,"customers"), {
+          ...data,
+          source: "manual",
+          totalOrders: 0, totalSpent: 0, points: 0,
+          createdAt: serverTimestamp(),
+        });
+      }
+      onSaved && onSaved();
+      onClose();
+    } catch(e) {
+      setErrMsg("Failed to save: "+e.message);
+    }
+    setSaving(false);
+  };
+  
+  const inp = {width:"100%",padding:"10px 14px",border:`1.5px solid ${ds.color.border}`,borderRadius:ds.radius.md,fontSize:14,fontFamily:ds.font.body,outline:"none",boxSizing:"border-box"};
+  const lbl = {fontSize:12,fontWeight:600,color:ds.color.textDark,display:"block",marginBottom:5};
+  
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center",padding:20,overflowY:"auto"}}>
+      <div style={{background:"#fff",borderRadius:ds.radius.xl,maxWidth:600,width:"100%",maxHeight:"90vh",display:"flex",flexDirection:"column",boxShadow:ds.shadow.xl}}>
+        <div style={{padding:"20px 28px",borderBottom:`1px solid ${ds.color.border}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          <div style={{fontFamily:ds.font.display,fontSize:18,color:ds.color.textDark}}>{customer?.id?"Edit Customer":"+ New Customer"}</div>
+          <button onClick={onClose} style={{background:"none",border:"none",cursor:"pointer",fontSize:22,color:ds.color.textMuted}}>✕</button>
+        </div>
+        <div style={{flex:1,overflowY:"auto",padding:"24px 28px",display:"grid",gridTemplateColumns:"1fr 1fr",gap:"14px 18px"}}>
+          <div><label style={lbl}>Name *</label><input value={data.name} onChange={e=>setData({...data,name:e.target.value})} style={inp}/></div>
+          <div><label style={lbl}>Phone *</label><input value={data.phone} onChange={e=>setData({...data,phone:e.target.value})} style={inp}/></div>
+          <div><label style={lbl}>Email</label><input value={data.email} onChange={e=>setData({...data,email:e.target.value})} style={inp}/></div>
+          <div><label style={lbl}>Customer Type</label>
+            <select value={data.customerType} onChange={e=>setData({...data,customerType:e.target.value})} style={{...inp,cursor:"pointer"}}>
+              <option value="individual">Individual</option>
+              <option value="institution">Institution</option>
+              <option value="walkin">Walk-in</option>
+            </select>
+          </div>
+          <div style={{gridColumn:"1/-1"}}><label style={lbl}>Address</label><textarea value={data.savedAddress} onChange={e=>setData({...data,savedAddress:e.target.value})} rows={2} style={{...inp,resize:"vertical"}}/></div>
+          <div style={{gridColumn:"1/-1"}}>
+            <label style={lbl}>Tags</label>
+            <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+              {CUSTOMER_TAGS.map(tag=>{
+                const active = data.tags.includes(tag.id);
+                return(
+                  <button key={tag.id} type="button" onClick={()=>{
+                    const newTags = active ? data.tags.filter(t=>t!==tag.id) : [...data.tags, tag.id];
+                    setData({...data,tags:newTags});
+                  }} style={{padding:"4px 10px",borderRadius:ds.radius.pill,border:`1px solid ${active?tag.color:ds.color.border}`,background:active?tag.color:"#fff",color:active?"#fff":ds.color.textBody,cursor:"pointer",fontSize:11.5,fontWeight:600,fontFamily:ds.font.body}}>{tag.label}</button>
+                );
+              })}
+            </div>
+          </div>
+          <div style={{gridColumn:"1/-1"}}>
+            <label style={lbl}>Internal Notes (admin only)</label>
+            <textarea value={data.internalNotes} onChange={e=>setData({...data,internalNotes:e.target.value})} rows={3} placeholder="Special instructions, preferences, history…" style={{...inp,resize:"vertical"}}/>
+          </div>
+          {errMsg&&<div style={{gridColumn:"1/-1",padding:"10px 14px",background:ds.color.redLight,borderRadius:ds.radius.md,fontSize:13,color:ds.color.red}}>{errMsg}</div>}
+        </div>
+        <div style={{padding:"16px 28px",borderTop:`1px solid ${ds.color.border}`,display:"flex",justifyContent:"flex-end",gap:8}}>
+          <Btn variant="outline" size="md" onClick={onClose}>Cancel</Btn>
+          <Btn variant="primary" size="md" disabled={saving} onClick={handleSave}>{saving?"Saving…":"💾 Save"}</Btn>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── v13.0a: BACKUP UTILITY ──────────────────────────────────────────────────
+async function performFullBackup(){
+  try {
+    const collections = ["orders","customers","products","rxUploads"];
+    const backup = { exportedAt: new Date().toISOString(), exportedBy: "DMEAST Admin" };
+    for (const col of collections) {
+      const snap = await getDocs(collection(db, col));
+      backup[col] = snap.docs.map(d => {
+        const data = d.data();
+        // Convert Firestore timestamps to ISO strings
+        Object.keys(data).forEach(k => {
+          if (data[k]?.toDate) data[k] = data[k].toDate().toISOString();
+        });
+        return { id: d.id, ...data };
+      });
+    }
+    const blob = new Blob([JSON.stringify(backup, null, 2)], {type:"application/json"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "dmeast-backup-"+new Date().toISOString().slice(0,10)+".json";
+    a.click();
+    URL.revokeObjectURL(url);
+    // Mark backup completed
+    localStorage.setItem("dmeast-last-backup", new Date().toISOString());
+    return { ok: true, counts: collections.reduce((acc,c) => ({...acc,[c]:backup[c].length}), {}) };
+  } catch(e) {
+    console.error("Backup failed:", e);
+    return { ok: false, error: e.message };
+  }
+}
+
+function BackupReminder(){
+  const [show, setShow] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [msg,  setMsg]  = useState("");
+  
+  useEffect(()=>{
+    const last = localStorage.getItem("dmeast-last-backup");
+    if (!last) { setShow(true); return; }
+    const days = (Date.now() - new Date(last).getTime()) / (1000*60*60*24);
+    if (days >= 7) setShow(true);
+  },[]);
+  
+  if (!show) return null;
+  
+  const last = localStorage.getItem("dmeast-last-backup");
+  const lastStr = last ? new Date(last).toLocaleDateString("en-PH",{year:"numeric",month:"short",day:"numeric"}) : "Never";
+  
+  const handleBackup = async () => {
+    setBusy(true); setMsg("");
+    const r = await performFullBackup();
+    setBusy(false);
+    if (r.ok) {
+      setMsg("✓ Backup downloaded! "+Object.entries(r.counts).map(([k,v])=>`${k}: ${v}`).join(" · "));
+      setTimeout(()=>setShow(false), 3000);
+    } else {
+      setMsg("⚠ Backup failed: "+r.error);
+    }
+  };
+  
+  return (
+    <div style={{background:ds.color.goldLight,border:`1px solid ${ds.color.goldBorder}`,borderRadius:ds.radius.lg,padding:"14px 18px",marginBottom:16,display:"flex",justifyContent:"space-between",alignItems:"center",gap:14,flexWrap:"wrap"}}>
+      <div>
+        <div style={{fontSize:13,fontWeight:700,color:ds.color.gold}}>📥 Time for your weekly backup</div>
+        <div style={{fontSize:12,color:ds.color.textMuted,marginTop:2}}>Last backup: {lastStr}. Download a full data backup as JSON.</div>
+        {msg&&<div style={{fontSize:12,color:msg.startsWith("⚠")?ds.color.red:ds.color.success,marginTop:4,fontWeight:600}}>{msg}</div>}
+      </div>
+      <div style={{display:"flex",gap:6}}>
+        <button onClick={()=>setShow(false)} style={{background:"none",border:"none",cursor:"pointer",fontSize:12,color:ds.color.textMuted,fontFamily:ds.font.body,padding:"6px 10px"}}>Dismiss</button>
+        <Btn variant="gold" size="sm" disabled={busy} onClick={handleBackup}>{busy?"Backing up…":"📥 Download Backup"}</Btn>
+      </div>
+    </div>
+  );
+}
+
+
 function AdminDashboard(){
   const { products: PRODUCTS, refresh: refreshProducts } = useProducts();
   const [tab,setTab]=useState("overview");
@@ -1406,6 +2201,13 @@ function AdminDashboard(){
   const [editingProduct,setEditingProduct]=useState(null);
   const [seeding,setSeeding]=useState(false);
   const [seedingMessage,setSeedingMessage]=useState("");
+  // v13.0a state
+  const [showNewOrderModal,setShowNewOrderModal]=useState(false);
+  const [showCustomerEditor,setShowCustomerEditor]=useState(null); // null or customer obj
+  const [orderSourceFilter,setOrderSourceFilter]=useState("all");
+  const [orderSearch,setOrderSearch]=useState("");
+  const [customerSearch,setCustomerSearch]=useState("");
+  const [customerTagFilter,setCustomerTagFilter]=useState("all");
 
   useEffect(()=>{
     (async()=>{
@@ -1635,7 +2437,30 @@ function AdminDashboard(){
     </div>
   );
 
-  const tabs=[{id:"overview",label:"Overview",icon:"📊"},{id:"orders",label:`Orders${pendingPaymentCount>0?" 🔔":""}`,icon:"📦"},{id:"products",label:"Products",icon:"🗂️"},{id:"customers",label:"Customers",icon:"👥"},{id:"rx",label:"Rx Uploads",icon:"💊"}];
+
+  // v13.0a: Mark a credit order as paid
+  const markOrderPaid = async (orderId) => {
+    try {
+      await updateDoc(doc(db,"orders",orderId), {
+        paymentStatus: "confirmed",
+        paidAt: serverTimestamp(),
+        status: "confirmed",
+      });
+      // Refresh
+      setOrders(prev => prev.map(o => o.id===orderId ? {...o, paymentStatus:"confirmed", status:"confirmed"} : o));
+    } catch(e) { alert("Failed: "+e.message); }
+  };
+
+  // v13.0a: Refresh data (after creating new order/customer)
+  const refreshData = async () => {
+    try {
+      const oSnap=await getDocs(query(collection(db,"orders"),orderBy("createdAt","desc")));
+      setOrders(oSnap.docs.map(d=>({id:d.id,...d.data()})));
+      const cSnap=await getDocs(collection(db,"customers"));
+      setCustomers(cSnap.docs.map(d=>({id:d.id,...d.data()})));
+    } catch(_){}
+  };
+  const tabs=[{id:"overview",label:"Overview",icon:"📊"},{id:"orders",label:`Orders${pendingPaymentCount>0?" 🔔":""}`,icon:"📦"},{id:"receivables",label:"Receivables",icon:"💰"},{id:"products",label:"Products",icon:"🗂️"},{id:"customers",label:"Customers",icon:"👥"},{id:"rx",label:"Rx Uploads",icon:"💊"}];
 
   return(
     <div style={{paddingTop:67,background:ds.color.canvas,minHeight:"100vh"}}>
@@ -1660,6 +2485,13 @@ function AdminDashboard(){
 
         {tab==="overview"&&(
           <div>
+              <div style={{display:"flex",justifyContent:"flex-end",marginBottom:16}}>
+                <button onClick={async()=>{
+                  if(!confirm("Download a full backup of orders, customers, products, and Rx uploads as JSON?")) return;
+                  const r=await performFullBackup();
+                  alert(r.ok?("✓ Backup downloaded! "+Object.entries(r.counts).map(([k,v])=>k+": "+v).join(" · ")):("⚠ "+r.error));
+                }} style={{padding:"8px 14px",borderRadius:ds.radius.md,border:`1px solid ${ds.color.gold}`,background:ds.color.goldLight,cursor:"pointer",fontSize:12,fontWeight:700,color:ds.color.gold,fontFamily:ds.font.body}}>📥 Download Backup</button>
+              </div>
             <div className="dm-grid-4" style={{marginBottom:32}}>
               {[{icon:"📦",label:"Total Orders",value:orders.length,color:ds.color.red},{icon:"🔔",label:"Payments to Review",value:pendingPaymentCount,color:"#1E40AF"},{icon:"💰",label:"Total Revenue",value:formatPHP(totalRevenue),color:ds.color.success},{icon:"👥",label:"Customers",value:customers.length,color:"#6366F1"}].map((s,i)=>(
                 <div key={i} style={{background:"#fff",border:`1px solid ${ds.color.border}`,borderRadius:ds.radius.lg,padding:"20px 22px",boxShadow:ds.shadow.xs,borderTop:`3px solid ${s.color}`}}>
@@ -1701,16 +2533,39 @@ function AdminDashboard(){
 
         {tab==="orders"&&(
           <div style={{background:"#fff",border:`1px solid ${ds.color.border}`,borderRadius:ds.radius.lg,padding:"24px 28px",boxShadow:ds.shadow.xs}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16,flexWrap:"wrap",gap:10}}>
               <div style={{fontFamily:ds.font.display,fontSize:18,color:ds.color.textDark}}>All Orders ({orders.length})</div>
-              <Btn variant="outline" size="sm" onClick={exportCSV}>⬇️ CSV</Btn>
+              <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                <Btn variant="primary" size="sm" onClick={()=>setShowNewOrderModal(true)}>+ New Order</Btn>
+                <Btn variant="outline" size="sm" onClick={exportCSV}>⬇️ CSV</Btn>
+              </div>
+            </div>
+            {/* v13.0a: Source filter and search */}
+            <div style={{display:"flex",gap:8,marginBottom:14,flexWrap:"wrap",alignItems:"center"}}>
+              <input value={orderSearch} onChange={e=>setOrderSearch(e.target.value)} placeholder="🔍 Search orders…" style={{padding:"6px 10px",borderRadius:ds.radius.sm,border:`1px solid ${ds.color.border}`,fontSize:12,fontFamily:ds.font.body,outline:"none",width:160}}/>
+              <button onClick={()=>setOrderSourceFilter("all")} style={{padding:"5px 10px",borderRadius:ds.radius.pill,border:`1px solid ${orderSourceFilter==="all"?ds.color.red:ds.color.border}`,background:orderSourceFilter==="all"?ds.color.redLight:"#fff",color:orderSourceFilter==="all"?ds.color.red:ds.color.textBody,cursor:"pointer",fontSize:11.5,fontWeight:600,fontFamily:ds.font.body}}>All Sources</button>
+              {ORDER_SOURCES.map(s=>(
+                <button key={s.id} onClick={()=>setOrderSourceFilter(s.id)} style={{padding:"5px 10px",borderRadius:ds.radius.pill,border:`1px solid ${orderSourceFilter===s.id?s.color:ds.color.border}`,background:orderSourceFilter===s.id?s.color+"22":"#fff",color:orderSourceFilter===s.id?s.color:ds.color.textBody,cursor:"pointer",fontSize:11.5,fontWeight:600,fontFamily:ds.font.body}}>{s.icon} {s.label}</button>
+              ))}
             </div>
             {pendingPaymentCount>0&&(
               <div style={{background:"#DBEAFE",border:"1px solid #93C5FD",borderRadius:ds.radius.md,padding:"12px 16px",marginBottom:16,fontSize:13,color:"#1E40AF"}}>
                 🔔 <strong>{pendingPaymentCount} payment proof{pendingPaymentCount!==1?"s":""} awaiting your review.</strong> Click "Confirm Payment" or "Reject Payment" on each order below.
               </div>
             )}
-            {orders.length===0?<div style={{textAlign:"center",padding:"40px 0",color:ds.color.textMuted}}>No orders yet.</div>:orders.map(o=>{
+            {(()=>{
+              const filteredOrders = orders.filter(o=>{
+                if(orderSourceFilter!=="all" && (o.source||"website")!==orderSourceFilter) return false;
+                if(orderSearch.trim()){
+                  const q = orderSearch.toLowerCase();
+                  return (o.name||"").toLowerCase().includes(q) ||
+                         (o.email||"").toLowerCase().includes(q) ||
+                         (o.phone||"").toLowerCase().includes(q) ||
+                         (o.id||"").toLowerCase().includes(q);
+                }
+                return true;
+              });
+              return filteredOrders.length===0?<div style={{textAlign:"center",padding:"40px 0",color:ds.color.textMuted}}>{orders.length===0?"No orders yet.":"No orders match the current filter."}</div>:filteredOrders.map(o=>{
               const sc=orderStatusColor(o.status||"pending");
               const psc=paymentStatusColor(o.paymentStatus||"awaiting");
               const isOOS = o.status==="out_of_stock";
@@ -1720,6 +2575,8 @@ function AdminDashboard(){
                   <div style={{background:needsReview?"#DBEAFE":isOOS?"#FFF7ED":ds.color.canvas,padding:"12px 18px",display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10}}>
                     <div>
                       <span style={{fontWeight:700,color:ds.color.textDark,fontSize:14}}>#{o.id.slice(-6).toUpperCase()}</span>
+                      {(()=>{const src=findSource(o.source||"website");return <span style={{fontSize:10,marginLeft:8,padding:"2px 7px",background:src.color+"22",color:src.color,borderRadius:ds.radius.pill,fontWeight:700}}>{src.icon} {src.label}</span>;})()}
+                      {o.createdByAdmin&&<span style={{fontSize:10,marginLeft:5,padding:"2px 7px",background:ds.color.goldLight,color:ds.color.gold,borderRadius:ds.radius.pill,fontWeight:700}}>👤 Admin</span>}
                       <span style={{fontSize:12,color:ds.color.textMuted,marginLeft:12}}>{o.name||"Guest"}</span>
                       <span style={{fontSize:12,color:ds.color.textMuted,marginLeft:8}}>· {o.email||"—"}</span>
                       {o.uid&&o.uid!=="guest"&&<span style={{fontSize:10,marginLeft:8,padding:"2px 6px",background:ds.color.successBg,color:ds.color.success,borderRadius:ds.radius.pill,fontWeight:700}}>✓ Registered</span>}
@@ -1775,8 +2632,13 @@ function AdminDashboard(){
                   </div>
                 </div>
               );
-            })}
+            });
+            })()}
           </div>
+        )}
+
+        {tab==="receivables"&&(
+          <ReceivablesTab orders={orders} onMarkPaid={markOrderPaid}/>
         )}
 
         {tab==="products"&&(
@@ -1853,28 +2715,72 @@ function AdminDashboard(){
 
         {tab==="customers"&&(
           <div style={{background:"#fff",border:`1px solid ${ds.color.border}`,borderRadius:ds.radius.lg,padding:"24px 28px",boxShadow:ds.shadow.xs}}>
-            <div style={{fontFamily:ds.font.display,fontSize:18,color:ds.color.textDark,marginBottom:20}}>Customers ({customers.length})</div>
-            {customers.length===0?<div style={{textAlign:"center",padding:"40px 0",color:ds.color.textMuted}}>No registered customers yet.</div>:(
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16,flexWrap:"wrap",gap:10}}>
+              <div style={{fontFamily:ds.font.display,fontSize:18,color:ds.color.textDark}}>Customers ({customers.length})</div>
+              <Btn variant="primary" size="sm" onClick={()=>setShowCustomerEditor({})}>+ New Customer</Btn>
+            </div>
+            {/* v13.0a: Customer search + tag filter */}
+            <div style={{display:"flex",gap:8,marginBottom:14,flexWrap:"wrap",alignItems:"center"}}>
+              <input value={customerSearch} onChange={e=>setCustomerSearch(e.target.value)} placeholder="🔍 Search by name, email, phone…" style={{padding:"6px 10px",borderRadius:ds.radius.sm,border:`1px solid ${ds.color.border}`,fontSize:12,fontFamily:ds.font.body,outline:"none",width:200}}/>
+              <button onClick={()=>setCustomerTagFilter("all")} style={{padding:"5px 10px",borderRadius:ds.radius.pill,border:`1px solid ${customerTagFilter==="all"?ds.color.red:ds.color.border}`,background:customerTagFilter==="all"?ds.color.redLight:"#fff",color:customerTagFilter==="all"?ds.color.red:ds.color.textBody,cursor:"pointer",fontSize:11.5,fontWeight:600,fontFamily:ds.font.body}}>All</button>
+              {CUSTOMER_TAGS.map(t=>(
+                <button key={t.id} onClick={()=>setCustomerTagFilter(t.id)} style={{padding:"5px 10px",borderRadius:ds.radius.pill,border:`1px solid ${customerTagFilter===t.id?t.color:ds.color.border}`,background:customerTagFilter===t.id?t.color+"22":"#fff",color:customerTagFilter===t.id?t.color:ds.color.textBody,cursor:"pointer",fontSize:11.5,fontWeight:600,fontFamily:ds.font.body}}>{t.label}</button>
+              ))}
+            </div>
+            {(()=>{
+              const filteredCustomers = customers.filter(c=>{
+                if(customerTagFilter!=="all"){
+                  if(!c.tags||!c.tags.includes(customerTagFilter)) return false;
+                }
+                if(customerSearch.trim()){
+                  const q = customerSearch.toLowerCase();
+                  return (c.name||"").toLowerCase().includes(q) ||
+                         (c.email||"").toLowerCase().includes(q) ||
+                         (c.phone||"").toLowerCase().includes(q);
+                }
+                return true;
+              });
+              return filteredCustomers.length===0?(
+                <div style={{textAlign:"center",padding:"40px 0",color:ds.color.textMuted}}>{customers.length===0?"No customers yet. Click \"+ New Customer\" to add one.":"No customers match the current filter."}</div>
+              ):(
               <div style={{overflowX:"auto"}}>
                 <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
                   <thead><tr style={{borderBottom:`2px solid ${ds.color.border}`}}>
-                    {["Name","Email","Orders","Total Spent","Points","Joined"].map(h=><th key={h} style={{textAlign:"left",padding:"10px 12px",fontWeight:700,color:ds.color.textDark,fontSize:11,textTransform:"uppercase",letterSpacing:"0.08em"}}>{h}</th>)}
+                    {["Name","Contact","Tags","Orders","Spent","Points","Action"].map(h=><th key={h} style={{textAlign:"left",padding:"10px 12px",fontWeight:700,color:ds.color.textDark,fontSize:11,textTransform:"uppercase",letterSpacing:"0.08em"}}>{h}</th>)}
                   </tr></thead>
                   <tbody>
-                    {customers.map(c=>(
+                    {filteredCustomers.map(c=>(
                       <tr key={c.id} style={{borderBottom:`1px solid ${ds.color.borderLight}`}}>
-                        <td style={{padding:"12px",fontWeight:600,color:ds.color.textDark}}>{c.name||"—"}</td>
-                        <td style={{padding:"12px",color:ds.color.textBody}}>{c.email||"—"}</td>
+                        <td style={{padding:"12px",fontWeight:600,color:ds.color.textDark}}>
+                          {c.name||"—"}
+                          {c.source==="manual"&&<span style={{fontSize:9,marginLeft:6,padding:"2px 6px",background:ds.color.canvas,borderRadius:ds.radius.pill,color:ds.color.textMuted}}>OFFLINE</span>}
+                        </td>
+                        <td style={{padding:"12px",color:ds.color.textBody,fontSize:12}}>
+                          {c.email||"—"}<br/>
+                          <span style={{color:ds.color.textMuted}}>{c.phone||"—"}</span>
+                        </td>
+                        <td style={{padding:"12px"}}>
+                          <div style={{display:"flex",flexWrap:"wrap",gap:3}}>
+                            {(c.tags||[]).map(t=>{
+                              const tag = findTag(t);
+                              return tag?<span key={t} style={{fontSize:10,padding:"2px 7px",borderRadius:ds.radius.pill,background:tag.color+"22",color:tag.color,fontWeight:600}}>{tag.label}</span>:null;
+                            })}
+                            {(!c.tags||c.tags.length===0)&&<span style={{fontSize:11,color:ds.color.textLight}}>—</span>}
+                          </div>
+                        </td>
                         <td style={{padding:"12px",color:ds.color.textMuted}}>{c.totalOrders||0}</td>
-                        <td style={{padding:"12px",fontWeight:600,color:ds.color.success}}>{formatPHP(c.totalSpent||0)}</td>
-                        <td style={{padding:"12px",color:ds.color.gold,fontWeight:600}}>{(c.points||0).toLocaleString()}</td>
-                        <td style={{padding:"12px",color:ds.color.textMuted}}>{formatDate(c.createdAt)}</td>
+                        <td style={{padding:"12px",fontWeight:600,color:ds.color.success,fontSize:12}}>{formatPHP(c.totalSpent||0)}</td>
+                        <td style={{padding:"12px",color:ds.color.gold,fontWeight:600,fontSize:12}}>{(c.points||0).toLocaleString()}</td>
+                        <td style={{padding:"12px"}}>
+                          <button onClick={()=>setShowCustomerEditor(c)} style={{padding:"4px 10px",borderRadius:ds.radius.sm,border:`1px solid ${ds.color.border}`,background:"#fff",cursor:"pointer",fontSize:11,fontWeight:600,color:ds.color.textBody,fontFamily:ds.font.body}}>✏️ Edit</button>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
-            )}
+              );
+            })()}
           </div>
         )}
 
@@ -1917,6 +2823,24 @@ function AdminDashboard(){
         )}
       </div>
       {editingProduct && <ProductEditModal product={editingProduct} onSave={saveProduct} onClose={()=>setEditingProduct(null)}/>}
+      
+      {/* v13.0a Modals */}
+      {showNewOrderModal && (
+        <NewOrderModal
+          onClose={()=>setShowNewOrderModal(false)}
+          onSaved={refreshData}
+          customers={customers}
+          products={PRODUCTS}
+        />
+      )}
+      {showCustomerEditor !== null && (
+        <CustomerEditorModal
+          customer={showCustomerEditor}
+          onClose={()=>setShowCustomerEditor(null)}
+          onSaved={refreshData}
+        />
+      )}
+      <BackupReminder/>
     </div>
   );
 }
