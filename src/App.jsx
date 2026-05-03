@@ -1,5 +1,11 @@
 /**
- * DMEAST — Medical Solutions Platform  v15
+ * DMEAST — Medical Solutions Platform  v15.1
+ *
+ * v15.1 ROLE ACTIVATION:
+ * - 🔧 ops@dmeastph.com activated as Operations Admin
+ * - 💼 accounting@dmeastph.com activated as Accounting Admin
+ * - 🔒 Hardened per-action permissions (delete/edit/new order respect role)
+ * - 📌 Note: Both accounts must be created in Firebase Auth first
  *
  * v15 NEW FEATURES:
  * - 👑 Role-Based Access Control (Super Admin / Operations / Accounting)
@@ -89,11 +95,17 @@ const ADMIN_EMAILS = ["info@dmeastph.com", "admin@dmeastph.com"]; // Legacy - ke
 // ─── v15 ROLE-BASED ACCESS CONTROL ───────────────────────────────────────────
 // Map admin emails to their role. Edit this list to add/remove staff.
 const ADMIN_ROLES = {
-  "info@dmeastph.com":       "super",        // Edward (owner) — full access
-  "admin@dmeastph.com":      "super",        // Edward (alt)
-  // Future staff (uncomment and customize as you hire):
-  // "ops@dmeastph.com":        "operations",   // Sales/order processor
-  // "accounting@dmeastph.com": "accounting",   // Accountant/finance
+  // 👑 SUPER ADMINS (Edward - owner) — full access to everything
+  "info@dmeastph.com":       "super",
+  "admin@dmeastph.com":      "super",
+  // 🔧 OPERATIONS ADMIN — sales coordinator / order processor
+  // Sees: Overview, Orders, Receivables, Products, Customers, Rx
+  // Cannot: see margins/expenses/billings/profits, delete orders
+  "ops@dmeastph.com":        "operations",
+  // 💼 ACCOUNTING ADMIN — bookkeeper / finance / accountant
+  // Sees: Overview, Receivables, Expenses, Billings, Margin, Customers (read-only)
+  // Cannot: edit orders or products, manage prescriptions
+  "accounting@dmeastph.com": "accounting",
 };
 
 // Role definitions and what each can access
@@ -3896,7 +3908,7 @@ function MarginDashboardTab({ orders, expenses }){
 // ─── v13.0c: ORDER EDITOR MODAL ──────────────────────────────────────────────
 // Lets admin edit any field on an existing order: customer info, items, charges,
 // payment method, source, status, supplier cost, notes, address, recipient
-function OrderEditorModal({ order, products: existingProducts, onClose, onSaved, onDeleted, onGeneratePDF, showMarginFields = true }){
+function OrderEditorModal({ order, products: existingProducts, onClose, onSaved, onDeleted, onGeneratePDF, showMarginFields = true, canDelete = true, canEdit = true }){
   const [tab, setTab] = useState("info"); // info | items | details
   
   // Customer info
@@ -4268,7 +4280,7 @@ function OrderEditorModal({ order, products: existingProducts, onClose, onSaved,
         {/* Footer */}
         <div style={{padding:"14px 28px",borderTop:`1px solid ${ds.color.border}`,display:"flex",justifyContent:"space-between",alignItems:"center",gap:8,flexWrap:"wrap"}}>
           <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-            <button onClick={handleDelete} style={{padding:"7px 14px",borderRadius:ds.radius.sm,border:`1px solid ${ds.color.red}`,background:"#fff",color:ds.color.red,cursor:"pointer",fontSize:12,fontWeight:600,fontFamily:ds.font.body}}>🗑️ Delete Order</button>
+            {canDelete && <button onClick={handleDelete} style={{padding:"7px 14px",borderRadius:ds.radius.sm,border:`1px solid ${ds.color.red}`,background:"#fff",color:ds.color.red,cursor:"pointer",fontSize:12,fontWeight:600,fontFamily:ds.font.body}}>🗑️ Delete Order</button>}
             {onGeneratePDF && <button onClick={()=>onGeneratePDF({id:order.id,...order,name,email,phone,address,instructions,items:items.map(i=>({id:i.productId,name:i.name,price:i.unitPrice,qty:i.qty,requiresPrescription:!!i.requiresPrescription})),otherCharges:otherCharges.filter(c=>c.description&&c.amount),total,paymentMethod,paymentTerms,source})} style={{padding:"7px 14px",borderRadius:ds.radius.sm,border:`1px solid ${ds.color.red}`,background:ds.color.redLight,color:ds.color.red,cursor:"pointer",fontSize:12,fontWeight:700,fontFamily:ds.font.body}}>📄 Generate Document</button>}
           </div>
           <div style={{display:"flex",gap:8,alignItems:"center"}}>
@@ -4276,7 +4288,11 @@ function OrderEditorModal({ order, products: existingProducts, onClose, onSaved,
               Total: <strong style={{color:ds.color.red,fontSize:14}}>{formatPHP(total)}</strong>
             </span>
             <Btn variant="outline" size="md" onClick={onClose}>Cancel</Btn>
-            <Btn variant="primary" size="md" disabled={saving} onClick={handleSave}>{saving?"Saving…":"💾 Save Changes"}</Btn>
+            {canEdit ? (
+              <Btn variant="primary" size="md" disabled={saving} onClick={handleSave}>{saving?"Saving…":"💾 Save Changes"}</Btn>
+            ) : (
+              <Btn variant="outline" size="md" disabled={true}>🔒 Read-Only</Btn>
+            )}
           </div>
         </div>
       </div>
@@ -4708,7 +4724,7 @@ function AdminDashboard({ user }){
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16,flexWrap:"wrap",gap:10}}>
               <div style={{fontFamily:ds.font.display,fontSize:18,color:ds.color.textDark}}>All Orders ({orders.length})</div>
               <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-                <Btn variant="primary" size="sm" onClick={()=>setShowNewOrderModal(true)}>+ New Order</Btn>
+                {userPerms?.canEditOrders !== false && <Btn variant="primary" size="sm" onClick={()=>setShowNewOrderModal(true)}>+ New Order</Btn>}
                 <Btn variant="outline" size="sm" onClick={exportCSV}>⬇️ CSV</Btn>
               </div>
             </div>
@@ -4913,7 +4929,7 @@ function AdminDashboard({ user }){
           <div style={{background:"#fff",border:`1px solid ${ds.color.border}`,borderRadius:ds.radius.lg,padding:"24px 28px",boxShadow:ds.shadow.xs}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16,flexWrap:"wrap",gap:10}}>
               <div style={{fontFamily:ds.font.display,fontSize:18,color:ds.color.textDark}}>Customers ({customers.length})</div>
-              <Btn variant="primary" size="sm" onClick={()=>setShowCustomerEditor({})}>+ New Customer</Btn>
+              {userPerms?.canEditOrders !== false && <Btn variant="primary" size="sm" onClick={()=>setShowCustomerEditor({})}>+ New Customer</Btn>}
             </div>
             {/* v13.0a: Customer search + tag filter */}
             <div style={{display:"flex",gap:8,marginBottom:14,flexWrap:"wrap",alignItems:"center"}}>
@@ -4968,7 +4984,7 @@ function AdminDashboard({ user }){
                         <td style={{padding:"12px",fontWeight:600,color:ds.color.success,fontSize:12}}>{formatPHP(c.totalSpent||0)}</td>
                         <td style={{padding:"12px",color:ds.color.gold,fontWeight:600,fontSize:12}}>{(c.points||0).toLocaleString()}</td>
                         <td style={{padding:"12px"}}>
-                          <button onClick={()=>setShowCustomerEditor(c)} style={{padding:"4px 10px",borderRadius:ds.radius.sm,border:`1px solid ${ds.color.border}`,background:"#fff",cursor:"pointer",fontSize:11,fontWeight:600,color:ds.color.textBody,fontFamily:ds.font.body}}>✏️ Edit</button>
+                          {userPerms?.canEditOrders !== false ? (<button onClick={()=>setShowCustomerEditor(c)} style={{padding:"4px 10px",borderRadius:ds.radius.sm,border:`1px solid ${ds.color.border}`,background:"#fff",cursor:"pointer",fontSize:11,fontWeight:600,color:ds.color.textBody,fontFamily:ds.font.body}}>✏️ Edit</button>) : (<span style={{fontSize:11,color:ds.color.textLight}}>🔒</span>)}
                         </td>
                       </tr>
                     ))}
@@ -5060,6 +5076,8 @@ function AdminDashboard({ user }){
           onDeleted={handleOrderDeleted}
           onGeneratePDF={(o)=>{setShowOrderEditor(null); setShowPDFModal(o);}}
           showMarginFields={userPerms?.canSeeMargins !== false}
+          canDelete={userPerms?.canDeleteOrders === true}
+          canEdit={userPerms?.canEditOrders === true}
         />
       )}
       {showPDFModal !== null && (
