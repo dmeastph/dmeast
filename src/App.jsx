@@ -4313,6 +4313,13 @@ function AdminDashboard({ user }){
   const [showPDFModal,setShowPDFModal]=useState(null); // null or order obj
   const userRole = user ? getUserRole(user.email) : null;
   const userPerms = userRole ? ROLE_PERMISSIONS[userRole] : null;
+  
+  // v15: If current tab not accessible by role, switch to first available
+  useEffect(()=>{
+    if(userPerms && !userPerms.tabs.includes(tab) && userPerms.tabs.length>0){
+      setTab(userPerms.tabs[0]);
+    }
+  },[userPerms, tab]);
 
   useEffect(()=>{
     (async()=>{
@@ -4619,8 +4626,6 @@ function AdminDashboard({ user }){
   const allTabs=[{id:"overview",label:"Overview",icon:"📊"},{id:"orders",label:`Orders${pendingPaymentCount>0?" 🔔":""}`,icon:"📦"},{id:"receivables",label:"Receivables",icon:"💰"},{id:"expenses",label:"Expenses",icon:"🏢"},{id:"billings",label:"Billings",icon:"📝"},{id:"margin",label:"Margin",icon:"📈"},{id:"products",label:"Products",icon:"🗂️"},{id:"customers",label:"Customers",icon:"👥"},{id:"rx",label:"Rx Uploads",icon:"💊"}];
   // v15: Filter tabs based on user role
   const tabs = userPerms ? allTabs.filter(t=>userPerms.tabs.includes(t.id)) : allTabs;
-  // If current tab is no longer accessible, switch to first available
-  useEffect(()=>{ if(userPerms && !userPerms.tabs.includes(tab) && tabs.length>0){ setTab(tabs[0].id); } },[userPerms, tab]);
 
   return(
     <div style={{paddingTop:67,background:ds.color.canvas,minHeight:"100vh"}}>
@@ -6800,7 +6805,7 @@ export default function App(){
 
   const handleSignIn=()=>setShowAuth(true);
   const handleSignOut=async()=>{await signOut(auth);setPage("home");};
-  const handleAuthSuccess=u=>{setShowAuth(false);setUser(u);setIsAdmin(ADMIN_EMAILS.includes(u.email?.toLowerCase()));};
+  const handleAuthSuccess=u=>{setShowAuth(false);setUser(u);setIsAdmin(isAdminUser(u.email));};
 
   const addToCart=useCallback(product=>{
     setCart(c=>{const e=c.find(i=>i.id===product.id);return e?c.map(i=>i.id===product.id?{...i,qty:i.qty+1}:i):[...c,{...product,qty:1}];});
