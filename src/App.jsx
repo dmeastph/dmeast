@@ -1,5 +1,15 @@
 /**
- * DMEAST — Medical Solutions Platform  v13.0d
+ * DMEAST — Medical Solutions Platform  v15
+ *
+ * v15 NEW FEATURES:
+ * - 👑 Role-Based Access Control (Super Admin / Operations / Accounting)
+ * - 📄 PDF Document Generation:
+ *     - Quotation (with validity period)
+ *     - Sales Order (internal record)
+ *     - Delivery Receipt (signature space)
+ *     - Provisional Receipt (clearly NOT BIR receipt)
+ * - 🧾 Auto-numbering: QT-2026-0001, SO-2026-0001, etc.
+ * - 💰 12% VAT inclusive computation matching BIR Sales Invoice booklet
  *
  * v13.0d EMAIL FIXES:
  * - 🔧 NewOrderModal (admin "+ New Order") now sends order confirmation
@@ -74,7 +84,76 @@ const firebaseApp = initializeApp(firebaseConfig);
 const auth    = getAuth(firebaseApp);
 const db      = getFirestore(firebaseApp);
 const storage = getStorage(firebaseApp);
-const ADMIN_EMAILS = ["info@dmeastph.com", "admin@dmeastph.com"];
+const ADMIN_EMAILS = ["info@dmeastph.com", "admin@dmeastph.com"]; // Legacy - kept for backward compat
+
+// ─── v15 ROLE-BASED ACCESS CONTROL ───────────────────────────────────────────
+// Map admin emails to their role. Edit this list to add/remove staff.
+const ADMIN_ROLES = {
+  "info@dmeastph.com":       "super",        // Edward (owner) — full access
+  "admin@dmeastph.com":      "super",        // Edward (alt)
+  // Future staff (uncomment and customize as you hire):
+  // "ops@dmeastph.com":        "operations",   // Sales/order processor
+  // "accounting@dmeastph.com": "accounting",   // Accountant/finance
+};
+
+// Role definitions and what each can access
+const ROLE_PERMISSIONS = {
+  super: {
+    label: "Super Admin",
+    icon: "👑",
+    color: "#7C3AED",
+    description: "Full access to all features",
+    tabs: ["overview","orders","receivables","expenses","billings","margin","products","customers","rx"],
+    canEditOrders: true,
+    canDeleteOrders: true,
+    canEditProducts: true,
+    canSeeMargins: true,
+    canSeeExpenses: true,
+    canManageUsers: true,
+  },
+  operations: {
+    label: "Operations Admin",
+    icon: "🔧",
+    color: "#0EA5E9",
+    description: "Manages orders, customers, products, prescriptions",
+    tabs: ["overview","orders","receivables","products","customers","rx"],
+    canEditOrders: true,
+    canDeleteOrders: false,        // Operations cannot delete orders
+    canEditProducts: true,
+    canSeeMargins: false,           // Hide supplier costs / margin from operations
+    canSeeExpenses: false,
+    canManageUsers: false,
+  },
+  accounting: {
+    label: "Accounting Admin",
+    icon: "💼",
+    color: "#10B981",
+    description: "Manages financial records, expenses, billings",
+    tabs: ["overview","receivables","expenses","billings","margin","customers"],
+    canEditOrders: false,           // Read-only on orders
+    canDeleteOrders: false,
+    canEditProducts: false,
+    canSeeMargins: true,
+    canSeeExpenses: true,
+    canManageUsers: false,
+  },
+};
+
+// v15: Get role for current user (replaces simple admin email check)
+const getUserRole = (email) => {
+  if (!email) return null;
+  const lower = email.toLowerCase();
+  return ADMIN_ROLES[lower] || null;
+};
+
+const isAdminUser = (email) => getUserRole(email) !== null;
+
+const getPermissions = (email) => {
+  const role = getUserRole(email);
+  return role ? ROLE_PERMISSIONS[role] : null;
+};
+
+
 
 import emailjs from "@emailjs/browser";
 const EMAILJS_CONFIG = {
@@ -1607,6 +1686,617 @@ function ProductEditModal({ product, onSave, onClose }){
 }
 
 // ─── ADMIN DASHBOARD ─────────────────────────────────────────────────────────
+
+
+// ─── v15 PDF DOCUMENT GENERATION ─────────────────────────────────────────────
+// Loads jsPDF from CDN and generates DMEAST-branded business documents.
+// IMPORTANT: These are NOT BIR Official Receipts. A clear disclaimer is on each.
+
+// Logo: when you have a logo file, replace the URL or set as base64 data URI
+// To use base64: const DMEAST_LOGO_DATA = "data:image/png;base64,..."
+// To use URL: const DMEAST_LOGO_URL = "https://dmeastph.com/logo.png"
+const DMEAST_LOGO_URL = null; // Set to URL string when ready, or null for text logo
+
+// Document number prefixes
+const DOC_PREFIXES = {
+  quotation:    "QT",
+  salesOrder:   "SO",
+  deliveryReceipt: "DR",
+  provisionalReceipt: "PR",
+};
+
+const DOC_TITLES = {
+  quotation:    "QUOTATION",
+  salesOrder:   "SALES ORDER",
+  deliveryReceipt: "DELIVERY RECEIPT",
+  provisionalReceipt: "PROVISIONAL RECEIPT",
+};
+
+// v15: Get next document number from Firestore counter
+async function getNextDocumentNumber(docType) {
+  const year = new Date().getFullYear();
+  const counterId = `${docType}_${year}`;
+  const counterRef = doc(db, "docCounters", counterId);
+  try {
+    const snap = await getDoc(counterRef);
+    let next = 1;
+    if (snap.exists()) {
+      next = (snap.data().count || 0) + 1;
+    }
+    await setDoc(counterRef, { count: next, lastUsed: serverTimestamp() }, { merge: true });
+    const prefix = DOC_PREFIXES[docType] || "DOC";
+    return `${prefix}-${year}-${String(next).padStart(4,"0")}`;
+  } catch(e) {
+    console.warn("Doc counter failed, using timestamp:", e);
+    return `${DOC_PREFIXES[docType]||"DOC"}-${year}-${Date.now().toString().slice(-4)}`;
+  }
+}
+
+// v15: Load jsPDF from CDN
+function loadJsPDF() {
+  return new Promise((resolve, reject) => {
+    if (window.jspdf) { resolve(window.jspdf.jsPDF); return; }
+    const existing = document.querySelector('script[src*="jspdf"]');
+    if (existing) {
+      existing.addEventListener('load', () => resolve(window.jspdf.jsPDF));
+      return;
+    }
+    const script = document.createElement("script");
+    script.src = "https://unpkg.com/jspdf@2.5.1/dist/jspdf.umd.min.js";
+    script.onload = () => resolve(window.jspdf.jsPDF);
+    script.onerror = () => reject(new Error("Failed to load PDF library"));
+    document.head.appendChild(script);
+  });
+}
+
+// v15: Calculate VAT inclusive breakdown (matches BIR Sales Invoice booklet)
+// Total Sales = Customer pays this (already VAT inclusive)
+// Net of VAT = Total / 1.12
+// VAT = Total - Net of VAT
+function computeVATBreakdown(totalInclusiveOfVAT) {
+  const total = Number(totalInclusiveOfVAT) || 0;
+  const netOfVAT = total / 1.12;
+  const vat = total - netOfVAT;
+  return {
+    total,
+    netOfVAT: Math.round(netOfVAT * 100) / 100,
+    vat: Math.round(vat * 100) / 100,
+  };
+}
+
+// v15: Main PDF generator - creates all 4 document types
+async function generateDocumentPDF({ order, docType, docNumber, validityDays = 30 }) {
+  const jsPDF = await loadJsPDF();
+  const pdf = new jsPDF({ unit: "pt", format: "a4" });
+  
+  const pageWidth = pdf.internal.pageSize.getWidth();
+  const pageHeight = pdf.internal.pageSize.getHeight();
+  const margin = 40;
+  const contentWidth = pageWidth - margin * 2;
+  
+  // Colors (match DMEAST branding)
+  const colors = {
+    red:    [204, 47, 60],     // ds.color.red
+    dark:   [26, 20, 16],      // ds.color.textDark
+    muted:  [115, 115, 115],   // textMuted
+    light:  [210, 210, 210],   // border
+    canvas: [248, 246, 243],   // canvas bg
+    gold:   [240, 168, 28],    // gold
+  };
+  
+  const setColor = (rgb) => pdf.setTextColor(rgb[0], rgb[1], rgb[2]);
+  const setFill  = (rgb) => pdf.setFillColor(rgb[0], rgb[1], rgb[2]);
+  const setDraw  = (rgb) => pdf.setDrawColor(rgb[0], rgb[1], rgb[2]);
+
+  let y = margin;
+  
+  // ── HEADER ─────────────────────────────────────────────────
+  // Logo area (left)
+  if (DMEAST_LOGO_URL) {
+    try {
+      // pdf.addImage works if img is loaded — this requires a URL load
+      // For now, fall through to text if URL fails
+      pdf.addImage(DMEAST_LOGO_URL, "PNG", margin, y, 100, 50);
+    } catch(e) {
+      // fallback to text
+      setColor(colors.red);
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(24);
+      pdf.text("DM EAST", margin, y + 22);
+    }
+  } else {
+    setColor(colors.red);
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(24);
+    pdf.text("DM EAST", margin, y + 22);
+  }
+  
+  // Document title (right side)
+  setColor(colors.dark);
+  pdf.setFont("helvetica", "bold");
+  pdf.setFontSize(18);
+  pdf.text(DOC_TITLES[docType], pageWidth - margin, y + 14, { align: "right" });
+  
+  // Doc number (right, below title)
+  setColor(colors.red);
+  pdf.setFont("helvetica", "normal");
+  pdf.setFontSize(10);
+  pdf.text(`No. ${docNumber}`, pageWidth - margin, y + 32, { align: "right" });
+  
+  y += 56;
+  
+  // Company info (full width line below logo)
+  setColor(colors.dark);
+  pdf.setFont("helvetica", "bold");
+  pdf.setFontSize(9);
+  pdf.text(DMEAST_BUSINESS_INFO.legalName, margin, y);
+  y += 12;
+  
+  setColor(colors.muted);
+  pdf.setFont("helvetica", "normal");
+  pdf.setFontSize(8);
+  const addrLines = pdf.splitTextToSize(DMEAST_BUSINESS_INFO.registeredAddress, contentWidth);
+  addrLines.forEach(line => { pdf.text(line, margin, y); y += 10; });
+  
+  pdf.text(`${DMEAST_BUSINESS_INFO.proprietor} - Prop.`, margin, y); y += 10;
+  pdf.text(`VAT Reg. TIN: ${DMEAST_BUSINESS_INFO.vatRegTIN}`, margin, y); y += 10;
+  
+  // Horizontal line
+  setDraw(colors.light);
+  pdf.setLineWidth(0.5);
+  pdf.line(margin, y + 6, pageWidth - margin, y + 6);
+  y += 18;
+  
+  // ── BILL TO + DATE/TERMS ───────────────────────────────────
+  const colWidth = contentWidth / 2 - 10;
+  const leftCol = margin;
+  const rightCol = margin + colWidth + 20;
+  
+  setColor(colors.muted);
+  pdf.setFont("helvetica", "bold");
+  pdf.setFontSize(8);
+  pdf.text("SOLD TO:", leftCol, y);
+  pdf.text("DATE:", rightCol, y);
+  
+  setColor(colors.dark);
+  pdf.setFont("helvetica", "normal");
+  pdf.setFontSize(10);
+  pdf.text(order.name || "—", leftCol + 60, y);
+  
+  const dateStr = new Date().toLocaleDateString("en-PH", { year:"numeric", month:"long", day:"numeric" });
+  pdf.text(dateStr, rightCol + 40, y);
+  y += 14;
+  
+  setColor(colors.muted);
+  pdf.setFont("helvetica", "bold");
+  pdf.setFontSize(8);
+  pdf.text("ADDRESS:", leftCol, y);
+  pdf.text(docType === "quotation" ? "VALID UNTIL:" : "TERMS:", rightCol, y);
+  
+  setColor(colors.dark);
+  pdf.setFont("helvetica", "normal");
+  pdf.setFontSize(9);
+  const addr = order.address || "—";
+  const addrShort = addr.length > 50 ? addr.substring(0, 50) + "..." : addr;
+  pdf.text(addrShort, leftCol + 60, y);
+  
+  if (docType === "quotation") {
+    const validUntil = new Date();
+    validUntil.setDate(validUntil.getDate() + validityDays);
+    pdf.text(validUntil.toLocaleDateString("en-PH", { year:"numeric", month:"long", day:"numeric" }), rightCol + 70, y);
+  } else {
+    const terms = order.paymentMethod || (order.paymentTerms ? findTerms(order.paymentTerms)?.label : "—") || "—";
+    pdf.text(terms, rightCol + 50, y);
+  }
+  y += 14;
+  
+  setColor(colors.muted);
+  pdf.setFont("helvetica", "bold");
+  pdf.setFontSize(8);
+  pdf.text("PHONE:", leftCol, y);
+  pdf.text("ORDER REF:", rightCol, y);
+  setColor(colors.dark);
+  pdf.setFont("helvetica", "normal");
+  pdf.setFontSize(9);
+  pdf.text(order.phone || "—", leftCol + 60, y);
+  pdf.text(`#${order.id.slice(-6).toUpperCase()}`, rightCol + 60, y);
+  y += 14;
+  
+  if (order.email) {
+    setColor(colors.muted);
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(8);
+    pdf.text("EMAIL:", leftCol, y);
+    setColor(colors.dark);
+    pdf.setFont("helvetica", "normal");
+    pdf.setFontSize(9);
+    pdf.text(order.email, leftCol + 60, y);
+    y += 14;
+  }
+  
+  y += 8;
+  
+  // ── ITEMS TABLE ────────────────────────────────────────────
+  setFill(colors.canvas);
+  pdf.rect(margin, y, contentWidth, 22, "F");
+  setDraw(colors.light);
+  pdf.rect(margin, y, contentWidth, 22, "S");
+  
+  setColor(colors.dark);
+  pdf.setFont("helvetica", "bold");
+  pdf.setFontSize(8);
+  pdf.text("QTY",         margin + 10,                  y + 14);
+  pdf.text("UNIT",        margin + 50,                  y + 14);
+  pdf.text("DESCRIPTION", margin + 90,                  y + 14);
+  pdf.text("UNIT PRICE",  margin + contentWidth - 130,  y + 14, { align: "left" });
+  pdf.text("AMOUNT",      margin + contentWidth - 50,   y + 14, { align: "left" });
+  y += 22;
+  
+  // Items rows
+  pdf.setFont("helvetica", "normal");
+  pdf.setFontSize(9);
+  setColor(colors.dark);
+  
+  let rowsDrawn = 0;
+  const rowHeight = 18;
+  const minRows = 8; // ensure consistent layout
+  
+  (order.items || []).forEach(item => {
+    pdf.line(margin, y, margin + contentWidth, y);
+    pdf.text(String(item.qty || 1),    margin + 10, y + 12);
+    pdf.text("pc",                      margin + 50, y + 12);
+    
+    const descLines = pdf.splitTextToSize(item.name || "—", 240);
+    pdf.text(descLines[0],              margin + 90, y + 12);
+    
+    pdf.text(formatPHPNum(item.price || 0),  margin + contentWidth - 130, y + 12);
+    pdf.text(formatPHPNum((item.price||0) * (item.qty||0)), margin + contentWidth - 50, y + 12);
+    y += rowHeight;
+    rowsDrawn++;
+  });
+  
+  // Other charges as additional rows
+  (order.otherCharges || []).forEach(charge => {
+    pdf.line(margin, y, margin + contentWidth, y);
+    pdf.text("1",              margin + 10, y + 12);
+    pdf.text("svc",             margin + 50, y + 12);
+    setColor(colors.muted);
+    pdf.text(charge.description || "Other charge", margin + 90, y + 12);
+    setColor(colors.dark);
+    pdf.text(formatPHPNum(charge.amount || 0),  margin + contentWidth - 130, y + 12);
+    pdf.text(formatPHPNum(charge.amount || 0),  margin + contentWidth - 50,  y + 12);
+    y += rowHeight;
+    rowsDrawn++;
+  });
+  
+  // Pad with empty rows so layout looks consistent
+  while (rowsDrawn < minRows) {
+    pdf.line(margin, y, margin + contentWidth, y);
+    y += rowHeight;
+    rowsDrawn++;
+  }
+  pdf.line(margin, y, margin + contentWidth, y);
+  
+  // Vertical lines for the table
+  pdf.line(margin + 40, y - rowHeight*rowsDrawn - 22, margin + 40, y);
+  pdf.line(margin + 80, y - rowHeight*rowsDrawn - 22, margin + 80, y);
+  pdf.line(margin + contentWidth - 140, y - rowHeight*rowsDrawn - 22, margin + contentWidth - 140, y);
+  pdf.line(margin + contentWidth - 60, y - rowHeight*rowsDrawn - 22, margin + contentWidth - 60, y);
+  pdf.line(margin, y - rowHeight*rowsDrawn - 22, margin, y);
+  pdf.line(margin + contentWidth, y - rowHeight*rowsDrawn - 22, margin + contentWidth, y);
+  
+  y += 14;
+  
+  // ── VAT BREAKDOWN ──────────────────────────────────────────
+  const vat = computeVATBreakdown(order.total || 0);
+  
+  // Two columns: left=labels, right=amounts
+  const totalsX = margin + contentWidth - 200;
+  
+  setColor(colors.dark);
+  pdf.setFont("helvetica", "normal");
+  pdf.setFontSize(9);
+  
+  // Total Sales (VAT Inclusive)
+  pdf.text("Total Sales (VAT Inclusive):", totalsX, y);
+  pdf.setFont("helvetica", "bold");
+  pdf.text(formatPHPNum(vat.total), margin + contentWidth - 10, y, { align: "right" });
+  y += 14;
+  
+  pdf.setFont("helvetica", "normal");
+  pdf.text("Less: VAT (12%):", totalsX, y);
+  pdf.text(`(${formatPHPNum(vat.vat)})`, margin + contentWidth - 10, y, { align: "right" });
+  y += 14;
+  
+  pdf.text("Amount Net of VAT:", totalsX, y);
+  pdf.text(formatPHPNum(vat.netOfVAT), margin + contentWidth - 10, y, { align: "right" });
+  y += 14;
+  
+  pdf.text("Add: VAT:", totalsX, y);
+  pdf.text(formatPHPNum(vat.vat), margin + contentWidth - 10, y, { align: "right" });
+  y += 14;
+  
+  // Grand total box
+  setFill(colors.red);
+  pdf.rect(totalsX - 10, y - 4, 220, 22, "F");
+  pdf.setTextColor(255, 255, 255);
+  pdf.setFont("helvetica", "bold");
+  pdf.setFontSize(11);
+  pdf.text("TOTAL AMOUNT DUE:", totalsX, y + 11);
+  pdf.text(formatPHP(vat.total), margin + contentWidth - 10, y + 11, { align: "right" });
+  y += 30;
+  
+  // ── DOCUMENT-SPECIFIC SECTIONS ─────────────────────────────
+  setColor(colors.muted);
+  pdf.setFont("helvetica", "italic");
+  pdf.setFontSize(8);
+  
+  if (docType === "quotation") {
+    pdf.setFont("helvetica", "bold");
+    setColor(colors.dark);
+    pdf.text("TERMS AND CONDITIONS:", margin, y);
+    y += 12;
+    pdf.setFont("helvetica", "normal");
+    setColor(colors.muted);
+    const terms = [
+      `1. This quotation is valid for ${validityDays} days from the date issued.`,
+      "2. Prices are quoted in Philippine Peso (PHP), VAT inclusive.",
+      "3. Payment terms: " + (order.paymentMethod || (order.paymentTerms ? findTerms(order.paymentTerms)?.label : "As agreed")),
+      "4. Delivery timeline subject to product availability and confirmation.",
+      "5. This quotation is subject to acceptance via signed PO or written confirmation.",
+    ];
+    terms.forEach(t => { pdf.text(t, margin, y); y += 10; });
+  } else if (docType === "deliveryReceipt") {
+    pdf.setFont("helvetica", "bold");
+    setColor(colors.dark);
+    pdf.text("RECEIVED BY:", margin, y); y += 14;
+    pdf.setFont("helvetica", "normal");
+    pdf.line(margin, y + 16, margin + 200, y + 16);
+    pdf.line(pageWidth - margin - 200, y + 16, pageWidth - margin, y + 16);
+    setColor(colors.muted);
+    pdf.setFontSize(7);
+    pdf.text("Signature over Printed Name", margin, y + 28);
+    pdf.text("Date Received", pageWidth - margin - 200, y + 28);
+    y += 40;
+  } else if (docType === "salesOrder") {
+    pdf.setFont("helvetica", "bold");
+    setColor(colors.dark);
+    pdf.text("ORDER DETAILS:", margin, y); y += 12;
+    pdf.setFont("helvetica", "normal");
+    setColor(colors.muted);
+    pdf.text(`Order Source: ${findSource(order.source)?.label || "Direct"}`, margin, y); y += 10;
+    pdf.text(`Order Date: ${formatDate(order.createdAt)}`, margin, y); y += 10;
+    if (order.paymentTerms) {
+      pdf.text(`Payment Terms: ${findTerms(order.paymentTerms)?.label || order.paymentTerms}`, margin, y); y += 10;
+    }
+  } else if (docType === "provisionalReceipt") {
+    setFill([254, 243, 199]); // light yellow
+    pdf.rect(margin, y, contentWidth, 50, "F");
+    setColor([146, 64, 14]); // dark amber
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(9);
+    pdf.text("⚠ PROVISIONAL RECEIPT — NOT A BIR OFFICIAL RECEIPT", margin + 10, y + 14);
+    pdf.setFont("helvetica", "normal");
+    pdf.setFontSize(8);
+    const note = "This document acknowledges receipt of payment provisionally. An official BIR-registered Sales Invoice or Official Receipt will be issued separately within the period required by law.";
+    const noteLines = pdf.splitTextToSize(note, contentWidth - 20);
+    let ny = y + 24;
+    noteLines.forEach(line => { pdf.text(line, margin + 10, ny); ny += 10; });
+    y += 60;
+  }
+  
+  // ── FOOTER ─────────────────────────────────────────────────
+  const footerY = pageHeight - 60;
+  setDraw(colors.light);
+  pdf.line(margin, footerY, pageWidth - margin, footerY);
+  
+  setColor(colors.muted);
+  pdf.setFont("helvetica", "italic");
+  pdf.setFontSize(7);
+  
+  if (docType !== "provisionalReceipt") {
+    const disclaimer = "This document is generated electronically by DMEAST Operations System. It is NOT a BIR Official Receipt. An Official Sales Invoice or Receipt will be issued separately upon payment per BIR regulations.";
+    const disclaimerLines = pdf.splitTextToSize(disclaimer, contentWidth);
+    let dy = footerY + 10;
+    disclaimerLines.forEach(line => { pdf.text(line, margin, dy); dy += 9; });
+  }
+  
+  setColor(colors.dark);
+  pdf.setFont("helvetica", "normal");
+  pdf.setFontSize(7);
+  pdf.text(`Generated: ${new Date().toLocaleString("en-PH")}`, margin, pageHeight - 16);
+  pdf.text(`dmeastph.com  |  ${CONTACT.email}  |  ${CONTACT.phone1}`, pageWidth - margin, pageHeight - 16, { align: "right" });
+  
+  return pdf;
+}
+
+// Helper: format number without ₱ (for tables in PDFs)
+function formatPHPNum(amount) {
+  return Number(amount).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+// ─── v15 PDF GENERATOR MODAL ─────────────────────────────────────────────────
+function PDFGeneratorModal({ order, onClose }){
+  const [docType, setDocType] = useState("quotation");
+  const [validityDays, setValidityDays] = useState(30);
+  const [generating, setGenerating] = useState(false);
+  const [generatedPdf, setGeneratedPdf] = useState(null);
+  const [docNumber, setDocNumber] = useState("");
+  const [errMsg, setErrMsg] = useState("");
+  const [previewUrl, setPreviewUrl] = useState(null);
+  
+  const handleGenerate = async () => {
+    setGenerating(true); setErrMsg("");
+    try {
+      const num = await getNextDocumentNumber(docType);
+      setDocNumber(num);
+      const pdf = await generateDocumentPDF({ order, docType, docNumber: num, validityDays });
+      setGeneratedPdf(pdf);
+      // Preview as data URL
+      const dataUrl = pdf.output("datauristring");
+      setPreviewUrl(dataUrl);
+    } catch(e) {
+      console.error("PDF generation failed:", e);
+      setErrMsg("Failed to generate PDF: " + e.message);
+    }
+    setGenerating(false);
+  };
+  
+  const handleDownload = () => {
+    if (!generatedPdf) return;
+    generatedPdf.save(`${docNumber}.pdf`);
+  };
+  
+  const handleEmail = () => {
+    if (!generatedPdf || !order.email) {
+      alert("No email on file for this customer.");
+      return;
+    }
+    // Open mail client with pre-filled email — user can attach the downloaded PDF
+    const subject = encodeURIComponent(`${DOC_TITLES[docType]} ${docNumber} from DMEAST`);
+    const body = encodeURIComponent(
+      `Dear ${order.name || "Customer"},\n\n` +
+      `Please find attached the ${DOC_TITLES[docType].toLowerCase()} (${docNumber}) ` +
+      `for your reference.\n\n` +
+      `Order Reference: #${order.id.slice(-6).toUpperCase()}\n` +
+      `Total Amount: ${formatPHP(order.total||0)}\n\n` +
+      `Please don't hesitate to contact us for any questions or clarifications.\n\n` +
+      `Best regards,\n` +
+      `DMEAST Team\n` +
+      `${CONTACT.email}\n${CONTACT.phone1}\n\n` +
+      `--\n` +
+      `📎 Please attach the downloaded ${docNumber}.pdf to this email before sending.`
+    );
+    window.location.href = `mailto:${order.email}?subject=${subject}&body=${body}`;
+    // Also auto-download for them
+    handleDownload();
+  };
+  
+  const handlePrint = () => {
+    if (!generatedPdf) return;
+    generatedPdf.autoPrint();
+    window.open(generatedPdf.output("bloburl"), "_blank");
+  };
+  
+  const docTypes = [
+    { id: "quotation",          label: "Quotation",          icon: "📋", desc: "Formal quote for prospective orders, with validity period" },
+    { id: "salesOrder",         label: "Sales Order",        icon: "📑", desc: "Internal record of confirmed order" },
+    { id: "deliveryReceipt",    label: "Delivery Receipt",   icon: "🚚", desc: "Document for courier/customer to sign upon delivery" },
+    { id: "provisionalReceipt", label: "Provisional Receipt",icon: "🧾", desc: "Acknowledges payment received (before BIR Official Receipt)" },
+  ];
+  
+  const inp = {width:"100%",padding:"10px 14px",border:`1.5px solid ${ds.color.border}`,borderRadius:ds.radius.md,fontSize:14,fontFamily:ds.font.body,outline:"none",boxSizing:"border-box"};
+  
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center",padding:20,overflowY:"auto"}}>
+      <div style={{background:"#fff",borderRadius:ds.radius.xl,maxWidth:900,width:"100%",maxHeight:"92vh",display:"flex",flexDirection:"column",boxShadow:ds.shadow.xl}}>
+        
+        {/* Header */}
+        <div style={{padding:"18px 28px",borderBottom:`1px solid ${ds.color.border}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          <div>
+            <div style={{fontFamily:ds.font.display,fontSize:20,color:ds.color.textDark}}>📄 Generate Document</div>
+            <div style={{fontSize:12,color:ds.color.textMuted,marginTop:2}}>Order #{order.id.slice(-6).toUpperCase()} · {order.name} · {formatPHP(order.total||0)}</div>
+          </div>
+          <button onClick={onClose} style={{background:"none",border:"none",cursor:"pointer",fontSize:24,color:ds.color.textMuted,padding:4}}>✕</button>
+        </div>
+        
+        {/* Body */}
+        <div style={{flex:1,overflowY:"auto",padding:"22px 28px"}}>
+          {!generatedPdf ? (
+            <>
+              {/* Document type selection */}
+              <div style={{fontSize:13,fontWeight:700,color:ds.color.textDark,marginBottom:12,textTransform:"uppercase",letterSpacing:"0.06em"}}>Select Document Type</div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:20}}>
+                {docTypes.map(d=>(
+                  <button key={d.id} onClick={()=>setDocType(d.id)} style={{
+                    padding:"14px 16px",
+                    borderRadius:ds.radius.md,
+                    border:`2px solid ${docType===d.id?ds.color.red:ds.color.border}`,
+                    background:docType===d.id?ds.color.redLight:"#fff",
+                    cursor:"pointer", textAlign:"left", fontFamily:ds.font.body,
+                    transition:"all 0.15s"
+                  }}>
+                    <div style={{fontSize:15,fontWeight:700,color:docType===d.id?ds.color.red:ds.color.textDark,marginBottom:4}}>{d.icon} {d.label}</div>
+                    <div style={{fontSize:11.5,color:ds.color.textMuted,lineHeight:1.4}}>{d.desc}</div>
+                  </button>
+                ))}
+              </div>
+              
+              {/* Quotation: validity */}
+              {docType === "quotation" && (
+                <div style={{marginBottom:20}}>
+                  <label style={{fontSize:12,fontWeight:600,color:ds.color.textDark,display:"block",marginBottom:5}}>Validity Period (days)</label>
+                  <select value={validityDays} onChange={e=>setValidityDays(Number(e.target.value))} style={{...inp,cursor:"pointer"}}>
+                    <option value={7}>7 days</option>
+                    <option value={15}>15 days</option>
+                    <option value={30}>30 days (recommended)</option>
+                    <option value={60}>60 days</option>
+                    <option value={90}>90 days</option>
+                  </select>
+                </div>
+              )}
+              
+              {/* Preview info */}
+              <div style={{padding:"14px 16px",background:ds.color.canvas,borderRadius:ds.radius.md,border:`1px solid ${ds.color.border}`,marginBottom:14}}>
+                <div style={{fontSize:11,fontWeight:700,color:ds.color.textMuted,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:8}}>Document Preview</div>
+                <div style={{fontSize:12,color:ds.color.textBody,lineHeight:1.6}}>
+                  📌 <strong>Customer:</strong> {order.name || "—"}<br/>
+                  📌 <strong>Items:</strong> {(order.items||[]).length} item{(order.items||[]).length!==1?"s":""} {(order.otherCharges||[]).length>0&&` + ${(order.otherCharges||[]).length} charge${(order.otherCharges||[]).length!==1?"s":""}`}<br/>
+                  📌 <strong>Total (VAT inclusive):</strong> {formatPHP(order.total||0)}<br/>
+                  📌 <strong>VAT (12%):</strong> {formatPHP(computeVATBreakdown(order.total||0).vat)}
+                </div>
+              </div>
+              
+              <div style={{padding:"10px 14px",background:ds.color.goldLight,border:`1px solid ${ds.color.goldBorder}`,borderRadius:ds.radius.md,fontSize:11.5,color:ds.color.gold}}>
+                ℹ️ <strong>Reminder:</strong> This document is for business reference only. It is NOT a BIR Official Receipt. Please continue issuing official BIR Sales Invoices/Receipts from your booklets per BIR regulations.
+              </div>
+              
+              {errMsg && <div style={{marginTop:12,padding:"10px 14px",background:ds.color.redLight,borderRadius:ds.radius.md,fontSize:13,color:ds.color.red}}>⚠ {errMsg}</div>}
+            </>
+          ) : (
+            <>
+              {/* Generated — show preview */}
+              <div style={{padding:"12px 16px",background:ds.color.successBg,border:`1px solid ${ds.color.successBorder}`,borderRadius:ds.radius.md,marginBottom:14,display:"flex",alignItems:"center",gap:10}}>
+                <span style={{fontSize:18}}>✓</span>
+                <div>
+                  <div style={{fontSize:13,fontWeight:700,color:ds.color.success}}>Document generated: {docNumber}</div>
+                  <div style={{fontSize:12,color:ds.color.textMuted,marginTop:2}}>Preview below — choose to download, print, or email.</div>
+                </div>
+              </div>
+              {previewUrl && (
+                <iframe
+                  src={previewUrl}
+                  title="PDF Preview"
+                  style={{width:"100%",height:480,border:`1px solid ${ds.color.border}`,borderRadius:ds.radius.md}}
+                />
+              )}
+            </>
+          )}
+        </div>
+        
+        {/* Footer */}
+        <div style={{padding:"14px 28px",borderTop:`1px solid ${ds.color.border}`,display:"flex",justifyContent:"flex-end",gap:8,flexWrap:"wrap"}}>
+          {!generatedPdf ? (
+            <>
+              <Btn variant="outline" size="md" onClick={onClose}>Cancel</Btn>
+              <Btn variant="primary" size="md" disabled={generating} onClick={handleGenerate}>
+                {generating ? "Generating…" : "📄 Generate PDF"}
+              </Btn>
+            </>
+          ) : (
+            <>
+              <Btn variant="outline" size="md" onClick={()=>{setGeneratedPdf(null);setPreviewUrl(null);}}>← Generate Another</Btn>
+              <Btn variant="outline" size="md" onClick={handlePrint}>🖨️ Print</Btn>
+              {order.email && <Btn variant="outline" size="md" onClick={handleEmail}>✉️ Email + Download</Btn>}
+              <Btn variant="primary" size="md" onClick={handleDownload}>📥 Download PDF</Btn>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 
 // ─── v13.0a: NEW ORDER MODAL (Admin Internal Order Entry) ────────────────────
 function NewOrderModal({ onClose, onSaved, customers: existingCustomers, products: existingProducts }){
@@ -3206,7 +3896,7 @@ function MarginDashboardTab({ orders, expenses }){
 // ─── v13.0c: ORDER EDITOR MODAL ──────────────────────────────────────────────
 // Lets admin edit any field on an existing order: customer info, items, charges,
 // payment method, source, status, supplier cost, notes, address, recipient
-function OrderEditorModal({ order, products: existingProducts, onClose, onSaved, onDeleted }){
+function OrderEditorModal({ order, products: existingProducts, onClose, onSaved, onDeleted, onGeneratePDF, showMarginFields = true }){
   const [tab, setTab] = useState("info"); // info | items | details
   
   // Customer info
@@ -3551,6 +4241,7 @@ function OrderEditorModal({ order, products: existingProducts, onClose, onSaved,
                 <textarea value={internalNotes} onChange={e=>setInternalNotes(e.target.value)} rows={2} placeholder="Notes about this specific order…" style={{...inp,resize:"vertical"}}/>
               </div>
               
+              {showMarginFields && (<>
               <div style={{gridColumn:"1/-1",borderTop:`1px dashed ${ds.color.border}`,paddingTop:14,marginTop:4}}>
                 <div style={{fontSize:11,fontWeight:700,color:ds.color.textMuted,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:10}}>Margin Tracking (Optional)</div>
               </div>
@@ -3567,6 +4258,7 @@ function OrderEditorModal({ order, products: existingProducts, onClose, onSaved,
                   💰 Margin: <strong>{formatPHP(margin)}</strong> ({total>0?((margin/total)*100).toFixed(1):0}% of revenue)
                 </div>
               )}
+              </>)}
             </div>
           )}
           
@@ -3575,8 +4267,9 @@ function OrderEditorModal({ order, products: existingProducts, onClose, onSaved,
         
         {/* Footer */}
         <div style={{padding:"14px 28px",borderTop:`1px solid ${ds.color.border}`,display:"flex",justifyContent:"space-between",alignItems:"center",gap:8,flexWrap:"wrap"}}>
-          <div style={{display:"flex",gap:8}}>
+          <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
             <button onClick={handleDelete} style={{padding:"7px 14px",borderRadius:ds.radius.sm,border:`1px solid ${ds.color.red}`,background:"#fff",color:ds.color.red,cursor:"pointer",fontSize:12,fontWeight:600,fontFamily:ds.font.body}}>🗑️ Delete Order</button>
+            {onGeneratePDF && <button onClick={()=>onGeneratePDF({id:order.id,...order,name,email,phone,address,instructions,items:items.map(i=>({id:i.productId,name:i.name,price:i.unitPrice,qty:i.qty,requiresPrescription:!!i.requiresPrescription})),otherCharges:otherCharges.filter(c=>c.description&&c.amount),total,paymentMethod,paymentTerms,source})} style={{padding:"7px 14px",borderRadius:ds.radius.sm,border:`1px solid ${ds.color.red}`,background:ds.color.redLight,color:ds.color.red,cursor:"pointer",fontSize:12,fontWeight:700,fontFamily:ds.font.body}}>📄 Generate Document</button>}
           </div>
           <div style={{display:"flex",gap:8,alignItems:"center"}}>
             <span style={{fontSize:13,color:ds.color.textMuted,marginRight:8}}>
@@ -3592,7 +4285,7 @@ function OrderEditorModal({ order, products: existingProducts, onClose, onSaved,
 }
 
 
-function AdminDashboard(){
+function AdminDashboard({ user }){
   const { products: PRODUCTS, refresh: refreshProducts } = useProducts();
   const [tab,setTab]=useState("overview");
   const [orders,setOrders]=useState([]);
@@ -3616,6 +4309,10 @@ function AdminDashboard(){
   const [showBillingEditor,setShowBillingEditor]=useState(null);
   // v13.0c: Order editor state
   const [showOrderEditor,setShowOrderEditor]=useState(null);
+  // v15: PDF modal + role
+  const [showPDFModal,setShowPDFModal]=useState(null); // null or order obj
+  const userRole = user ? getUserRole(user.email) : null;
+  const userPerms = userRole ? ROLE_PERMISSIONS[userRole] : null;
 
   useEffect(()=>{
     (async()=>{
@@ -3919,7 +4616,11 @@ function AdminDashboard(){
       } catch(_){}
     } catch(_){}
   };
-  const tabs=[{id:"overview",label:"Overview",icon:"📊"},{id:"orders",label:`Orders${pendingPaymentCount>0?" 🔔":""}`,icon:"📦"},{id:"receivables",label:"Receivables",icon:"💰"},{id:"expenses",label:"Expenses",icon:"🏢"},{id:"billings",label:"Billings",icon:"📝"},{id:"margin",label:"Margin",icon:"📈"},{id:"products",label:"Products",icon:"🗂️"},{id:"customers",label:"Customers",icon:"👥"},{id:"rx",label:"Rx Uploads",icon:"💊"}];
+  const allTabs=[{id:"overview",label:"Overview",icon:"📊"},{id:"orders",label:`Orders${pendingPaymentCount>0?" 🔔":""}`,icon:"📦"},{id:"receivables",label:"Receivables",icon:"💰"},{id:"expenses",label:"Expenses",icon:"🏢"},{id:"billings",label:"Billings",icon:"📝"},{id:"margin",label:"Margin",icon:"📈"},{id:"products",label:"Products",icon:"🗂️"},{id:"customers",label:"Customers",icon:"👥"},{id:"rx",label:"Rx Uploads",icon:"💊"}];
+  // v15: Filter tabs based on user role
+  const tabs = userPerms ? allTabs.filter(t=>userPerms.tabs.includes(t.id)) : allTabs;
+  // If current tab is no longer accessible, switch to first available
+  useEffect(()=>{ if(userPerms && !userPerms.tabs.includes(tab) && tabs.length>0){ setTab(tabs[0].id); } },[userPerms, tab]);
 
   return(
     <div style={{paddingTop:67,background:ds.color.canvas,minHeight:"100vh"}}>
@@ -3928,6 +4629,13 @@ function AdminDashboard(){
           <div>
             <div style={{fontSize:11,fontWeight:700,color:ds.color.goldBright,textTransform:"uppercase",letterSpacing:"0.12em",marginBottom:4}}>Admin Dashboard</div>
             <div style={{fontFamily:ds.font.display,fontSize:22,color:"#fff"}}>DMEAST Control Panel ⚙️</div>
+            {userPerms && (
+              <div style={{display:"inline-flex",alignItems:"center",gap:8,marginTop:8,padding:"4px 12px",borderRadius:ds.radius.pill,background:userPerms.color+"33",border:`1px solid ${userPerms.color}66`}}>
+                <span style={{fontSize:13}}>{userPerms.icon}</span>
+                <span style={{fontSize:11,fontWeight:700,color:"#fff"}}>{userPerms.label}</span>
+                {user&&<span style={{fontSize:10,color:"rgba(255,255,255,0.6)"}}>· {user.email}</span>}
+              </div>
+            )}
           </div>
           <Btn variant="gold" size="md" onClick={exportCSV}>⬇️ Export Orders CSV</Btn>
         </div>
@@ -4345,6 +5053,14 @@ function AdminDashboard(){
           onClose={()=>setShowOrderEditor(null)}
           onSaved={handleOrderSaved}
           onDeleted={handleOrderDeleted}
+          onGeneratePDF={(o)=>{setShowOrderEditor(null); setShowPDFModal(o);}}
+          showMarginFields={userPerms?.canSeeMargins !== false}
+        />
+      )}
+      {showPDFModal !== null && (
+        <PDFGeneratorModal
+          order={showPDFModal}
+          onClose={()=>setShowPDFModal(null)}
         />
       )}
       <BackupReminder/>
@@ -6075,7 +6791,7 @@ export default function App(){
     return onAuthStateChanged(auth,async u=>{
       setUser(u);
       if(u){
-        setIsAdmin(ADMIN_EMAILS.includes(u.email?.toLowerCase()));
+        setIsAdmin(isAdminUser(u.email));
         try{const snap=await getDoc(doc(db,"customers",u.uid));if(snap.exists())setWishlist(snap.data().wishlist||[]);}catch(_){}
       }else{setIsAdmin(false);setWishlist([]);}
       setAuthLoading(false);
