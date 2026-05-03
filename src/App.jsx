@@ -1,5 +1,14 @@
 /**
- * DMEAST — Medical Solutions Platform  v15.1
+ * DMEAST — Medical Solutions Platform  v15.2
+ *
+ * v15.2 FIXES:
+ * - 🐛 Quote Request form was failing — now sends both admin+customer emails
+ *   AND saves quote to Firestore for admin tracking
+ * - 🐛 Operations admin couldn't see customers — fixed by per-collection
+ *   error handling (each load is independent — partial failures don't break all)
+ * - 📈 Operations role now has access to Margin Dashboard
+ * - 📸 Payment proof upload moved to TOP of order success screen
+ *   (more prominent — customers immediately see they can upload proof)
  *
  * v15.1 ROLE ACTIVATION:
  * - 🔧 ops@dmeastph.com activated as Operations Admin
@@ -127,13 +136,13 @@ const ROLE_PERMISSIONS = {
     label: "Operations Admin",
     icon: "🔧",
     color: "#0EA5E9",
-    description: "Manages orders, customers, products, prescriptions",
-    tabs: ["overview","orders","receivables","products","customers","rx"],
+    description: "Manages orders, customers, products, prescriptions, margin dashboard",
+    tabs: ["overview","orders","receivables","margin","products","customers","rx"],
     canEditOrders: true,
     canDeleteOrders: false,        // Operations cannot delete orders
     canEditProducts: true,
-    canSeeMargins: false,           // Hide supplier costs / margin from operations
-    canSeeExpenses: false,
+    canSeeMargins: true,            // v15.2: now allowed to see margin dashboard
+    canSeeExpenses: false,           // but NOT detailed expenses (still hidden)
     canManageUsers: false,
   },
   accounting: {
@@ -1255,20 +1264,23 @@ function CustomerPortal({user,setPage,addToCart,wishlist,toggleWishlist}){
 
   // v13.0a: Refresh data (after creating new order/customer)
   const refreshData = async () => {
+    // v15.2: Each collection in its own try/catch — partial failures don't kill the whole refresh
     try {
       const oSnap=await getDocs(query(collection(db,"orders"),orderBy("createdAt","desc")));
       setOrders(oSnap.docs.map(d=>({id:d.id,...d.data()})));
+    } catch(e){ console.warn("Refresh orders failed:", e.message); }
+    try {
       const cSnap=await getDocs(collection(db,"customers"));
       setCustomers(cSnap.docs.map(d=>({id:d.id,...d.data()})));
-      try {
-        const eSnap=await getDocs(query(collection(db,"expenses"),orderBy("date","desc")));
-        setExpenses(eSnap.docs.map(d=>({id:d.id,...d.data()})));
-      } catch(_){}
-      try {
-        const bSnap=await getDocs(query(collection(db,"manualBillings"),orderBy("date","desc")));
-        setManualBillings(bSnap.docs.map(d=>({id:d.id,...d.data()})));
-      } catch(_){}
-    } catch(_){}
+    } catch(e){ console.warn("Refresh customers failed:", e.message); }
+    try {
+      const eSnap=await getDocs(query(collection(db,"expenses"),orderBy("date","desc")));
+      setExpenses(eSnap.docs.map(d=>({id:d.id,...d.data()})));
+    } catch(e){ console.warn("Refresh expenses failed:", e.message); }
+    try {
+      const bSnap=await getDocs(query(collection(db,"manualBillings"),orderBy("date","desc")));
+      setManualBillings(bSnap.docs.map(d=>({id:d.id,...d.data()})));
+    } catch(e){ console.warn("Refresh billings failed:", e.message); }
   };
   const tabs=[{id:"overview",label:"Overview",icon:"📊"},{id:"orders",label:"Orders",icon:"📦"},{id:"wishlist",label:"Wishlist",icon:"❤️"},{id:"address",label:"My Address",icon:"📍"},{id:"rx",label:"Rx History",icon:"💊"},{id:"rewards",label:"Rewards",icon:"⭐"}];
 
@@ -4415,23 +4427,27 @@ function AdminDashboard({ user }){
 
   useEffect(()=>{
     (async()=>{
-      try{
+      // v15.2: Load each collection independently so one permission error doesn't kill all data
+      try {
         const oSnap=await getDocs(query(collection(db,"orders"),orderBy("createdAt","desc")));
         setOrders(oSnap.docs.map(d=>({id:d.id,...d.data()})));
+      } catch(e){ console.warn("Orders load failed:", e.message); }
+      try {
         const cSnap=await getDocs(collection(db,"customers"));
         setCustomers(cSnap.docs.map(d=>({id:d.id,...d.data()})));
+      } catch(e){ console.warn("Customers load failed:", e.message); }
+      try {
         const rSnap=await getDocs(query(collection(db,"rxUploads"),orderBy("createdAt","desc")));
         setRxUps(rSnap.docs.map(d=>({id:d.id,...d.data()})));
-        // v13.0b: Load expenses and manual billings
-        try {
-          const eSnap=await getDocs(query(collection(db,"expenses"),orderBy("date","desc")));
-          setExpenses(eSnap.docs.map(d=>({id:d.id,...d.data()})));
-        } catch(_){ /* collection may not exist yet */ }
-        try {
-          const bSnap=await getDocs(query(collection(db,"manualBillings"),orderBy("date","desc")));
-          setManualBillings(bSnap.docs.map(d=>({id:d.id,...d.data()})));
-        } catch(_){ /* collection may not exist yet */ }
-      }catch(_){}
+      } catch(e){ console.warn("Rx uploads load failed:", e.message); }
+      try {
+        const eSnap=await getDocs(query(collection(db,"expenses"),orderBy("date","desc")));
+        setExpenses(eSnap.docs.map(d=>({id:d.id,...d.data()})));
+      } catch(e){ console.warn("Expenses load failed:", e.message); }
+      try {
+        const bSnap=await getDocs(query(collection(db,"manualBillings"),orderBy("date","desc")));
+        setManualBillings(bSnap.docs.map(d=>({id:d.id,...d.data()})));
+      } catch(e){ console.warn("Manual billings load failed:", e.message); }
       setLoading(false);
     })();
   },[]);
@@ -4624,20 +4640,23 @@ function AdminDashboard({ user }){
 
   // v13.0a: Refresh data (after creating new order/customer)
   const refreshData = async () => {
+    // v15.2: Each collection in its own try/catch — partial failures don't kill the whole refresh
     try {
       const oSnap=await getDocs(query(collection(db,"orders"),orderBy("createdAt","desc")));
       setOrders(oSnap.docs.map(d=>({id:d.id,...d.data()})));
+    } catch(e){ console.warn("Refresh orders failed:", e.message); }
+    try {
       const cSnap=await getDocs(collection(db,"customers"));
       setCustomers(cSnap.docs.map(d=>({id:d.id,...d.data()})));
-      try {
-        const eSnap=await getDocs(query(collection(db,"expenses"),orderBy("date","desc")));
-        setExpenses(eSnap.docs.map(d=>({id:d.id,...d.data()})));
-      } catch(_){}
-      try {
-        const bSnap=await getDocs(query(collection(db,"manualBillings"),orderBy("date","desc")));
-        setManualBillings(bSnap.docs.map(d=>({id:d.id,...d.data()})));
-      } catch(_){}
-    } catch(_){}
+    } catch(e){ console.warn("Refresh customers failed:", e.message); }
+    try {
+      const eSnap=await getDocs(query(collection(db,"expenses"),orderBy("date","desc")));
+      setExpenses(eSnap.docs.map(d=>({id:d.id,...d.data()})));
+    } catch(e){ console.warn("Refresh expenses failed:", e.message); }
+    try {
+      const bSnap=await getDocs(query(collection(db,"manualBillings"),orderBy("date","desc")));
+      setManualBillings(bSnap.docs.map(d=>({id:d.id,...d.data()})));
+    } catch(e){ console.warn("Refresh billings failed:", e.message); }
   };
   const allTabs=[{id:"overview",label:"Overview",icon:"📊"},{id:"orders",label:`Orders${pendingPaymentCount>0?" 🔔":""}`,icon:"📦"},{id:"receivables",label:"Receivables",icon:"💰"},{id:"expenses",label:"Expenses",icon:"🏢"},{id:"billings",label:"Billings",icon:"📝"},{id:"margin",label:"Margin",icon:"📈"},{id:"products",label:"Products",icon:"🗂️"},{id:"customers",label:"Customers",icon:"👥"},{id:"rx",label:"Rx Uploads",icon:"💊"}];
   // v15: Filter tabs based on user role
@@ -5508,9 +5527,42 @@ function QuotePage(){
     if(!filled)return;
     setStatus("sending");setErrorMsg("");
     try{
-      await emailjs.send(EMAILJS_CONFIG.serviceId,EMAILJS_CONFIG.templateId,{...form,reply_to:form.email},EMAILJS_CONFIG.publicKey);
+      // v15.2 FIX: include to_email so EmailJS template can route it (template_5r24wue uses {{to_email}})
+      // Send admin notification + customer confirmation
+      await emailjs.send(EMAILJS_CONFIG.serviceId, EMAILJS_CONFIG.orderTemplateId, {
+        customer_name:    form.name,
+        customer_email:   form.email,
+        customer_phone:   form.phone,
+        customer_address: form.location || "Not specified",
+        order_items:      `QUOTE REQUEST: ${form.product}` + (form.quantity?` (Qty: ${form.quantity})`:""),
+        order_total:      form.budget ? `Target: ${form.budget}` : "TBD",
+        payment_method:   "Quote Request - Pending",
+      }, EMAILJS_CONFIG.publicKey);
+      // Send confirmation to customer
+      try {
+        await emailjs.send(EMAILJS_CONFIG.serviceId, EMAILJS_CONFIG.templateId, {
+          from_name: "DM EAST Team", company: "DM EAST",
+          from_email: CONTACT.email, phone: CONTACT.phone1,
+          product: `Quote Request Received: ${form.product}`,
+          quantity: form.quantity || "TBD",
+          budget: form.budget || "TBD",
+          timeline: form.timeline || "TBD",
+          location: form.location || "TBD",
+          details: `Dear ${form.name},\n\nThank you for your quotation request. We have received your inquiry for: ${form.product}.\n\nOur team will review your requirements and respond within 24-48 hours with a formal quotation.\n\nDetails submitted:\n- Product: ${form.product}\n- Quantity: ${form.quantity||"TBD"}\n- Budget: ${form.budget||"TBD"}\n- Location: ${form.location||"TBD"}\n- Timeline: ${form.timeline||"TBD"}\n${form.details?'- Details: '+form.details:''}\n\nIf urgent, please contact us:\n📱 ${CONTACT.phone1}\n💬 WhatsApp: ${CONTACT.whatsapp}\n✉️ ${CONTACT.email}\n\nThank you for choosing DM EAST!`,
+          reply_to: CONTACT.email,
+          to_email: form.email,
+        }, EMAILJS_CONFIG.publicKey);
+      } catch(e) { console.warn("Customer confirmation email failed:", e); }
+      // Save to Firestore for admin tracking
+      try {
+        await addDoc(collection(db, "quotes"), {
+          ...form,
+          status: "new",
+          createdAt: serverTimestamp(),
+        });
+      } catch(e) { console.warn("Quote save to Firestore failed:", e); }
       setStatus("success");
-    }catch{setErrorMsg("Failed to send. Please email us directly at "+CONTACT.email);setStatus("error");}
+    }catch(e){console.error("Quote submission error:",e);setErrorMsg("Failed to send. Please email us directly at "+CONTACT.email+" or message us on WhatsApp. Error: "+e.message);setStatus("error");}
   };
 
   if(status==="success") return(
@@ -5935,14 +5987,34 @@ function CartPage({cart,removeFromCart,updateQty,setPage,user,onOrderComplete}){
     <div style={{paddingTop:67,background:ds.color.canvas,minHeight:"100vh"}}>
       <div style={{maxWidth:680,margin:"0 auto",padding:"48px 24px"}}>
 
-        <div style={{textAlign:"center",marginBottom:36}}>
+        <div style={{textAlign:"center",marginBottom:24}}>
           <div style={{width:80,height:80,borderRadius:"50%",background:ds.color.successBg,border:`3px solid ${ds.color.successBorder}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:32,margin:"0 auto 20px"}}>✓</div>
           <div style={{fontFamily:ds.font.display,fontSize:30,color:ds.color.textDark,marginBottom:8}}>Order Confirmed!</div>
           <p style={{fontSize:15,color:ds.color.textMuted,lineHeight:1.7}}>
             Thank you, <strong>{successOrder.details.name}</strong>! Your order has been received.<br/>
             A confirmation email has been sent to <strong>{successOrder.details.email}</strong>.
           </p>
+          <div style={{fontSize:13,color:ds.color.textBody,marginTop:8,fontWeight:600}}>
+            Order Reference: <span style={{color:ds.color.red,fontFamily:"monospace"}}>#{successOrder.id.slice(-6).toUpperCase()}</span>
+          </div>
         </div>
+
+        {/* v15.2: PROMINENT Payment Proof Upload Section — directly after order confirmation */}
+        {successOrder.method !== "International Inquiry" && (
+          <div style={{background:"#fff",border:`2px solid ${ds.color.red}`,borderRadius:ds.radius.xl,padding:"24px 28px",boxShadow:ds.shadow.md,marginBottom:24}}>
+            <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:16}}>
+              <div style={{width:44,height:44,borderRadius:"50%",background:ds.color.redLight,display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,flexShrink:0}}>📸</div>
+              <div>
+                <div style={{fontFamily:ds.font.display,fontSize:18,color:ds.color.textDark}}>Upload Your Payment Proof</div>
+                <div style={{fontSize:12.5,color:ds.color.textMuted,marginTop:2}}>Snap a screenshot of your GCash/Maya/bank transfer receipt and upload it here.</div>
+              </div>
+            </div>
+            <PaymentProofUpload orderId={successOrder.id} onUploaded={()=>{}}/>
+            <div style={{fontSize:11.5,color:ds.color.textMuted,marginTop:12,textAlign:"center",lineHeight:1.5}}>
+              💡 <strong>Tip:</strong> Upload now to speed up order processing. Our team reviews payment proofs within 24 hours.
+            </div>
+          </div>
+        )}
 
         <div id="dmeast-order-receipt" style={{background:"#fff",border:`1px solid ${ds.color.border}`,borderRadius:ds.radius.xl,padding:"32px 36px",boxShadow:ds.shadow.md,marginBottom:24}}>
 
@@ -6031,9 +6103,8 @@ function CartPage({cart,removeFromCart,updateQty,setPage,user,onOrderComplete}){
           </div>
 
           <div style={{borderTop:"1px solid "+ds.color.borderLight,paddingTop:20,marginTop:4}}>
-            <div style={{fontSize:12,fontWeight:700,color:ds.color.textDark,textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:12}}>Upload Payment Proof Now</div>
-            <div style={{fontSize:13,color:ds.color.textMuted,marginBottom:14}}>Save time — upload your GCash, Maya, or bank transfer receipt right here.</div>
-            <PaymentProofUpload orderId={successOrder.id} onUploaded={()=>{}}/>
+            <div style={{fontSize:12,fontWeight:700,color:ds.color.textDark,textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:12}}>Or Track Your Order Later</div>
+            <div style={{fontSize:13,color:ds.color.textMuted,marginBottom:0}}>You can also track your order and upload payment proof later.</div>
           </div>
 
           <div style={{background:ds.color.canvas,borderRadius:ds.radius.md,padding:"14px 18px",marginTop:16,textAlign:"center"}}>
