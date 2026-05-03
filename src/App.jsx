@@ -1,5 +1,11 @@
 /**
- * DMEAST — Medical Solutions Platform  v15.2
+ * DMEAST — Medical Solutions Platform  v15.3
+ *
+ * v15.3 NEW: AUTO-ATTACH PDF EMAIL
+ * - 📎 PDF documents (Quotation/SO/DR/PR) now attach automatically to email
+ * - ✉️ Click "Email to Customer" → adds personal message → sends with attachment
+ * - 🛡️ Fallback to manual mailto if EmailJS template not yet configured
+ * - 🔧 Requires NEW EmailJS template "template_pdf_doc" with Variable Attachment
  *
  * v15.2 FIXES:
  * - 🐛 Quote Request form was failing — now sends both admin+customer emails
@@ -182,6 +188,7 @@ const EMAILJS_CONFIG = {
   orderTemplateId:     "template_udt3wjn",  // To: admin (info@dmeastph.com) — order received notification
   templateId:          "template_5r24wue",  // To: {{to_email}} — universal customer notifications
   receiptTemplateId:   "template_adb2so7",  // To: {{to_email}} — customer order receipt
+  pdfTemplateId:       "template_pdf_doc",  // v15.3: To: {{to_email}} — PDF document (Quotation/SO/DR/PR) with attachment. CONFIGURE IN EMAILJS DASHBOARD.
   publicKey:           "gV5OXqbN2PHond86B",
 };
 
@@ -2139,6 +2146,52 @@ function formatPHPNum(amount) {
   return Number(amount).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+// v15.3: Convert jsPDF document to base64 string for EmailJS attachment
+function pdfToBase64(pdf) {
+  // jsPDF outputs as a data URI: "data:application/pdf;base64,JVBERi0xLjMKMyAw..."
+  // EmailJS Variable Attachment expects either a data URL or just base64 — both work
+  return pdf.output("datauristring");
+}
+
+// v15.3: Send PDF document via email with auto-attachment
+// Requires EmailJS template (pdfTemplateId) to have a Variable Attachment configured
+// with parameter name = "pdf_attachment"
+async function sendPDFviaEmail({ order, pdf, docType, docNumber, customMessage }) {
+  if (!order?.email) return { ok: false, reason: "No email on file for this customer." };
+  if (!pdf) return { ok: false, reason: "No PDF generated." };
+  
+  try {
+    const base64 = pdfToBase64(pdf);
+    const docTitle = DOC_TITLES[docType] || "Document";
+    
+    await emailjs.send(EMAILJS_CONFIG.serviceId, EMAILJS_CONFIG.pdfTemplateId, {
+      // Standard variables for the email body
+      customer_name:    order.name || "Customer",
+      customer_email:   order.email,
+      customer_phone:   order.phone || "—",
+      doc_type:         docTitle,
+      doc_number:       docNumber,
+      order_ref:        "#" + order.id.slice(-6).toUpperCase(),
+      order_total:      order.total ? formatPHP(order.total) : "—",
+      custom_message:   customMessage || `Please find attached the ${docTitle.toLowerCase()} for your reference.`,
+      from_name:        "DM EAST Team",
+      from_email:       CONTACT.email,
+      from_phone:       CONTACT.phone1,
+      to_email:         order.email,
+      reply_to:         CONTACT.email,
+      // Attachment variable — must match the EmailJS template's Variable Attachment parameter name
+      pdf_attachment:   base64,
+      // Filename suggestion (also configured in EmailJS template, but pass it for reference)
+      pdf_filename:     docNumber + ".pdf",
+    }, EMAILJS_CONFIG.publicKey);
+    
+    return { ok: true };
+  } catch(e) {
+    console.error("PDF email failed:", e);
+    return { ok: false, reason: e.message || e.text || String(e) };
+  }
+}
+
 // ─── v15 PDF GENERATOR MODAL ─────────────────────────────────────────────────
 function PDFGeneratorModal({ order, onClose }){
   const [docType, setDocType] = useState("quotation");
@@ -2171,12 +2224,46 @@ function PDFGeneratorModal({ order, onClose }){
     generatedPdf.save(`${docNumber}.pdf`);
   };
   
-  const handleEmail = () => {
+  // v15.3: Auto-send PDF as email attachment (no manual drag-drop required)
+  const [emailSending, setEmailSending] = useState(false);
+  const [emailStatus, setEmailStatus] = useState(""); // "" | "success" | "error"
+  const [emailError, setEmailError] = useState("");
+  const [customMsg, setCustomMsg] = useState("");
+  const [showEmailForm, setShowEmailForm] = useState(false);
+  
+  const handleEmail = async () => {
+    if (!generatedPdf || !order.email) {
+      alert("No email on file for this customer. Please add an email to the order first, or download the PDF to send manually.");
+      return;
+    }
+    setEmailSending(true);
+    setEmailStatus("");
+    setEmailError("");
+    
+    const result = await sendPDFviaEmail({
+      order,
+      pdf: generatedPdf,
+      docType,
+      docNumber,
+      customMessage: customMsg.trim() || null,
+    });
+    
+    if (result.ok) {
+      setEmailStatus("success");
+      setShowEmailForm(false);
+    } else {
+      setEmailStatus("error");
+      setEmailError(result.reason || "Unknown error");
+    }
+    setEmailSending(false);
+  };
+  
+  // Fallback: original mailto-based email (if EmailJS template not yet configured)
+  const handleEmailManual = () => {
     if (!generatedPdf || !order.email) {
       alert("No email on file for this customer.");
       return;
     }
-    // Open mail client with pre-filled email — user can attach the downloaded PDF
     const subject = encodeURIComponent(`${DOC_TITLES[docType]} ${docNumber} from DMEAST`);
     const body = encodeURIComponent(
       `Dear ${order.name || "Customer"},\n\n` +
@@ -2185,14 +2272,10 @@ function PDFGeneratorModal({ order, onClose }){
       `Order Reference: #${order.id.slice(-6).toUpperCase()}\n` +
       `Total Amount: ${formatPHP(order.total||0)}\n\n` +
       `Please don't hesitate to contact us for any questions or clarifications.\n\n` +
-      `Best regards,\n` +
-      `DMEAST Team\n` +
-      `${CONTACT.email}\n${CONTACT.phone1}\n\n` +
-      `--\n` +
-      `📎 Please attach the downloaded ${docNumber}.pdf to this email before sending.`
+      `Best regards,\nDMEAST Team\n${CONTACT.email}\n${CONTACT.phone1}\n\n` +
+      `--\n📎 Please attach the downloaded ${docNumber}.pdf to this email before sending.`
     );
     window.location.href = `mailto:${order.email}?subject=${subject}&body=${body}`;
-    // Also auto-download for them
     handleDownload();
   };
   
@@ -2287,11 +2370,50 @@ function PDFGeneratorModal({ order, onClose }){
                   <div style={{fontSize:12,color:ds.color.textMuted,marginTop:2}}>Preview below — choose to download, print, or email.</div>
                 </div>
               </div>
+              {/* v15.3: Email status feedback */}
+              {emailStatus === "success" && (
+                <div style={{padding:"12px 16px",background:ds.color.successBg,border:`1px solid ${ds.color.successBorder}`,borderRadius:ds.radius.md,marginBottom:14,display:"flex",alignItems:"center",gap:10}}>
+                  <span style={{fontSize:18}}>✉️</span>
+                  <div>
+                    <div style={{fontSize:13,fontWeight:700,color:ds.color.success}}>Email sent to {order.email}!</div>
+                    <div style={{fontSize:12,color:ds.color.textMuted,marginTop:2}}>The PDF was attached automatically. The customer will receive it shortly.</div>
+                  </div>
+                </div>
+              )}
+              {emailStatus === "error" && (
+                <div style={{padding:"12px 16px",background:ds.color.redLight,border:`1px solid ${ds.color.redBorder}`,borderRadius:ds.radius.md,marginBottom:14}}>
+                  <div style={{fontSize:13,fontWeight:700,color:ds.color.red}}>⚠ Email failed to send</div>
+                  <div style={{fontSize:12,color:ds.color.textMuted,marginTop:4}}>{emailError}</div>
+                  <div style={{fontSize:11.5,color:ds.color.textMuted,marginTop:6}}>
+                    💡 Make sure your EmailJS dashboard has the PDF template configured. See setup guide. As a workaround, click <button onClick={handleEmailManual} style={{background:"none",border:"none",color:ds.color.red,cursor:"pointer",fontWeight:700,padding:0,textDecoration:"underline",fontFamily:ds.font.body,fontSize:11.5}}>here</button> to email manually (download PDF + open mail draft).
+                  </div>
+                </div>
+              )}
+              
+              {/* v15.3: Email composition form */}
+              {showEmailForm && emailStatus !== "success" && (
+                <div style={{padding:"16px",background:ds.color.canvas,border:`1px solid ${ds.color.border}`,borderRadius:ds.radius.md,marginBottom:14}}>
+                  <div style={{fontSize:13,fontWeight:700,color:ds.color.textDark,marginBottom:10}}>✉️ Email PDF to {order.email}</div>
+                  <div style={{fontSize:11.5,color:ds.color.textMuted,marginBottom:8}}>Add a personal message (optional). The PDF will be attached automatically.</div>
+                  <textarea
+                    value={customMsg}
+                    onChange={e=>setCustomMsg(e.target.value)}
+                    placeholder="Hi! Please find attached the quotation as discussed..."
+                    rows={3}
+                    style={{width:"100%",padding:"10px 12px",border:`1.5px solid ${ds.color.border}`,borderRadius:ds.radius.sm,fontSize:13,fontFamily:ds.font.body,outline:"none",resize:"vertical",boxSizing:"border-box",marginBottom:10}}
+                  />
+                  <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
+                    <Btn variant="outline" size="sm" onClick={()=>setShowEmailForm(false)}>Cancel</Btn>
+                    <Btn variant="primary" size="sm" disabled={emailSending} onClick={handleEmail}>{emailSending ? "Sending…" : "📤 Send Email with PDF"}</Btn>
+                  </div>
+                </div>
+              )}
+              
               {previewUrl && (
                 <iframe
                   src={previewUrl}
                   title="PDF Preview"
-                  style={{width:"100%",height:480,border:`1px solid ${ds.color.border}`,borderRadius:ds.radius.md}}
+                  style={{width:"100%",height:380,border:`1px solid ${ds.color.border}`,borderRadius:ds.radius.md}}
                 />
               )}
             </>
@@ -2309,9 +2431,13 @@ function PDFGeneratorModal({ order, onClose }){
             </>
           ) : (
             <>
-              <Btn variant="outline" size="md" onClick={()=>{setGeneratedPdf(null);setPreviewUrl(null);}}>← Generate Another</Btn>
+              <Btn variant="outline" size="md" onClick={()=>{setGeneratedPdf(null);setPreviewUrl(null);setEmailStatus("");setShowEmailForm(false);}}>← Generate Another</Btn>
               <Btn variant="outline" size="md" onClick={handlePrint}>🖨️ Print</Btn>
-              {order.email && <Btn variant="outline" size="md" onClick={handleEmail}>✉️ Email + Download</Btn>}
+              {order.email && (
+                <Btn variant="outline" size="md" onClick={()=>setShowEmailForm(true)} disabled={emailSending}>
+                  {emailSending ? "Sending…" : "✉️ Email to Customer"}
+                </Btn>
+              )}
               <Btn variant="primary" size="md" onClick={handleDownload}>📥 Download PDF</Btn>
             </>
           )}
