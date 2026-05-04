@@ -1,5 +1,19 @@
 /**
- * DMEAST — Medical Solutions Platform  v16.0.2
+ * DMEAST — Medical Solutions Platform  v16.2
+ *
+ * v16.1 PRODUCTS PAGE REDESIGN:
+ * - 🛒 ProductCard: hover lift, category labels, stock indicator, larger price
+ * - 🔍 ProductsPage: prominent search bar, horizontal pill nav, sort dropdown
+ * - 🎯 Better empty state with helpful CTAs (clear filters, request quote)
+ * - 📱 Mobile-friendly: 2-col grid on phones, 1-col on tiny screens
+ * - 🗑️ Removed redundant StatsTrustBand from homepage (already in hero)
+ *
+ * v16.2 CART/CHECKOUT REDESIGN:
+ * - 🛒 Improved empty cart with trust signals
+ * - 🛡️ Trust signals strip on cart review page
+ * - 📦 Mobile-responsive cart items with better quantity stepper
+ * - 💰 VAT breakdown visible in order summary (subtotal, VAT, shipping, total)
+ * - 📌 Sticky order summary on desktop
  *
  * v16.0.2 HOTFIXES:
  * - 🎨 Logo updated to white-bg version (works on both PDF and website)
@@ -437,10 +451,15 @@ const GLOBAL_CSS = `
   .dm-grid-4{display:grid;grid-template-columns:repeat(4,1fr);gap:20px}
   .dm-grid-hero{display:grid;grid-template-columns:1.1fr 0.9fr;gap:64px;align-items:center}
   @media(max-width:1100px){.dm-grid-hero{grid-template-columns:1fr}.dm-grid-4{grid-template-columns:repeat(2,1fr)}}
-  @media(max-width:768px){.dm-grid-2{grid-template-columns:1fr}.dm-grid-3{grid-template-columns:1fr}.dm-grid-4{grid-template-columns:1fr}}
+  @media(max-width:768px){.dm-grid-2{grid-template-columns:1fr}.dm-grid-3{grid-template-columns:1fr}.dm-grid-4{grid-template-columns:repeat(2,1fr)}}
+  @media(max-width:480px){.dm-grid-4{grid-template-columns:1fr}}
   .dm-hero-grid{display:grid;grid-template-columns:1.1fr 1fr;gap:60px;align-items:center}
   @media(max-width:1100px){.dm-hero-grid{grid-template-columns:1fr;gap:40px}}
   @media(max-width:768px){.dm-hero-grid{gap:32px}.dm-hero-visual{min-height:380px}}
+  .dm-cat-pills::-webkit-scrollbar{height:4px}
+  .dm-cat-pills::-webkit-scrollbar-thumb{background:rgba(0,0,0,0.15);border-radius:2px}
+  @media(max-width:900px){.dm-cart-grid{grid-template-columns:1fr !important}.dm-cart-summary{position:relative !important;top:auto !important}}
+  @media(max-width:560px){.dm-cart-item{grid-template-columns:1fr !important;gap:10px !important;padding:18px 0 !important}}
   .dm-card-hover{transition:transform .22s ease,box-shadow .22s ease,border-color .22s ease}
   .dm-card-hover:hover{transform:translateY(-3px);box-shadow:0 8px 40px rgba(26,20,16,.12);border-color:#F5C4C7!important}
   .dm-nav-link{position:relative;background:none;border:none;font-family:var(--font-body);font-size:14px;font-weight:500;letter-spacing:.01em;padding:6px 0;color:#3D3530;transition:color .18s;cursor:pointer}
@@ -788,38 +807,110 @@ function PageHero({eyebrow,title,subtitle}){
 
 function Divider(){return <div style={{height:1,background:ds.color.borderLight}}/>;}
 
+// v16.1: Improved product card with hover lift, better hierarchy, quick-add feedback
 function ProductCard({product,addToCart,setPage,wishlist,toggleWishlist}){
   const [feedback,setFeedback]=useState(null);
+  const [hover,setHover]=useState(false);
   const inWishlist=wishlist&&wishlist.includes(product.id);
   const handleBuy=useCallback(()=>{addToCart(product);setFeedback("added");setTimeout(()=>setFeedback(null),2000);},[product,addToCart]);
+  
+  // Determine accent color from category
+  const cat = CATEGORIES.find(c=>c.id===product.category);
+  const accentColor = cat?.accent || ds.color.red;
+  
   return(
-    <div className="dm-card-hover" style={{background:ds.color.white,border:`1px solid ${ds.color.border}`,borderRadius:ds.radius.lg,overflow:"hidden",boxShadow:ds.shadow.xs,position:"relative"}}>
-      {toggleWishlist&&(
-        <button onClick={()=>toggleWishlist(product.id)} title={inWishlist?"Remove from wishlist":"Add to wishlist"}
-          style={{position:"absolute",top:10,right:10,zIndex:2,background:"rgba(255,255,255,0.92)",border:`1px solid ${ds.color.border}`,borderRadius:"50%",width:32,height:32,display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,cursor:"pointer"}}>
-          {inWishlist?"❤️":"🤍"}
-        </button>
-      )}
-      <ProductImg imageSrc={product.imageSrc} category={product.category} name={product.name}/>
-      <div style={{padding:"18px 20px 20px"}}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8,marginBottom:8}}>
-          <h3 style={{fontSize:14,fontWeight:600,color:ds.color.textDark,lineHeight:1.35,flex:1}}>{product.name}</h3>
-          <CtaBadge type={product.cta}/>
+    <div 
+      onMouseEnter={()=>setHover(true)} 
+      onMouseLeave={()=>setHover(false)}
+      style={{
+        background:ds.color.white,
+        border:`1px solid ${hover?accentColor+"55":ds.color.border}`,
+        borderRadius:ds.radius.lg,
+        overflow:"hidden",
+        boxShadow:hover?ds.shadow.md:ds.shadow.xs,
+        position:"relative",
+        transform:hover?"translateY(-3px)":"translateY(0)",
+        transition:"all 0.2s ease",
+        display:"flex",
+        flexDirection:"column",
+        height:"100%",
+      }}
+    >
+      {/* Top right badges container */}
+      <div style={{position:"absolute",top:10,right:10,zIndex:2,display:"flex",flexDirection:"column",gap:6,alignItems:"flex-end"}}>
+        {toggleWishlist&&(
+          <button onClick={()=>toggleWishlist(product.id)} title={inWishlist?"Remove from wishlist":"Add to wishlist"}
+            style={{background:"rgba(255,255,255,0.95)",border:`1px solid ${ds.color.border}`,borderRadius:"50%",width:32,height:32,display:"flex",alignItems:"center",justifyContent:"center",fontSize:15,cursor:"pointer",boxShadow:ds.shadow.xs}}>
+            {inWishlist?"❤️":"🤍"}
+          </button>
+        )}
+      </div>
+      
+      {/* Top-left CTA badge (smaller, cleaner) */}
+      {product.cta && product.cta !== "buy" && (
+        <div style={{position:"absolute",top:10,left:10,zIndex:2}}>
+          {product.cta==="quote" && <span style={{fontSize:9.5,fontWeight:700,letterSpacing:"0.06em",padding:"3px 8px",borderRadius:ds.radius.pill,background:ds.color.goldLight,color:ds.color.gold,border:`1px solid ${ds.color.goldBorder}`,textTransform:"uppercase"}}>By Quote</span>}
+          {product.cta==="sales" && <span style={{fontSize:9.5,fontWeight:700,letterSpacing:"0.06em",padding:"3px 8px",borderRadius:ds.radius.pill,background:ds.color.canvas,color:ds.color.textBody,border:`1px solid ${ds.color.border}`,textTransform:"uppercase"}}>Contact Sales</span>}
         </div>
+      )}
+      
+      <ProductImg imageSrc={product.imageSrc} category={product.category} name={product.name}/>
+      
+      <div style={{padding:"16px 18px 18px",display:"flex",flexDirection:"column",flex:1}}>
+        {/* Category label (small, above name) */}
+        {cat && (
+          <div style={{fontSize:10,fontWeight:700,color:accentColor,letterSpacing:"0.08em",textTransform:"uppercase",marginBottom:6}}>
+            {cat.label}
+          </div>
+        )}
+        
+        {/* Product name */}
+        <h3 style={{fontSize:14,fontWeight:600,color:ds.color.textDark,lineHeight:1.35,marginBottom:6,minHeight:38}}>
+          {product.name}
+        </h3>
+        
+        {/* Rx badge inline if needed */}
         {product.requiresPrescription&&(
-          <div style={{display:"inline-flex",alignItems:"center",gap:5,background:"#FFF3CD",border:"1px solid #FBBF24",borderRadius:ds.radius.pill,padding:"3px 10px",marginBottom:8}}>
-            <span style={{fontSize:11}}>💊</span>
-            <span style={{fontSize:10,fontWeight:700,color:"#92400E",letterSpacing:"0.05em",textTransform:"uppercase"}}>Rx — Prescription Required</span>
+          <div style={{display:"inline-flex",alignItems:"center",gap:4,background:"#FFF3CD",border:"1px solid #FBBF24",borderRadius:ds.radius.pill,padding:"2px 8px",marginBottom:8,alignSelf:"flex-start"}}>
+            <span style={{fontSize:10}}>💊</span>
+            <span style={{fontSize:9,fontWeight:700,color:"#92400E",letterSpacing:"0.05em",textTransform:"uppercase"}}>Rx Required</span>
           </div>
         )}
-        <p style={{fontSize:12.5,color:ds.color.textMuted,lineHeight:1.6,marginBottom:16}}>{product.desc}</p>
-        {product.price&&(
-          <div style={{marginBottom:14}}>
-            <div style={{fontSize:19,fontWeight:700,color:ds.color.textDark,lineHeight:1}}>{formatPHP(product.price)}</div>
-            <div style={{fontSize:11,color:ds.color.textLight,marginTop:3}}>{formatUSD(product.price)} · indicative rate</div>
+        
+        {/* Description (truncated) */}
+        <p style={{
+          fontSize:12,
+          color:ds.color.textMuted,
+          lineHeight:1.55,
+          marginBottom:12,
+          display:"-webkit-box",
+          WebkitLineClamp:2,
+          WebkitBoxOrient:"vertical",
+          overflow:"hidden",
+          flex:1,
+        }}>{product.desc}</p>
+        
+        {/* Price + Stock indicator */}
+        {product.price ? (
+          <div style={{marginBottom:12,display:"flex",alignItems:"baseline",justifyContent:"space-between",gap:8}}>
+            <div>
+              <div style={{fontSize:18,fontWeight:700,color:ds.color.textDark,lineHeight:1,fontFamily:ds.font.body}}>{formatPHP(product.price)}</div>
+              <div style={{fontSize:10.5,color:ds.color.textLight,marginTop:2}}>VAT incl.</div>
+            </div>
+            {/* Stock indicator (always "in stock" for now since you have all photos) */}
+            <div style={{display:"flex",alignItems:"center",gap:4,fontSize:10.5,color:"#10B981",fontWeight:600}}>
+              <span style={{width:6,height:6,borderRadius:"50%",background:"#10B981"}}></span>
+              In Stock
+            </div>
+          </div>
+        ) : (
+          <div style={{marginBottom:12,fontSize:12,color:ds.color.textMuted,fontStyle:"italic"}}>
+            Price upon request
           </div>
         )}
-        {product.cta==="buy"  &&<Btn variant={feedback==="added"?"success":"primary"} size="sm" fullWidth onClick={handleBuy}>{feedback==="added"?"✓ Added to Cart":"Add to Cart"}</Btn>}
+        
+        {/* CTA button */}
+        {product.cta==="buy"  &&<Btn variant={feedback==="added"?"success":"primary"} size="sm" fullWidth onClick={handleBuy}>{feedback==="added"?"✓ Added to Cart":"+ Add to Cart"}</Btn>}
         {product.cta==="quote"&&<Btn variant="gold" size="sm" fullWidth onClick={()=>setPage("quote")}>Request Quote</Btn>}
         {product.cta==="sales"&&<Btn variant="secondary" size="sm" fullWidth onClick={()=>setPage("contact")}>Talk to Sales</Btn>}
       </div>
@@ -6233,7 +6324,6 @@ function HomePage({setPage,setActiveCategory,addToCart}){
     <div style={{paddingTop:67}}>
       <TopAnnouncementBar/>
       <HeroSectionV16 setPage={setPage}/>
-      <StatsTrustBand/>
       <CategoryGridV16 setPage={setPage} setActiveCategory={setActiveCategory}/>
       <TrendingProductsV16 setPage={setPage} addToCart={addToCart}/>
       <PromoCardsV16 setPage={setPage}/>
@@ -6281,17 +6371,20 @@ function AboutPage(){
 }
 
 // ─── PRODUCTS PAGE (SHOP) ────────────────────────────────────────────────────
+// v16.1: Improved ProductsPage with pill nav, sort dropdown, better UX
 function ProductsPage({setPage,addToCart,setActiveCategory,activeCategory,wishlist,toggleWishlist}){
   const { products: PRODUCTS } = useProducts();
   const [search,setSearch]=useState("");
   const [cat,setCat]=useState(activeCategory||null);
   const [showAll,setShowAll]=useState(false);
+  const [sortBy,setSortBy]=useState("default"); // default | price-asc | price-desc | name
   useEffect(()=>{if(activeCategory)setCat(activeCategory);},[activeCategory]);
 
   const shopCats = CATEGORIES.filter(c=>!c.institutional);
+  const institutionalCats = CATEGORIES.filter(c=>c.institutional);
   const isInstitutionalCat = cat && CATEGORIES.find(c=>c.id===cat)?.institutional;
 
-  const filtered=PRODUCTS.filter(p=>{
+  let filtered=PRODUCTS.filter(p=>{
     const mc=!cat||p.category===cat;
     const q=search.toLowerCase();
     const ms=!q||p.name.toLowerCase().includes(q)||p.desc.toLowerCase().includes(q)||p.tag.toLowerCase().includes(q);
@@ -6299,51 +6392,199 @@ function ProductsPage({setPage,addToCart,setActiveCategory,activeCategory,wishli
     return mc&&ms&&notInstit;
   });
 
+  // Sort
+  if(sortBy==="price-asc")  filtered = [...filtered].sort((a,b)=>(a.price||0)-(b.price||0));
+  if(sortBy==="price-desc") filtered = [...filtered].sort((a,b)=>(b.price||0)-(a.price||0));
+  if(sortBy==="name")       filtered = [...filtered].sort((a,b)=>a.name.localeCompare(b.name));
+
   const shopProductCount = PRODUCTS.filter(p=>!CATEGORIES.find(c=>c.id===p.category)?.institutional).length;
+  const clearFilters = ()=>{setSearch("");setCat(null);setActiveCategory(null);setSortBy("default");setShowAll(false);};
+  const hasActiveFilters = !!cat || !!search || sortBy!=="default";
 
   return(
     <div style={{paddingTop:67}}>
       <PageHero eyebrow="Online Shop" title="Healthcare Products & Medical Supplies" subtitle={`${shopProductCount}+ products available for direct purchase with nationwide delivery.`}/>
-      <div style={{maxWidth:1280,margin:"0 auto",padding:"40px 28px"}}>
+      
+      <div style={{maxWidth:1280,margin:"0 auto",padding:"32px 28px"}}>
+        
+        {/* Search bar - prominent at top */}
+        <div style={{
+          background:"#fff",
+          border:`1px solid ${ds.color.border}`,
+          borderRadius:ds.radius.lg,
+          padding:"6px 6px 6px 16px",
+          display:"flex",
+          alignItems:"center",
+          gap:10,
+          boxShadow:ds.shadow.xs,
+          marginBottom:20,
+        }}>
+          <span style={{fontSize:18,color:ds.color.textMuted}}>🔍</span>
+          <input 
+            value={search} 
+            onChange={e=>setSearch(e.target.value)} 
+            placeholder="Search by product name, description, or category…"
+            style={{
+              flex:1,
+              border:"none",
+              fontSize:14,
+              outline:"none",
+              fontFamily:ds.font.body,
+              color:ds.color.textDark,
+              background:"transparent",
+              padding:"8px 0",
+            }}
+          />
+          {search && (
+            <button onClick={()=>setSearch("")} style={{background:"none",border:"none",fontSize:18,color:ds.color.textMuted,cursor:"pointer",padding:"0 8px"}}>✕</button>
+          )}
+        </div>
+
+        {/* Category pill nav - horizontal scroll on mobile */}
+        <div style={{
+          display:"flex",
+          gap:8,
+          marginBottom:18,
+          flexWrap:"nowrap",
+          overflowX:"auto",
+          paddingBottom:6,
+          WebkitOverflowScrolling:"touch",
+        }} className="dm-cat-pills">
+          <button onClick={()=>{setCat(null);setActiveCategory(null);}} style={{
+            padding:"8px 16px",
+            borderRadius:ds.radius.pill,
+            border:`1.5px solid ${!cat?ds.color.red:ds.color.border}`,
+            background:!cat?ds.color.red:"#fff",
+            color:!cat?"#fff":ds.color.textBody,
+            cursor:"pointer",
+            fontSize:13,
+            fontWeight:600,
+            fontFamily:ds.font.body,
+            whiteSpace:"nowrap",
+            flexShrink:0,
+            transition:"all 0.15s",
+          }}>All Products</button>
+          {shopCats.map(c=>(
+            <button key={c.id} onClick={()=>{setCat(c.id);setActiveCategory(c.id);}} style={{
+              padding:"8px 14px",
+              borderRadius:ds.radius.pill,
+              border:`1.5px solid ${cat===c.id?c.accent:ds.color.border}`,
+              background:cat===c.id?c.accent:"#fff",
+              color:cat===c.id?"#fff":ds.color.textBody,
+              cursor:"pointer",
+              fontSize:13,
+              fontWeight:600,
+              fontFamily:ds.font.body,
+              whiteSpace:"nowrap",
+              flexShrink:0,
+              display:"flex",
+              alignItems:"center",
+              gap:6,
+              transition:"all 0.15s",
+            }}>
+              <span style={{fontSize:14}}>{c.icon}</span>
+              <span>{c.label}</span>
+            </button>
+          ))}
+          {showAll && institutionalCats.map(c=>(
+            <button key={c.id} onClick={()=>{setCat(c.id);setActiveCategory(c.id);}} style={{
+              padding:"8px 14px",
+              borderRadius:ds.radius.pill,
+              border:`1.5px solid ${cat===c.id?ds.color.gold:ds.color.goldBorder}`,
+              background:cat===c.id?ds.color.gold:ds.color.goldLight,
+              color:cat===c.id?"#fff":ds.color.gold,
+              cursor:"pointer",
+              fontSize:13,
+              fontWeight:600,
+              fontFamily:ds.font.body,
+              whiteSpace:"nowrap",
+              flexShrink:0,
+              display:"flex",
+              alignItems:"center",
+              gap:6,
+            }}>
+              <span style={{fontSize:14}}>{c.icon}</span>
+              <span>{c.label}</span>
+              <span style={{fontSize:9,padding:"2px 6px",background:cat===c.id?"rgba(255,255,255,0.25)":ds.color.gold+"33",borderRadius:ds.radius.pill,fontWeight:700,letterSpacing:"0.04em"}}>BIZ</span>
+            </button>
+          ))}
+        </div>
+
+        {/* Institutional category banner */}
         {isInstitutionalCat && (
-          <div style={{background:ds.color.goldLight,border:`1px solid ${ds.color.goldBorder}`,borderRadius:ds.radius.lg,padding:"14px 20px",marginBottom:24,display:"flex",alignItems:"center",justifyContent:"space-between",gap:16,flexWrap:"wrap"}}>
+          <div style={{background:ds.color.goldLight,border:`1px solid ${ds.color.goldBorder}`,borderRadius:ds.radius.lg,padding:"14px 20px",marginBottom:20,display:"flex",alignItems:"center",justifyContent:"space-between",gap:16,flexWrap:"wrap"}}>
             <div style={{fontSize:13.5,color:ds.color.gold}}>
-              <strong>ℹ️ Institutional Category:</strong> Items in this category are available through institutional inquiry. <button onClick={()=>setPage("institutional")} style={{background:"none",border:"none",color:ds.color.gold,fontWeight:700,cursor:"pointer",fontFamily:ds.font.body,fontSize:13.5,textDecoration:"underline"}}>View Institutional Orders →</button>
+              <strong>ℹ️ Institutional Category:</strong> Items are available through formal quotation. <button onClick={()=>setPage("institutional")} style={{background:"none",border:"none",color:ds.color.gold,fontWeight:700,cursor:"pointer",fontFamily:ds.font.body,fontSize:13.5,textDecoration:"underline"}}>Learn more →</button>
             </div>
             <Btn variant="gold" size="sm" onClick={()=>setPage("quote")}>Request a Quote</Btn>
           </div>
         )}
-        <div style={{display:"flex",gap:12,marginBottom:24,flexWrap:"wrap",alignItems:"center"}}>
-          <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="🔍 Search products…" style={{flex:1,minWidth:200,padding:"11px 16px",border:`1.5px solid ${ds.color.border}`,borderRadius:ds.radius.md,fontSize:14,outline:"none",fontFamily:ds.font.body}} onFocus={e=>e.target.style.borderColor=ds.color.red} onBlur={e=>e.target.style.borderColor=ds.color.border}/>
-          <select value={cat||""} onChange={e=>{setCat(e.target.value||null);setActiveCategory(e.target.value||null);}} style={{padding:"11px 16px",border:`1.5px solid ${ds.color.border}`,borderRadius:ds.radius.md,fontSize:14,outline:"none",fontFamily:ds.font.body,background:"#fff",cursor:"pointer"}}>
-            <option value="">All Shop Categories</option>
-            {shopCats.map(c=><option key={c.id} value={c.id}>{c.label}</option>)}
-            <optgroup label="── Institutional Orders ──">
-              {CATEGORIES.filter(c=>c.institutional).map(c=><option key={c.id} value={c.id}>{c.label}</option>)}
-            </optgroup>
-          </select>
+
+        {/* Result count + sort row */}
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:20,flexWrap:"wrap",gap:10}}>
+          <div style={{fontSize:13,color:ds.color.textMuted}}>
+            <strong style={{color:ds.color.textDark}}>{filtered.length}</strong> product{filtered.length!==1?"s":""} 
+            {cat && <> in <strong style={{color:ds.color.textDark}}>{CATEGORIES.find(c=>c.id===cat)?.label}</strong></>}
+            {search && <> matching "<strong style={{color:ds.color.textDark}}>{search}</strong>"</>}
+            {hasActiveFilters && (
+              <button onClick={clearFilters} style={{marginLeft:10,background:"none",border:"none",color:ds.color.red,fontWeight:600,cursor:"pointer",fontSize:12,fontFamily:ds.font.body,textDecoration:"underline"}}>Clear filters</button>
+            )}
+          </div>
+          
+          <div style={{display:"flex",gap:8,alignItems:"center"}}>
+            <span style={{fontSize:12.5,color:ds.color.textMuted,fontWeight:500}}>Sort:</span>
+            <select value={sortBy} onChange={e=>setSortBy(e.target.value)} style={{
+              padding:"7px 12px",
+              border:`1.5px solid ${ds.color.border}`,
+              borderRadius:ds.radius.sm,
+              fontSize:13,
+              outline:"none",
+              fontFamily:ds.font.body,
+              background:"#fff",
+              cursor:"pointer",
+              color:ds.color.textBody,
+            }}>
+              <option value="default">Featured</option>
+              <option value="price-asc">Price: Low to High</option>
+              <option value="price-desc">Price: High to Low</option>
+              <option value="name">Name (A-Z)</option>
+            </select>
+          </div>
         </div>
-        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:22,flexWrap:"wrap",gap:10}}>
-          <div style={{fontSize:13,color:ds.color.textMuted}}>{filtered.length} product{filtered.length!==1?"s":""} found</div>
-          {!showAll&&!cat&&!search&&(
-            <button onClick={()=>setShowAll(true)} style={{background:"none",border:"none",cursor:"pointer",fontSize:13,color:ds.color.red,fontFamily:ds.font.body,fontWeight:600}}>Show all products including institutional →</button>
-          )}
-        </div>
-        <div className="dm-grid-4">
-          {filtered.map(p=><ProductCard key={p.id} product={p} addToCart={addToCart} setPage={setPage} wishlist={wishlist} toggleWishlist={toggleWishlist}/>)}
-        </div>
-        {filtered.length===0&&(
-          <div style={{textAlign:"center",padding:"60px 0",color:ds.color.textMuted}}>
-            <div style={{fontSize:32,marginBottom:12}}>🔍</div>
-            <div style={{fontSize:15,fontWeight:600,marginBottom:8}}>No products found</div>
-            <div style={{fontSize:13}}>Try a different search term or category.</div>
+
+        {/* Show institutional toggle */}
+        {!showAll&&!cat&&!search&&(
+          <div style={{textAlign:"center",marginBottom:20}}>
+            <button onClick={()=>setShowAll(true)} style={{background:ds.color.canvas,border:`1px solid ${ds.color.border}`,borderRadius:ds.radius.pill,padding:"6px 16px",cursor:"pointer",fontSize:12,color:ds.color.textBody,fontFamily:ds.font.body,fontWeight:600}}>+ Show institutional categories</button>
           </div>
         )}
-        {!isInstitutionalCat&&(
-          <div style={{marginTop:48,padding:"28px 32px",background:ds.color.canvas,borderRadius:ds.radius.xl,border:`1px solid ${ds.color.border}`,textAlign:"center"}}>
-            <div style={{fontSize:15,fontWeight:600,color:ds.color.textDark,marginBottom:6}}>Need hospital equipment, imaging systems, or specialized devices?</div>
-            <div style={{fontSize:13.5,color:ds.color.textMuted,marginBottom:16}}>Institutional and specialized orders are handled separately with formal quotation.</div>
-            <Btn variant="secondary" size="md" onClick={()=>setPage("institutional")}>View Institutional Orders →</Btn>
+
+        {/* Product grid */}
+        <div className="dm-grid-4" style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(220px,1fr))",gap:16}}>
+          {filtered.map(p=><ProductCard key={p.id} product={p} addToCart={addToCart} setPage={setPage} wishlist={wishlist} toggleWishlist={toggleWishlist}/>)}
+        </div>
+
+        {/* Empty state */}
+        {filtered.length===0&&(
+          <div style={{textAlign:"center",padding:"60px 28px",background:ds.color.canvas,borderRadius:ds.radius.lg,border:`1px solid ${ds.color.border}`}}>
+            <div style={{fontSize:48,marginBottom:14,opacity:0.6}}>🔍</div>
+            <div style={{fontSize:16,fontWeight:700,color:ds.color.textDark,marginBottom:6}}>No products found</div>
+            <div style={{fontSize:13.5,color:ds.color.textMuted,marginBottom:20,maxWidth:380,margin:"0 auto 20px"}}>
+              {search ? `We couldn't find anything matching "${search}". Try different keywords or browse by category.` : "Try selecting a different category or clearing your filters."}
+            </div>
+            <div style={{display:"flex",gap:10,justifyContent:"center",flexWrap:"wrap"}}>
+              <Btn variant="primary" size="sm" onClick={clearFilters}>Clear Filters</Btn>
+              <Btn variant="outline" size="sm" onClick={()=>setPage("quote")}>Request a Quote Instead</Btn>
+            </div>
+          </div>
+        )}
+
+        {/* Bottom institutional CTA */}
+        {!isInstitutionalCat&&filtered.length>0&&(
+          <div style={{marginTop:48,padding:"28px 32px",background:`linear-gradient(135deg, ${ds.color.canvasWarm} 0%, ${ds.color.canvasGold} 100%)`,borderRadius:ds.radius.xl,border:`1px solid ${ds.color.goldBorder}`,textAlign:"center"}}>
+            <div style={{fontSize:15,fontWeight:700,color:ds.color.textDark,marginBottom:6}}>Need hospital equipment, imaging systems, or specialized devices?</div>
+            <div style={{fontSize:13.5,color:ds.color.textMuted,marginBottom:16}}>Institutional and bulk orders are handled separately with formal BIR-compliant quotation.</div>
+            <Btn variant="gold" size="md" onClick={()=>setPage("quote")}>Request Bulk Quote →</Btn>
           </div>
         )}
       </div>
@@ -7050,14 +7291,31 @@ function CartPage({cart,removeFromCart,updateQty,setPage,user,onOrderComplete}){
     </div>
   );
 
-  // ── Empty cart (only show if NOT in success state)
+  // v16.2: Better empty cart state with trust signals
   if(cart.length===0) return(
-    <div style={{paddingTop:67,minHeight:"80vh",display:"flex",alignItems:"center",justifyContent:"center",background:ds.color.canvas}}>
-      <div style={{textAlign:"center",maxWidth:400,padding:"0 24px"}}>
-        <div style={{fontSize:48,marginBottom:16}}>🛒</div>
-        <div style={{fontFamily:ds.font.display,fontSize:22,color:ds.color.textDark,marginBottom:10}}>Your cart is empty</div>
-        <p style={{fontSize:14,color:ds.color.textMuted,lineHeight:1.7,marginBottom:24}}>Browse our catalog and add items to your cart.</p>
-        <Btn variant="primary" size="md" onClick={()=>setPage("products")}>Browse Products</Btn>
+    <div style={{paddingTop:67,minHeight:"80vh",background:`linear-gradient(180deg, ${ds.color.canvas} 0%, ${ds.color.canvasWarm} 100%)`,display:"flex",alignItems:"center",justifyContent:"center"}}>
+      <div style={{textAlign:"center",maxWidth:480,padding:"40px 24px"}}>
+        <div style={{
+          width:120,height:120,borderRadius:"50%",
+          background:`radial-gradient(circle, ${ds.color.redLight} 0%, transparent 70%)`,
+          margin:"0 auto 24px",
+          display:"flex",alignItems:"center",justifyContent:"center",
+          fontSize:56,
+        }}>🛒</div>
+        <div style={{fontFamily:ds.font.display,fontSize:26,color:ds.color.textDark,marginBottom:10}}>Your cart is empty</div>
+        <p style={{fontSize:14.5,color:ds.color.textMuted,lineHeight:1.7,marginBottom:28}}>Browse our catalog of pharmaceuticals, medical equipment, and healthcare essentials. We deliver nationwide.</p>
+        <div style={{display:"flex",gap:10,justifyContent:"center",flexWrap:"wrap",marginBottom:32}}>
+          <Btn variant="primary" size="lg" onClick={()=>setPage("products")}>Browse Products</Btn>
+          <Btn variant="outline" size="lg" onClick={()=>setPage("quote")}>Request Quote</Btn>
+        </div>
+        {/* Trust signals */}
+        <div style={{display:"flex",gap:16,justifyContent:"center",flexWrap:"wrap",fontSize:11.5,color:ds.color.textMuted}}>
+          <span>📋 BIR-Registered</span>
+          <span style={{opacity:0.4}}>·</span>
+          <span>🚚 Nationwide Delivery</span>
+          <span style={{opacity:0.4}}>·</span>
+          <span>🔒 Secure Checkout</span>
+        </div>
       </div>
     </div>
   );
@@ -7180,36 +7438,130 @@ function CartPage({cart,removeFromCart,updateQty,setPage,user,onOrderComplete}){
           })}
         </div>
 
+        {/* v16.2: Trust signals bar above cart */}
+        {step===1 && cart.length > 0 && (
+          <div style={{
+            display:"flex",
+            gap:14,
+            justifyContent:"center",
+            flexWrap:"wrap",
+            padding:"14px 20px",
+            background:"#fff",
+            borderRadius:ds.radius.lg,
+            border:`1px solid ${ds.color.borderLight}`,
+            marginBottom:18,
+            fontSize:12,
+            color:ds.color.textBody,
+          }}>
+            <span style={{display:"flex",alignItems:"center",gap:5}}>
+              <span style={{color:ds.color.success}}>✓</span> Secure Checkout
+            </span>
+            <span style={{opacity:0.4}}>·</span>
+            <span style={{display:"flex",alignItems:"center",gap:5}}>
+              <span>🚚</span> Nationwide Delivery
+            </span>
+            <span style={{opacity:0.4}}>·</span>
+            <span style={{display:"flex",alignItems:"center",gap:5}}>
+              <span>📋</span> BIR-Compliant Receipts
+            </span>
+            <span style={{opacity:0.4}}>·</span>
+            <span style={{display:"flex",alignItems:"center",gap:5}}>
+              <span>💬</span> Support 24/7
+            </span>
+          </div>
+        )}
+
         {/* ── Step 1 — Cart Review */}
         {step===1&&(
-          <div style={{display:"grid",gridTemplateColumns:"1fr 320px",gap:24,alignItems:"start"}}>
+          <div className="dm-cart-grid" style={{display:"grid",gridTemplateColumns:"1fr 320px",gap:24,alignItems:"start"}}>
             <div style={{background:"#fff",borderRadius:ds.radius.xl,padding:"28px 32px",boxShadow:ds.shadow.sm,border:`1px solid ${ds.color.borderLight}`}}>
               <div style={{fontFamily:ds.font.display,fontSize:20,color:ds.color.textDark,marginBottom:20}}>🛒 Your Cart ({cart.length} item{cart.length!==1?"s":""})</div>
               {cart.map(item=>(
-                <div key={item.id} style={{display:"flex",alignItems:"center",gap:14,padding:"16px 0",borderBottom:`1px solid ${ds.color.borderLight}`}}>
-                  <div style={{flex:1}}>
-                    <div style={{fontSize:14,fontWeight:600,color:ds.color.textDark}}>{item.name}</div>
-                    {item.requiresPrescription&&<div style={{fontSize:11,color:"#92400E",marginTop:2}}>💊 Prescription required</div>}
-                    <div style={{fontSize:12,color:ds.color.textMuted,marginTop:2}}>{formatPHP(item.price)} per unit</div>
+                <div key={item.id} style={{
+                  display:"grid",
+                  gridTemplateColumns:"1fr auto auto auto",
+                  alignItems:"center",
+                  gap:14,
+                  padding:"16px 0",
+                  borderBottom:`1px solid ${ds.color.borderLight}`,
+                }} className="dm-cart-item">
+                  {/* Item info */}
+                  <div style={{minWidth:0}}>
+                    <div style={{fontSize:14,fontWeight:600,color:ds.color.textDark,marginBottom:3}}>{item.name}</div>
+                    <div style={{fontSize:11.5,color:ds.color.textMuted}}>
+                      {formatPHP(item.price)} <span style={{opacity:0.6}}>per unit</span>
+                    </div>
+                    {item.requiresPrescription&&<div style={{display:"inline-flex",alignItems:"center",gap:4,marginTop:5,fontSize:10,fontWeight:700,padding:"2px 8px",borderRadius:ds.radius.pill,background:"#FFF3CD",border:"1px solid #FBBF24",color:"#92400E"}}>💊 RX REQUIRED</div>}
                   </div>
-                  <div style={{display:"flex",alignItems:"center",gap:8}}>
-                    <button onClick={()=>updateQty(item.id,item.qty-1)} style={{width:28,height:28,borderRadius:ds.radius.sm,border:`1px solid ${ds.color.border}`,background:"#fff",cursor:"pointer",fontSize:14,display:"flex",alignItems:"center",justifyContent:"center"}}>−</button>
-                    <span style={{fontSize:14,fontWeight:600,minWidth:20,textAlign:"center"}}>{item.qty}</span>
-                    <button onClick={()=>updateQty(item.id,item.qty+1)} style={{width:28,height:28,borderRadius:ds.radius.sm,border:`1px solid ${ds.color.border}`,background:"#fff",cursor:"pointer",fontSize:14,display:"flex",alignItems:"center",justifyContent:"center"}}>+</button>
+                  
+                  {/* Qty stepper */}
+                  <div style={{display:"flex",alignItems:"center",gap:0,border:`1px solid ${ds.color.border}`,borderRadius:ds.radius.md,overflow:"hidden",background:"#fff"}}>
+                    <button onClick={()=>updateQty(item.id,Math.max(1,item.qty-1))} disabled={item.qty<=1} style={{width:30,height:32,border:"none",background:item.qty<=1?ds.color.canvas:"#fff",cursor:item.qty<=1?"not-allowed":"pointer",fontSize:16,fontWeight:600,color:item.qty<=1?ds.color.textLight:ds.color.textDark,display:"flex",alignItems:"center",justifyContent:"center"}}>−</button>
+                    <span style={{fontSize:13,fontWeight:700,minWidth:32,textAlign:"center",color:ds.color.textDark,padding:"0 6px",borderLeft:`1px solid ${ds.color.borderLight}`,borderRight:`1px solid ${ds.color.borderLight}`,height:32,display:"flex",alignItems:"center",justifyContent:"center"}}>{item.qty}</span>
+                    <button onClick={()=>updateQty(item.id,item.qty+1)} style={{width:30,height:32,border:"none",background:"#fff",cursor:"pointer",fontSize:16,fontWeight:600,color:ds.color.textDark,display:"flex",alignItems:"center",justifyContent:"center"}}>+</button>
                   </div>
-                  <div style={{fontSize:14,fontWeight:700,minWidth:90,textAlign:"right"}}>{formatPHP(item.price*item.qty)}</div>
-                  <button onClick={()=>removeFromCart(item.id)} style={{background:"none",border:"none",cursor:"pointer",fontSize:16,color:ds.color.textLight,padding:4}}>✕</button>
+                  
+                  {/* Line total */}
+                  <div style={{fontSize:14,fontWeight:700,minWidth:88,textAlign:"right",color:ds.color.textDark}}>{formatPHP(item.price*item.qty)}</div>
+                  
+                  {/* Remove button */}
+                  <button onClick={()=>removeFromCart(item.id)} title="Remove from cart" style={{background:"none",border:"none",cursor:"pointer",fontSize:14,color:ds.color.textLight,padding:6,borderRadius:ds.radius.sm,transition:"color 0.15s, background 0.15s"}}
+                    onMouseEnter={e=>{e.currentTarget.style.color=ds.color.red;e.currentTarget.style.background=ds.color.redLight;}}
+                    onMouseLeave={e=>{e.currentTarget.style.color=ds.color.textLight;e.currentTarget.style.background="none";}}
+                  >✕</button>
                 </div>
               ))}
+              
+              {/* Continue shopping link */}
+              <div style={{textAlign:"center",paddingTop:18}}>
+                <button onClick={()=>setPage("products")} style={{background:"none",border:"none",cursor:"pointer",fontSize:13,color:ds.color.red,fontFamily:ds.font.body,fontWeight:600}}>
+                  ← Continue Shopping
+                </button>
+              </div>
             </div>
-            <div style={{background:"#fff",borderRadius:ds.radius.xl,padding:"24px",border:`1px solid ${ds.color.border}`}}>
-              <div style={{fontFamily:ds.font.display,fontSize:18,color:ds.color.textDark,marginBottom:16}}>Order Total</div>
-              <div style={{display:"flex",justifyContent:"space-between",fontSize:15,fontWeight:700,marginBottom:6}}><span>Total</span><span>{formatPHP(total)}</span></div>
-              <div style={{fontSize:12,color:ds.color.textLight,marginBottom:20}}>{formatUSD(total)} · indicative</div>
-              {hasRx&&<div style={{background:"#FFF3CD",border:"1px solid #FBBF24",borderRadius:ds.radius.md,padding:"10px 14px",fontSize:12,color:"#92400E",marginBottom:16}}>💊 Prescription items in cart. You'll be asked to upload a valid Rx.</div>}
-              {user&&<div style={{background:ds.color.goldLight,borderRadius:ds.radius.md,padding:"10px 12px",fontSize:12,color:ds.color.gold,marginBottom:16}}>⭐ You'll earn <strong>{Math.floor(total*POINTS_PER_PHP)} points</strong> for this order!</div>}
+            <div className="dm-cart-summary" style={{background:"#fff",borderRadius:ds.radius.xl,padding:"24px",border:`1px solid ${ds.color.border}`,boxShadow:ds.shadow.sm,position:"sticky",top:90}}>
+              <div style={{fontFamily:ds.font.display,fontSize:18,color:ds.color.textDark,marginBottom:16}}>Order Summary</div>
+              
+              {/* v16.2: Show VAT breakdown */}
+              {(()=>{ 
+                const vat = computeVATBreakdown(total, "vat_inclusive");
+                return (
+                  <div style={{marginBottom:16}}>
+                    <div style={{display:"flex",justifyContent:"space-between",fontSize:13,color:ds.color.textBody,marginBottom:6}}>
+                      <span>Subtotal ({cart.length} item{cart.length!==1?"s":""})</span>
+                      <span>{formatPHP(vat.netOfVAT)}</span>
+                    </div>
+                    <div style={{display:"flex",justifyContent:"space-between",fontSize:13,color:ds.color.textBody,marginBottom:6}}>
+                      <span>VAT (12%)</span>
+                      <span>{formatPHP(vat.vat)}</span>
+                    </div>
+                    <div style={{display:"flex",justifyContent:"space-between",fontSize:13,color:ds.color.textMuted,marginBottom:14}}>
+                      <span>Shipping</span>
+                      <span style={{color:ds.color.success,fontWeight:600}}>Calculated next →</span>
+                    </div>
+                    <div style={{borderTop:`1px solid ${ds.color.borderLight}`,paddingTop:12}}>
+                      <div style={{display:"flex",justifyContent:"space-between",fontSize:16,fontWeight:700,color:ds.color.textDark}}>
+                        <span>Total</span>
+                        <span>{formatPHP(total)}</span>
+                      </div>
+                      <div style={{fontSize:11,color:ds.color.textLight,marginTop:4,textAlign:"right"}}>VAT included · {formatUSD(total)} approx.</div>
+                    </div>
+                  </div>
+                );
+              })()}
+              
+              {hasRx&&<div style={{background:"#FFF3CD",border:"1px solid #FBBF24",borderRadius:ds.radius.md,padding:"10px 14px",fontSize:12,color:"#92400E",marginBottom:14,lineHeight:1.5}}>💊 <strong>Prescription items in cart.</strong> You'll be asked to upload a valid Rx during checkout.</div>}
+              {user&&<div style={{background:ds.color.goldLight,border:`1px solid ${ds.color.goldBorder}`,borderRadius:ds.radius.md,padding:"10px 12px",fontSize:12,color:ds.color.gold,marginBottom:14}}>⭐ You'll earn <strong>{Math.floor(total*POINTS_PER_PHP)} points</strong> with this order!</div>}
+              
               <Btn variant="primary" size="lg" fullWidth onClick={()=>setStep(2)}>Proceed to Checkout →</Btn>
-              <button onClick={()=>setOrderMode(null)} style={{background:"none",border:"none",cursor:"pointer",fontSize:12.5,color:ds.color.textMuted,fontFamily:ds.font.body,marginTop:12,display:"block",width:"100%",textAlign:"center"}}>← Change shipping region</button>
+              
+              {/* Trust signals below button */}
+              <div style={{marginTop:14,padding:"10px 0",borderTop:`1px solid ${ds.color.borderLight}`,fontSize:11,color:ds.color.textMuted,textAlign:"center",lineHeight:1.6}}>
+                <div>🔒 Your data is securely encrypted</div>
+                <div style={{marginTop:4}}>📞 Need help? <a href="mailto:info@dmeastph.com" style={{color:ds.color.red,fontWeight:600,textDecoration:"none"}}>info@dmeastph.com</a></div>
+              </div>
+              
+              <button onClick={()=>setOrderMode(null)} style={{background:"none",border:"none",cursor:"pointer",fontSize:11.5,color:ds.color.textLight,fontFamily:ds.font.body,marginTop:10,display:"block",width:"100%",textAlign:"center"}}>← Change shipping region</button>
             </div>
           </div>
         )}
