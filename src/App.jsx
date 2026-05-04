@@ -1,5 +1,13 @@
 /**
- * DMEAST — Medical Solutions Platform  v16.3
+ * DMEAST — Medical Solutions Platform  v16.4
+ *
+ * v16.4 SEO + DISCOVERABILITY:
+ * - 🔍 Per-page meta titles + descriptions (Google sees each page as unique)
+ * - 📱 Open Graph tags (Facebook/Messenger/WhatsApp link previews)
+ * - 🐦 Twitter Card tags
+ * - 🔗 Canonical URLs (prevents duplicate content issues)
+ * - 🤖 robots/keywords meta tags
+ * - 📋 New static files: sitemap.xml, robots.txt, manifest.json
  *
  * v16.3 FIUU COMPLIANCE:
  * - 📋 Added Cancellation & Termination Policy page (required by Fiuu)
@@ -479,6 +487,134 @@ const GLOBAL_CSS = `
   .leaflet-container{font-family:var(--font-body);border-radius:10px}
   .leaflet-popup-content{font-size:12px}
 `;
+
+// v16.4: SEO metadata for each page (used by useSEO hook)
+// Goal: every page has unique title + description for Google + good link previews
+const SEO_META = {
+  home: {
+    title: "DM EAST · Quality Medical Solutions Delivered Nationwide | Pharmaceuticals, Equipment, Supplies",
+    description: "DMEAST is your trusted source for pharmaceuticals, medical equipment, and healthcare essentials in the Philippines. BIR-registered. Delivered nationwide. Trusted by 50+ healthcare institutions, hospitals, LGUs, and clinics.",
+    keywords: "medical supplies Philippines, pharmaceuticals Manila, medical equipment supplier, healthcare distributor Philippines, hospital supplies, LGU medical supplier, BIR registered medical trader, DMEAST",
+  },
+  products: {
+    title: "Shop Medical Supplies & Pharmaceuticals · Free Delivery NCR | DM EAST",
+    description: "Browse 500+ healthcare products: pharmaceuticals, medical equipment, supplies, and more. PHP prices, BIR-compliant invoicing, nationwide delivery from Metro Manila to provinces.",
+    keywords: "buy medical supplies online Philippines, pharmaceutical online store, medical equipment shop, Philippine healthcare ecommerce",
+  },
+  about: {
+    title: "About DM EAST · Medical Trading Company in Manila Since 2020",
+    description: "DM EAST (Decon Medical Equipment and Supplies Trading) — Philippine-based medical trading company established 2020. Sourcing pharmaceuticals, medical equipment, and supplies from authorized FDA-licensed suppliers.",
+    keywords: "about DMEAST, medical trading company Philippines, Decon Medical Equipment, Manila medical supplier",
+  },
+  institutional: {
+    title: "Institutional Orders · Hospitals, LGUs, Clinics | DM EAST",
+    description: "Special pricing and dedicated account support for hospitals, LGUs, RHUs, BPO companies, and corporate buyers. Bulk orders, BIR-compliant documentation, formal quotations.",
+    keywords: "LGU medical supplier, hospital procurement Philippines, bulk medical supplies, RHU equipment supplier, BPO medical kits",
+  },
+  quote: {
+    title: "Request a Quote · Bulk & Specialized Medical Orders | DM EAST",
+    description: "Need bulk pharmaceuticals, specialized medical equipment, or institutional supplies? Request a formal quotation. We respond within 24-48 hours with PHP-priced quotation and BIR-compliant terms.",
+    keywords: "medical supplies quote Philippines, bulk pharmaceutical pricing, hospital equipment quotation",
+  },
+  track: {
+    title: "Track Your Order | DM EAST",
+    description: "Track your DM EAST order status. Upload payment proof and view delivery progress.",
+    keywords: "track order DMEAST, medical supplies delivery tracking",
+  },
+  contact: {
+    title: "Contact DM EAST · Manila Medical Supplier",
+    description: "Contact DM EAST: info@dmeastph.com | +63 951 040 1708. Office: 1146 M. Natividad St., Sta. Cruz, Manila. Business hours Mon-Sat 9 AM - 6 PM.",
+    keywords: "DMEAST contact, Manila medical supplier phone, Sta Cruz Manila medical company",
+  },
+  cart: {
+    title: "Your Cart | DM EAST",
+    description: "Review your cart and proceed to checkout. Secure payment, BIR-compliant invoicing, nationwide delivery.",
+  },
+  privacy: {
+    title: "Privacy Policy | DM EAST",
+    description: "How DM EAST handles your personal information, data security practices, and your privacy rights.",
+  },
+  terms: {
+    title: "Terms & Conditions | DM EAST",
+    description: "Terms and conditions for using dmeastph.com and ordering from DM EAST.",
+  },
+  refunds: {
+    title: "Return & Refund Policy | DM EAST",
+    description: "DM EAST 7-day replacement guarantee, refund eligibility, and returns process.",
+  },
+  shipping: {
+    title: "Shipping Policy · Nationwide & International | DM EAST",
+    description: "DM EAST domestic and international shipping policy. Delivery times, tracking, and damaged-in-transit handling.",
+  },
+  cancellation: {
+    title: "Cancellation & Termination Policy | DM EAST",
+    description: "How to cancel DM EAST orders, refund methods, account termination procedures, and dispute resolution.",
+  },
+  account: {
+    title: "My Account | DM EAST",
+    description: "Manage your DM EAST account, view order history, addresses, and rewards.",
+  },
+  admin: {
+    title: "Admin Dashboard | DM EAST",
+    description: "Admin control panel.",
+  },
+};
+
+// v16.4: SEO hook — updates document head metadata when page changes
+function useSEO(page) {
+  useEffect(() => {
+    const meta = SEO_META[page] || SEO_META.home;
+    const baseUrl = "https://dmeastph.com";
+    const canonical = page === "home" ? baseUrl : `${baseUrl}/${page}`;
+    const ogImage = `${baseUrl}/logo.png`;
+    
+    // Title
+    document.title = meta.title;
+    
+    // Helper to set or create a meta tag
+    const setMeta = (name, content, attr = "name") => {
+      if (!content) return;
+      let tag = document.querySelector(`meta[${attr}="${name}"]`);
+      if (!tag) {
+        tag = document.createElement("meta");
+        tag.setAttribute(attr, name);
+        document.head.appendChild(tag);
+      }
+      tag.setAttribute("content", content);
+    };
+    
+    // Standard SEO
+    setMeta("description", meta.description);
+    if (meta.keywords) setMeta("keywords", meta.keywords);
+    setMeta("robots", "index, follow");
+    setMeta("author", "DM EAST");
+    
+    // Open Graph (Facebook, Messenger, WhatsApp)
+    setMeta("og:title", meta.title, "property");
+    setMeta("og:description", meta.description, "property");
+    setMeta("og:type", "website", "property");
+    setMeta("og:url", canonical, "property");
+    setMeta("og:image", ogImage, "property");
+    setMeta("og:site_name", "DM EAST", "property");
+    setMeta("og:locale", "en_PH", "property");
+    
+    // Twitter Card
+    setMeta("twitter:card", "summary_large_image");
+    setMeta("twitter:title", meta.title);
+    setMeta("twitter:description", meta.description);
+    setMeta("twitter:image", ogImage);
+    
+    // Canonical URL
+    let link = document.querySelector("link[rel='canonical']");
+    if (!link) {
+      link = document.createElement("link");
+      link.setAttribute("rel", "canonical");
+      document.head.appendChild(link);
+    }
+    link.setAttribute("href", canonical);
+    
+  }, [page]);
+}
 
 const CONTACT = {
   phone1:"+63 951 040 1708", phone1Raw:"+639510401708",
@@ -8190,6 +8326,8 @@ function FloatingChat(){
 // ─── ROOT APP ────────────────────────────────────────────────────────────────
 export default function App(){
   const [page,setPageRaw]=useState("home");
+  // v16.4: Update meta tags on page change for SEO + social sharing
+  useSEO(page);
   const [cart,setCart]=useState([]);
   const [activeCategory,setActiveCategory]=useState(null);
   const [user,setUser]=useState(null);

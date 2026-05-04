@@ -1,0 +1,12 @@
+# DM EAST robots.txt
+
+User-agent: *
+Allow: /
+
+# Block admin and account areas (no SEO value, also private)
+Disallow: /admin
+Disallow: /account
+Disallow: /cart
+
+# Sitemap location
+Sitemap: https://dmeastph.com/sitemap.xml

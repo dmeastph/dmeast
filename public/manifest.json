@@ -1,0 +1,32 @@
+{
+  "name": "DM EAST · Quality Medical Solutions",
+  "short_name": "DM EAST",
+  "description": "Pharmaceuticals, medical equipment, and healthcare essentials delivered nationwide. BIR-registered. Trusted by hospitals, clinics, LGUs, and individuals across the Philippines.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#FFFFFF",
+  "theme_color": "#CC2F3C",
+  "orientation": "portrait-primary",
+  "lang": "en-PH",
+  "icons": [
+    {
+      "src": "/logo.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/logo.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "categories": ["medical", "shopping", "health"]
+}
