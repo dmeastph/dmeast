@@ -1,5 +1,14 @@
 /**
- * DMEAST — Medical Solutions Platform  v16.4
+ * DMEAST — Medical Solutions Platform  v16.5
+ *
+ * v16.5 BLOG SYSTEM:
+ * - 📝 Full blog system: public listing page (/blog), individual articles (/blog/:slug)
+ * - 🛠️ Admin Posts tab — create/edit/publish articles via dashboard
+ * - 🔍 Per-article SEO meta tags + structured data
+ * - 🏷️ Categories, tags, author, featured image, draft/published states
+ * - 🌟 Latest articles section on homepage
+ * - 🔥 Related articles at bottom of each post
+ * - 📊 Read time estimation, slug auto-generation
  *
  * v16.4 SEO + DISCOVERABILITY:
  * - 🔍 Per-page meta titles + descriptions (Google sees each page as unique)
@@ -184,26 +193,28 @@ const ROLE_PERMISSIONS = {
     icon: "👑",
     color: "#7C3AED",
     description: "Full access to all features",
-    tabs: ["overview","orders","receivables","expenses","billings","margin","products","customers","rx"],
+    tabs: ["overview","orders","receivables","expenses","billings","margin","products","customers","rx","blog"],
     canEditOrders: true,
     canDeleteOrders: true,
     canEditProducts: true,
     canSeeMargins: true,
     canSeeExpenses: true,
     canManageUsers: true,
+    canEditBlog: true,
   },
   operations: {
     label: "Operations Admin",
     icon: "🔧",
     color: "#0EA5E9",
     description: "Manages orders, customers, products, prescriptions, margin dashboard",
-    tabs: ["overview","orders","receivables","margin","products","customers","rx"],
+    tabs: ["overview","orders","receivables","margin","products","customers","rx","blog"],
     canEditOrders: true,
     canDeleteOrders: false,        // Operations cannot delete orders
     canEditProducts: true,
     canSeeMargins: true,            // v15.2: now allowed to see margin dashboard
     canSeeExpenses: false,           // but NOT detailed expenses (still hidden)
     canManageUsers: false,
+    canEditBlog: true,              // v16.5: ops can manage blog
   },
   accounting: {
     label: "Accounting Admin",
@@ -217,6 +228,7 @@ const ROLE_PERMISSIONS = {
     canSeeMargins: true,
     canSeeExpenses: true,
     canManageUsers: false,
+    canEditBlog: false,             // v16.5: accounting doesn't manage blog
   },
 };
 
@@ -558,15 +570,35 @@ const SEO_META = {
     title: "Admin Dashboard | DM EAST",
     description: "Admin control panel.",
   },
+  blog: {
+    title: "Blog · Healthcare Insights & Procurement Guidance | DM EAST",
+    description: "Industry insights, procurement guidance, and healthcare news from DM EAST. Resources for hospital pharmacists, LGU procurement officers, and clinic managers in the Philippines.",
+    keywords: "medical procurement Philippines, healthcare blog Philippines, BIR-compliant procurement, LGU medical supplies guide, Filipino pharmacy industry insights",
+  },
+  blogPost: {
+    title: "Article | DMEAST Blog",  // Will be overridden dynamically in the BlogPostPage
+    description: "Read healthcare insights and procurement guidance from DMEAST.",
+  },
 };
 
-// v16.4: SEO hook — updates document head metadata when page changes
-function useSEO(page) {
+// v16.4/v16.5: SEO hook — updates document head metadata when page changes
+function useSEO(page, activePost) {
   useEffect(() => {
-    const meta = SEO_META[page] || SEO_META.home;
+    let meta = SEO_META[page] || SEO_META.home;
     const baseUrl = "https://dmeastph.com";
-    const canonical = page === "home" ? baseUrl : `${baseUrl}/${page}`;
-    const ogImage = `${baseUrl}/logo.png`;
+    let canonical = page === "home" ? baseUrl : `${baseUrl}/${page}`;
+    let ogImage = `${baseUrl}/logo.png`;
+    
+    // v16.5: For individual blog posts, override title/description with article meta
+    if (page === "blogPost" && activePost) {
+      meta = {
+        title: `${activePost.title} | DMEAST Blog`,
+        description: activePost.metaDescription || activePost.excerpt || activePost.title,
+        keywords: (activePost.tags || []).join(", "),
+      };
+      canonical = `${baseUrl}/blog/${activePost.slug}`;
+      if (activePost.featuredImage) ogImage = activePost.featuredImage;
+    }
     
     // Title
     document.title = meta.title;
@@ -1176,7 +1208,7 @@ function Navbar({activePage,setPage,cartCount,user,isAdmin,onSignIn,onSignOut}){
     return()=>document.removeEventListener("mousedown",fn);
   },[]);
 
-  const links=[{id:"home",label:"Home"},{id:"about",label:"About Us"},{id:"products",label:"Shop"},{id:"institutional",label:"Institutional Orders"},{id:"quote",label:"Request Quote"},{id:"track",label:"Track Order"},{id:"contact",label:"Contact"}];
+  const links=[{id:"home",label:"Home"},{id:"about",label:"About Us"},{id:"products",label:"Shop"},{id:"institutional",label:"Institutional"},{id:"blog",label:"Blog"},{id:"quote",label:"Request Quote"},{id:"track",label:"Track Order"},{id:"contact",label:"Contact"}];
   const nav=id=>{setPage(id);setMenuOpen(false);};
 
   return(
@@ -1586,6 +1618,14 @@ function CustomerPortal({user,setPage,addToCart,wishlist,toggleWishlist}){
       const bSnap=await getDocs(query(collection(db,"manualBillings"),orderBy("date","desc")));
       setManualBillings(bSnap.docs.map(d=>({id:d.id,...d.data()})));
     } catch(e){ console.warn("Refresh billings failed:", e.message); }
+  };
+  
+  // v16.5: Refresh just blog posts
+  const refreshPosts = async () => {
+    try {
+      const pSnap=await getDocs(query(collection(db,"posts"),orderBy("createdAt","desc")));
+      setPosts(pSnap.docs.map(d=>({id:d.id,...d.data()})));
+    } catch(e){ console.warn("Refresh posts failed:", e.message); }
   };
   const tabs=[{id:"overview",label:"Overview",icon:"📊"},{id:"orders",label:"Orders",icon:"📦"},{id:"wishlist",label:"Wishlist",icon:"❤️"},{id:"address",label:"My Address",icon:"📍"},{id:"rx",label:"Rx History",icon:"💊"},{id:"rewards",label:"Rewards",icon:"⭐"}];
 
@@ -4910,6 +4950,8 @@ function AdminDashboard({ user }){
   const [showExpenseEditor,setShowExpenseEditor]=useState(null);
   const [manualBillings,setManualBillings]=useState([]);
   const [showBillingEditor,setShowBillingEditor]=useState(null);
+  // v16.5: Blog posts
+  const [posts,setPosts]=useState([]);
   // v13.0c: Order editor state
   const [showOrderEditor,setShowOrderEditor]=useState(null);
   // v15: PDF modal + role
@@ -5023,6 +5065,11 @@ function AdminDashboard({ user }){
         const bSnap=await getDocs(query(collection(db,"manualBillings"),orderBy("date","desc")));
         setManualBillings(bSnap.docs.map(d=>({id:d.id,...d.data()})));
       } catch(e){ console.warn("Manual billings load failed:", e.message); }
+      // v16.5: Blog posts
+      try {
+        const pSnap=await getDocs(query(collection(db,"posts"),orderBy("createdAt","desc")));
+        setPosts(pSnap.docs.map(d=>({id:d.id,...d.data()})));
+      } catch(e){ console.warn("Blog posts load failed:", e.message); }
       setLoading(false);
     })();
   },[]);
@@ -5233,7 +5280,15 @@ function AdminDashboard({ user }){
       setManualBillings(bSnap.docs.map(d=>({id:d.id,...d.data()})));
     } catch(e){ console.warn("Refresh billings failed:", e.message); }
   };
-  const allTabs=[{id:"overview",label:"Overview",icon:"📊"},{id:"orders",label:`Orders${pendingPaymentCount>0?" 🔔":""}`,icon:"📦"},{id:"receivables",label:"Receivables",icon:"💰"},{id:"expenses",label:"Expenses",icon:"🏢"},{id:"billings",label:"Billings",icon:"📝"},{id:"margin",label:"Margin",icon:"📈"},{id:"products",label:"Products",icon:"🗂️"},{id:"customers",label:"Customers",icon:"👥"},{id:"rx",label:"Rx Uploads",icon:"💊"}];
+  
+  // v16.5: Refresh just blog posts
+  const refreshPosts = async () => {
+    try {
+      const pSnap=await getDocs(query(collection(db,"posts"),orderBy("createdAt","desc")));
+      setPosts(pSnap.docs.map(d=>({id:d.id,...d.data()})));
+    } catch(e){ console.warn("Refresh posts failed:", e.message); }
+  };
+  const allTabs=[{id:"overview",label:"Overview",icon:"📊"},{id:"orders",label:`Orders${pendingPaymentCount>0?" 🔔":""}`,icon:"📦"},{id:"receivables",label:"Receivables",icon:"💰"},{id:"expenses",label:"Expenses",icon:"🏢"},{id:"billings",label:"Billings",icon:"📝"},{id:"margin",label:"Margin",icon:"📈"},{id:"products",label:"Products",icon:"🗂️"},{id:"customers",label:"Customers",icon:"👥"},{id:"rx",label:"Rx Uploads",icon:"💊"},{id:"blog",label:"Blog",icon:"📝"}];
   // v15: Filter tabs based on user role
   const tabs = userPerms ? allTabs.filter(t=>userPerms.tabs.includes(t.id)) : allTabs;
 
@@ -5626,6 +5681,13 @@ function AdminDashboard({ user }){
                 </select>
               </div>
             ))}
+          </div>
+        )}
+        
+        {/* v16.5: Blog/Posts tab */}
+        {tab==="blog"&&(
+          <div style={{background:"#fff",border:`1px solid ${ds.color.border}`,borderRadius:ds.radius.lg,padding:"24px 28px",boxShadow:ds.shadow.xs}}>
+            <PostsTab posts={posts} refreshPosts={refreshPosts} userRole={userRole}/>
           </div>
         )}
       </div>
@@ -6459,7 +6521,7 @@ function WhyChooseSection(){
   );
 }
 
-function HomePage({setPage,setActiveCategory,addToCart}){
+function HomePage({setPage,setActiveCategory,addToCart,setActivePost}){
   return(
     <div style={{paddingTop:67}}>
       <TopAnnouncementBar/>
@@ -6471,6 +6533,7 @@ function HomePage({setPage,setActiveCategory,addToCart}){
       <InstitutionalCTABannerV16 setPage={setPage}/>
       <TestimonialsV16/>
       <FAQAccordionV16/>
+      <LatestArticlesSection setPage={setPage} setActivePost={setActivePost}/>
       <CtaBanner setPage={setPage}/>
     </div>
   );
@@ -8198,6 +8261,777 @@ function ShippingPage(){
   );
 }
 
+// ─── v16.5 BLOG SYSTEM (Public-facing) ───────────────────────────────────────
+
+// v16.5: Helper - generate URL-friendly slug from title
+function slugify(text) {
+  return (text || "")
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9\s-]/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+    .substring(0, 80);
+}
+
+// v16.5: Helper - estimate read time from content
+function estimateReadTime(htmlContent) {
+  const text = (htmlContent || "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+  const wordCount = text.split(" ").filter(Boolean).length;
+  const minutes = Math.max(1, Math.ceil(wordCount / 200));
+  return `${minutes} min read`;
+}
+
+// v16.5: Helper - format publish date nicely
+function formatBlogDate(d) {
+  if (!d) return "";
+  const date = d.toDate ? d.toDate() : new Date(d);
+  return date.toLocaleDateString("en-PH", { year: "numeric", month: "long", day: "numeric" });
+}
+
+// v16.5: Hook to load published blog posts
+function usePublishedPosts() {
+  const [posts, setPosts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const snap = await getDocs(query(collection(db, "posts"), orderBy("publishedAt", "desc")));
+        if (cancelled) return;
+        const all = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        setPosts(all.filter(p => p.status === "published"));
+      } catch(e) {
+        console.warn("Blog posts load failed:", e.message);
+      }
+      if (!cancelled) setLoading(false);
+    })();
+    return () => { cancelled = true; };
+  }, []);
+  
+  return { posts, loading };
+}
+
+// v16.5: Blog listing page (public, SEO-optimized)
+function BlogPage({ setPage, setActivePost }) {
+  const { posts, loading } = usePublishedPosts();
+  const [search, setSearch] = useState("");
+  const [activeCategory, setActiveCategory] = useState(null);
+  
+  // Get unique categories
+  const allCategories = [...new Set(posts.map(p => p.category).filter(Boolean))].sort();
+  
+  const filtered = posts.filter(p => {
+    const q = search.toLowerCase();
+    const matchesSearch = !q || 
+      p.title?.toLowerCase().includes(q) || 
+      p.excerpt?.toLowerCase().includes(q) ||
+      p.tags?.some(t => t.toLowerCase().includes(q));
+    const matchesCategory = !activeCategory || p.category === activeCategory;
+    return matchesSearch && matchesCategory;
+  });
+  
+  const handleArticleClick = (post) => {
+    setActivePost(post);
+    setPage("blogPost");
+  };
+  
+  return (
+    <div style={{paddingTop:67}}>
+      <PageHero 
+        eyebrow="Insights & News" 
+        title="DMEAST Blog" 
+        subtitle="Healthcare insights, industry updates, and procurement guidance for medical professionals and institutional buyers." 
+      />
+      
+      <div style={{maxWidth:1280,margin:"0 auto",padding:"40px 28px"}}>
+        
+        {/* Search bar */}
+        <div style={{
+          background:"#fff",
+          border:`1px solid ${ds.color.border}`,
+          borderRadius:ds.radius.lg,
+          padding:"6px 6px 6px 16px",
+          display:"flex",
+          alignItems:"center",
+          gap:10,
+          boxShadow:ds.shadow.xs,
+          marginBottom:20,
+          maxWidth:600,
+        }}>
+          <span style={{fontSize:18,color:ds.color.textMuted}}>🔍</span>
+          <input 
+            value={search} 
+            onChange={e=>setSearch(e.target.value)} 
+            placeholder="Search articles…"
+            style={{
+              flex:1,border:"none",fontSize:14,outline:"none",
+              fontFamily:ds.font.body,color:ds.color.textDark,
+              background:"transparent",padding:"8px 0",
+            }}
+          />
+          {search && (
+            <button onClick={()=>setSearch("")} style={{background:"none",border:"none",fontSize:18,color:ds.color.textMuted,cursor:"pointer",padding:"0 8px"}}>✕</button>
+          )}
+        </div>
+        
+        {/* Category pills */}
+        {allCategories.length > 0 && (
+          <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:24}}>
+            <button onClick={()=>setActiveCategory(null)} style={{
+              padding:"7px 14px",borderRadius:ds.radius.pill,
+              border:`1.5px solid ${!activeCategory?ds.color.red:ds.color.border}`,
+              background:!activeCategory?ds.color.red:"#fff",
+              color:!activeCategory?"#fff":ds.color.textBody,
+              cursor:"pointer",fontSize:12.5,fontWeight:600,fontFamily:ds.font.body,
+            }}>All Articles</button>
+            {allCategories.map(c => (
+              <button key={c} onClick={()=>setActiveCategory(c)} style={{
+                padding:"7px 14px",borderRadius:ds.radius.pill,
+                border:`1.5px solid ${activeCategory===c?ds.color.gold:ds.color.border}`,
+                background:activeCategory===c?ds.color.gold:"#fff",
+                color:activeCategory===c?"#fff":ds.color.textBody,
+                cursor:"pointer",fontSize:12.5,fontWeight:600,fontFamily:ds.font.body,
+              }}>{c}</button>
+            ))}
+          </div>
+        )}
+        
+        {/* Loading state */}
+        {loading && (
+          <div style={{textAlign:"center",padding:"60px 0",color:ds.color.textMuted}}>
+            Loading articles…
+          </div>
+        )}
+        
+        {/* Empty state */}
+        {!loading && filtered.length === 0 && (
+          <div style={{textAlign:"center",padding:"60px 28px",background:ds.color.canvas,borderRadius:ds.radius.lg,border:`1px solid ${ds.color.border}`}}>
+            <div style={{fontSize:48,marginBottom:14,opacity:0.6}}>📝</div>
+            <div style={{fontSize:16,fontWeight:700,color:ds.color.textDark,marginBottom:6}}>
+              {posts.length === 0 ? "No articles yet" : "No matching articles"}
+            </div>
+            <div style={{fontSize:13.5,color:ds.color.textMuted,marginBottom:20,maxWidth:380,margin:"0 auto 20px"}}>
+              {posts.length === 0 ? "Check back soon — we're working on insightful content for medical professionals." : "Try different keywords or browse all articles."}
+            </div>
+            {posts.length > 0 && (
+              <Btn variant="primary" size="sm" onClick={()=>{setSearch("");setActiveCategory(null);}}>Show All Articles</Btn>
+            )}
+          </div>
+        )}
+        
+        {/* Article grid */}
+        {!loading && filtered.length > 0 && (
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(300px,1fr))",gap:24}}>
+            {filtered.map(post => (
+              <article key={post.id} 
+                onClick={()=>handleArticleClick(post)}
+                style={{
+                  background:"#fff",
+                  border:`1px solid ${ds.color.border}`,
+                  borderRadius:ds.radius.lg,
+                  overflow:"hidden",
+                  cursor:"pointer",
+                  transition:"transform 0.2s, box-shadow 0.2s, border-color 0.2s",
+                  display:"flex",
+                  flexDirection:"column",
+                }}
+                onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-3px)";e.currentTarget.style.boxShadow=ds.shadow.md;e.currentTarget.style.borderColor=ds.color.redBorder;}}
+                onMouseLeave={e=>{e.currentTarget.style.transform="translateY(0)";e.currentTarget.style.boxShadow="none";e.currentTarget.style.borderColor=ds.color.border;}}
+              >
+                {/* Featured image */}
+                <div style={{
+                  width:"100%",
+                  height:180,
+                  background:post.featuredImage ? `url(${post.featuredImage}) center/cover no-repeat` : `linear-gradient(135deg, ${ds.color.redLight} 0%, ${ds.color.goldLight} 100%)`,
+                  display:"flex",alignItems:"center",justifyContent:"center",
+                }}>
+                  {!post.featuredImage && <span style={{fontSize:56,opacity:0.4}}>📰</span>}
+                </div>
+                
+                {/* Content */}
+                <div style={{padding:"20px 22px",flex:1,display:"flex",flexDirection:"column"}}>
+                  {/* Category + date */}
+                  <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10,fontSize:11,color:ds.color.textMuted}}>
+                    {post.category && (
+                      <span style={{color:ds.color.gold,fontWeight:700,letterSpacing:"0.06em",textTransform:"uppercase"}}>
+                        {post.category}
+                      </span>
+                    )}
+                    {post.category && <span style={{opacity:0.4}}>·</span>}
+                    <span>{formatBlogDate(post.publishedAt)}</span>
+                  </div>
+                  
+                  {/* Title */}
+                  <h3 style={{
+                    fontFamily:ds.font.display,
+                    fontSize:18,
+                    color:ds.color.textDark,
+                    lineHeight:1.3,
+                    marginBottom:10,
+                    fontWeight:400,
+                  }}>{post.title}</h3>
+                  
+                  {/* Excerpt */}
+                  <p style={{
+                    fontSize:13.5,
+                    color:ds.color.textMuted,
+                    lineHeight:1.6,
+                    marginBottom:16,
+                    flex:1,
+                    display:"-webkit-box",
+                    WebkitLineClamp:3,
+                    WebkitBoxOrient:"vertical",
+                    overflow:"hidden",
+                  }}>{post.excerpt}</p>
+                  
+                  {/* Read more */}
+                  <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",fontSize:12,color:ds.color.textLight,paddingTop:14,borderTop:`1px solid ${ds.color.borderLight}`}}>
+                    <span>📖 {post.readTime || estimateReadTime(post.content)}</span>
+                    <span style={{color:ds.color.red,fontWeight:700}}>Read article →</span>
+                  </div>
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
+        
+        {/* Bottom CTA */}
+        {!loading && filtered.length > 0 && (
+          <div style={{marginTop:60,padding:"32px",background:`linear-gradient(135deg, ${ds.color.canvasWarm} 0%, ${ds.color.canvasGold} 100%)`,borderRadius:ds.radius.xl,border:`1px solid ${ds.color.goldBorder}`,textAlign:"center"}}>
+            <div style={{fontFamily:ds.font.display,fontSize:22,color:ds.color.textDark,marginBottom:10}}>Have questions about medical procurement?</div>
+            <div style={{fontSize:14,color:ds.color.textMuted,marginBottom:18,maxWidth:520,margin:"0 auto 18px"}}>Our team responds to inquiries within 24-48 hours with formal quotations and BIR-compliant documentation.</div>
+            <Btn variant="gold" size="md" onClick={()=>setPage("quote")}>Request a Quote →</Btn>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// v16.5: Individual blog post page
+function BlogPostPage({ post, setPage, setActivePost }) {
+  const { posts: allPosts } = usePublishedPosts();
+  
+  if (!post) {
+    return (
+      <div style={{paddingTop:67,textAlign:"center",padding:"100px 28px"}}>
+        <div style={{fontSize:48,marginBottom:16,opacity:0.6}}>📰</div>
+        <div style={{fontFamily:ds.font.display,fontSize:24,color:ds.color.textDark,marginBottom:12}}>Article not found</div>
+        <p style={{fontSize:14,color:ds.color.textMuted,marginBottom:24}}>The article you're looking for might have been moved or removed.</p>
+        <Btn variant="primary" size="md" onClick={()=>setPage("blog")}>← Back to Blog</Btn>
+      </div>
+    );
+  }
+  
+  // Find related articles (same category, exclude current)
+  const related = allPosts.filter(p => p.id !== post.id && p.category === post.category).slice(0, 3);
+  
+  return (
+    <div style={{paddingTop:67}}>
+      <article style={{maxWidth:780,margin:"0 auto",padding:"40px 28px"}}>
+        {/* Back link */}
+        <button onClick={()=>{setActivePost(null);setPage("blog");}} style={{
+          background:"none",border:"none",cursor:"pointer",fontSize:13,
+          color:ds.color.red,fontWeight:600,fontFamily:ds.font.body,
+          marginBottom:24,padding:0,
+        }}>← Back to Blog</button>
+        
+        {/* Category */}
+        {post.category && (
+          <div style={{fontSize:11,fontWeight:700,color:ds.color.gold,letterSpacing:"0.14em",textTransform:"uppercase",marginBottom:12}}>
+            {post.category}
+          </div>
+        )}
+        
+        {/* Title */}
+        <h1 style={{
+          fontFamily:ds.font.display,
+          fontSize:"clamp(1.8rem,4vw,2.8rem)",
+          color:ds.color.textDark,
+          lineHeight:1.2,
+          marginBottom:18,
+          fontWeight:400,
+        }}>{post.title}</h1>
+        
+        {/* Meta row */}
+        <div style={{display:"flex",alignItems:"center",gap:14,marginBottom:32,fontSize:13,color:ds.color.textMuted,flexWrap:"wrap"}}>
+          {post.author && (
+            <span style={{display:"flex",alignItems:"center",gap:6}}>
+              <span style={{width:32,height:32,borderRadius:"50%",background:`linear-gradient(135deg, ${ds.color.redLight} 0%, ${ds.color.goldLight} 100%)`,display:"inline-flex",alignItems:"center",justifyContent:"center",fontSize:14}}>👤</span>
+              <span style={{fontWeight:600,color:ds.color.textBody}}>{post.author}</span>
+            </span>
+          )}
+          {post.author && <span style={{opacity:0.4}}>·</span>}
+          <span>{formatBlogDate(post.publishedAt)}</span>
+          <span style={{opacity:0.4}}>·</span>
+          <span>📖 {post.readTime || estimateReadTime(post.content)}</span>
+        </div>
+        
+        {/* Featured image */}
+        {post.featuredImage && (
+          <div style={{
+            width:"100%",
+            aspectRatio:"16/9",
+            background:`url(${post.featuredImage}) center/cover no-repeat`,
+            borderRadius:ds.radius.lg,
+            marginBottom:32,
+          }}/>
+        )}
+        
+        {/* Excerpt as lead paragraph */}
+        {post.excerpt && (
+          <p style={{
+            fontSize:18,
+            color:ds.color.textBody,
+            lineHeight:1.65,
+            marginBottom:32,
+            paddingLeft:18,
+            borderLeft:`3px solid ${ds.color.goldBright}`,
+            fontStyle:"italic",
+          }}>{post.excerpt}</p>
+        )}
+        
+        {/* Content (HTML rendered) */}
+        <div 
+          className="dm-blog-content"
+          style={{
+            fontSize:15.5,
+            color:ds.color.textBody,
+            lineHeight:1.8,
+          }}
+          dangerouslySetInnerHTML={{ __html: post.content || "" }}
+        />
+        
+        {/* Tags */}
+        {post.tags && post.tags.length > 0 && (
+          <div style={{marginTop:40,paddingTop:24,borderTop:`1px solid ${ds.color.borderLight}`,display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
+            <span style={{fontSize:12,color:ds.color.textMuted,fontWeight:600}}>Tags:</span>
+            {post.tags.map(t => (
+              <span key={t} style={{padding:"4px 12px",background:ds.color.canvas,border:`1px solid ${ds.color.border}`,borderRadius:ds.radius.pill,fontSize:11.5,color:ds.color.textBody,fontFamily:ds.font.body}}>
+                #{t}
+              </span>
+            ))}
+          </div>
+        )}
+        
+        {/* CTA */}
+        <div style={{marginTop:48,padding:"28px 32px",background:`linear-gradient(135deg, ${ds.color.redLight} 0%, ${ds.color.canvasWarm} 100%)`,borderRadius:ds.radius.xl,border:`1px solid ${ds.color.redBorder}`,textAlign:"center"}}>
+          <div style={{fontFamily:ds.font.display,fontSize:20,color:ds.color.textDark,marginBottom:10}}>Need medical supplies for your institution?</div>
+          <div style={{fontSize:13.5,color:ds.color.textMuted,marginBottom:18,maxWidth:520,margin:"0 auto 18px"}}>DMEAST sources from FDA-licensed suppliers and provides BIR-compliant documentation. Bulk pricing for hospitals, LGUs, and clinics.</div>
+          <div style={{display:"flex",gap:10,justifyContent:"center",flexWrap:"wrap"}}>
+            <Btn variant="primary" size="md" onClick={()=>setPage("products")}>Shop Products</Btn>
+            <Btn variant="outline" size="md" onClick={()=>setPage("quote")}>Request Quote</Btn>
+          </div>
+        </div>
+      </article>
+      
+      {/* Related articles */}
+      {related.length > 0 && (
+        <section style={{background:ds.color.canvas,padding:"60px 28px",marginTop:60}}>
+          <div style={{maxWidth:1280,margin:"0 auto"}}>
+            <h2 style={{fontFamily:ds.font.display,fontSize:24,color:ds.color.textDark,marginBottom:24,textAlign:"center",fontWeight:400}}>Related Articles</h2>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(280px,1fr))",gap:18,maxWidth:920,margin:"0 auto"}}>
+              {related.map(p => (
+                <button key={p.id} onClick={()=>{setActivePost(p);setPage("blogPost");window.scrollTo({top:0,behavior:"instant"});}} style={{
+                  background:"#fff",border:`1px solid ${ds.color.border}`,borderRadius:ds.radius.lg,
+                  padding:"18px 22px",cursor:"pointer",textAlign:"left",fontFamily:ds.font.body,
+                  transition:"box-shadow 0.2s, border-color 0.2s",
+                }}
+                onMouseEnter={e=>{e.currentTarget.style.boxShadow=ds.shadow.md;e.currentTarget.style.borderColor=ds.color.redBorder;}}
+                onMouseLeave={e=>{e.currentTarget.style.boxShadow="none";e.currentTarget.style.borderColor=ds.color.border;}}
+                >
+                  <div style={{fontSize:10,fontWeight:700,color:ds.color.gold,letterSpacing:"0.06em",textTransform:"uppercase",marginBottom:6}}>{p.category}</div>
+                  <div style={{fontFamily:ds.font.display,fontSize:15,color:ds.color.textDark,lineHeight:1.35,marginBottom:8}}>{p.title}</div>
+                  <div style={{fontSize:11.5,color:ds.color.textMuted}}>{formatBlogDate(p.publishedAt)} · {p.readTime || estimateReadTime(p.content)}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+    </div>
+  );
+}
+
+// v16.5: Latest articles section for homepage
+function LatestArticlesSection({ setPage, setActivePost }) {
+  const { posts, loading } = usePublishedPosts();
+  const featured = posts.slice(0, 3);
+  
+  if (loading || featured.length === 0) return null;
+  
+  return (
+    <section style={{background:ds.color.white,padding:"64px 28px"}}>
+      <div style={{maxWidth:1280,margin:"0 auto"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-end",marginBottom:32,flexWrap:"wrap",gap:16}}>
+          <div>
+            <div style={{fontSize:11,fontWeight:700,color:ds.color.gold,letterSpacing:"0.14em",textTransform:"uppercase",marginBottom:8}}>📝 From Our Blog</div>
+            <h2 style={{fontFamily:ds.font.display,fontSize:"clamp(1.6rem,3vw,2.2rem)",color:ds.color.textDark,fontWeight:400,marginBottom:6}}>Latest Insights</h2>
+            <p style={{fontSize:14,color:ds.color.textMuted,maxWidth:520}}>Healthcare industry updates and procurement guidance.</p>
+          </div>
+          <button onClick={()=>setPage("blog")} style={{background:"none",border:"none",color:ds.color.red,fontWeight:700,cursor:"pointer",fontSize:13,fontFamily:ds.font.body,padding:"6px 0"}}>
+            View All Articles →
+          </button>
+        </div>
+        
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(280px,1fr))",gap:18}}>
+          {featured.map(post => (
+            <article key={post.id} 
+              onClick={()=>{setActivePost(post);setPage("blogPost");}}
+              style={{
+                background:"#fff",border:`1px solid ${ds.color.border}`,borderRadius:ds.radius.lg,
+                overflow:"hidden",cursor:"pointer",transition:"all 0.2s",
+              }}
+              onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-2px)";e.currentTarget.style.boxShadow=ds.shadow.md;}}
+              onMouseLeave={e=>{e.currentTarget.style.transform="translateY(0)";e.currentTarget.style.boxShadow="none";}}
+            >
+              <div style={{
+                width:"100%",height:160,
+                background:post.featuredImage ? `url(${post.featuredImage}) center/cover no-repeat` : `linear-gradient(135deg, ${ds.color.redLight} 0%, ${ds.color.goldLight} 100%)`,
+                display:"flex",alignItems:"center",justifyContent:"center",
+              }}>
+                {!post.featuredImage && <span style={{fontSize:42,opacity:0.4}}>📰</span>}
+              </div>
+              <div style={{padding:"18px 20px"}}>
+                {post.category && <div style={{fontSize:10,fontWeight:700,color:ds.color.gold,letterSpacing:"0.06em",textTransform:"uppercase",marginBottom:8}}>{post.category}</div>}
+                <h3 style={{fontFamily:ds.font.display,fontSize:16,color:ds.color.textDark,lineHeight:1.3,marginBottom:8,fontWeight:400}}>{post.title}</h3>
+                <p style={{fontSize:13,color:ds.color.textMuted,lineHeight:1.55,marginBottom:12,display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden"}}>{post.excerpt}</p>
+                <div style={{fontSize:11.5,color:ds.color.textLight,display:"flex",justifyContent:"space-between"}}>
+                  <span>{formatBlogDate(post.publishedAt)}</span>
+                  <span>{post.readTime || estimateReadTime(post.content)}</span>
+                </div>
+              </div>
+            </article>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+
+// ─── v16.5 BLOG ADMIN COMPONENTS ──────────────────────────────────────────────
+
+// v16.5: Posts management tab in admin dashboard
+function PostsTab({ posts, refreshPosts, userRole }) {
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all"); // all | published | draft
+  const [editingPost, setEditingPost] = useState(null);
+  const [showEditor, setShowEditor] = useState(false);
+  
+  const filtered = posts.filter(p => {
+    const q = search.toLowerCase();
+    const matchesSearch = !q || 
+      p.title?.toLowerCase().includes(q) ||
+      p.excerpt?.toLowerCase().includes(q) ||
+      p.tags?.some(t => t.toLowerCase().includes(q));
+    const matchesStatus = statusFilter === "all" || p.status === statusFilter;
+    return matchesSearch && matchesStatus;
+  });
+  
+  const handleDelete = async (postId, postTitle) => {
+    if (!confirm(`Delete article "${postTitle}"? This cannot be undone.`)) return;
+    try {
+      await deleteDoc(doc(db, "posts", postId));
+      await refreshPosts();
+    } catch(e) {
+      alert("Failed to delete: " + e.message);
+    }
+  };
+  
+  const handleNewPost = () => {
+    setEditingPost(null);
+    setShowEditor(true);
+  };
+  
+  const handleEdit = (post) => {
+    setEditingPost(post);
+    setShowEditor(true);
+  };
+  
+  const handleEditorClose = () => {
+    setShowEditor(false);
+    setEditingPost(null);
+  };
+  
+  const handleEditorSaved = async () => {
+    setShowEditor(false);
+    setEditingPost(null);
+    await refreshPosts();
+  };
+  
+  return (
+    <div>
+      {/* Header */}
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:20,flexWrap:"wrap",gap:12}}>
+        <div>
+          <div style={{fontFamily:ds.font.display,fontSize:22,color:ds.color.textDark}}>📝 Blog Articles ({posts.length})</div>
+          <div style={{fontSize:12.5,color:ds.color.textMuted,marginTop:4}}>
+            {posts.filter(p=>p.status==="published").length} published · {posts.filter(p=>p.status==="draft").length} drafts
+          </div>
+        </div>
+        <Btn variant="primary" size="sm" onClick={handleNewPost}>+ New Article</Btn>
+      </div>
+      
+      {/* Filters */}
+      <div style={{display:"flex",gap:10,marginBottom:18,flexWrap:"wrap"}}>
+        <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="🔍 Search articles…" style={{flex:1,minWidth:200,padding:"9px 14px",border:`1.5px solid ${ds.color.border}`,borderRadius:ds.radius.sm,fontSize:13,outline:"none",fontFamily:ds.font.body}}/>
+        <select value={statusFilter} onChange={e=>setStatusFilter(e.target.value)} style={{padding:"9px 14px",border:`1.5px solid ${ds.color.border}`,borderRadius:ds.radius.sm,fontSize:13,outline:"none",fontFamily:ds.font.body,background:"#fff",cursor:"pointer"}}>
+          <option value="all">All ({posts.length})</option>
+          <option value="published">Published ({posts.filter(p=>p.status==="published").length})</option>
+          <option value="draft">Drafts ({posts.filter(p=>p.status==="draft").length})</option>
+        </select>
+      </div>
+      
+      {/* Empty state */}
+      {filtered.length === 0 && (
+        <div style={{textAlign:"center",padding:"50px 28px",background:ds.color.canvas,borderRadius:ds.radius.lg,border:`1px solid ${ds.color.border}`}}>
+          <div style={{fontSize:42,marginBottom:12,opacity:0.5}}>📝</div>
+          <div style={{fontSize:15,fontWeight:700,color:ds.color.textDark,marginBottom:6}}>
+            {posts.length === 0 ? "No articles yet" : "No matching articles"}
+          </div>
+          <div style={{fontSize:13,color:ds.color.textMuted,marginBottom:18}}>
+            {posts.length === 0 ? "Click '+ New Article' to publish your first blog post." : "Try a different search or filter."}
+          </div>
+          {posts.length === 0 && <Btn variant="primary" size="sm" onClick={handleNewPost}>+ Create First Article</Btn>}
+        </div>
+      )}
+      
+      {/* Article list */}
+      {filtered.length > 0 && (
+        <div style={{display:"flex",flexDirection:"column",gap:10}}>
+          {filtered.map(post => (
+            <div key={post.id} style={{
+              background:"#fff",
+              border:`1px solid ${ds.color.border}`,
+              borderRadius:ds.radius.md,
+              padding:"16px 20px",
+              display:"grid",
+              gridTemplateColumns:"1fr auto",
+              gap:14,
+              alignItems:"center",
+            }}>
+              <div style={{minWidth:0}}>
+                <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6,flexWrap:"wrap"}}>
+                  <span style={{
+                    fontSize:9.5,fontWeight:700,letterSpacing:"0.06em",textTransform:"uppercase",
+                    padding:"3px 8px",borderRadius:ds.radius.pill,
+                    background: post.status==="published" ? ds.color.successBg : ds.color.canvas,
+                    color: post.status==="published" ? ds.color.success : ds.color.textMuted,
+                    border: `1px solid ${post.status==="published" ? ds.color.successBorder : ds.color.border}`,
+                  }}>{post.status === "published" ? "✓ PUBLISHED" : "DRAFT"}</span>
+                  {post.category && <span style={{fontSize:10,color:ds.color.gold,fontWeight:700,letterSpacing:"0.06em",textTransform:"uppercase"}}>{post.category}</span>}
+                  {post.publishedAt && <span style={{fontSize:11,color:ds.color.textMuted}}>{formatBlogDate(post.publishedAt)}</span>}
+                </div>
+                <div style={{fontSize:14,fontWeight:700,color:ds.color.textDark,marginBottom:3}}>{post.title}</div>
+                <div style={{fontSize:12,color:ds.color.textMuted,lineHeight:1.5,display:"-webkit-box",WebkitLineClamp:1,WebkitBoxOrient:"vertical",overflow:"hidden"}}>{post.excerpt}</div>
+                <div style={{fontSize:10.5,color:ds.color.textLight,marginTop:5}}>
+                  /blog/{post.slug || "no-slug"} · {post.readTime || estimateReadTime(post.content)} · by {post.author || "—"}
+                </div>
+              </div>
+              <div style={{display:"flex",gap:6,flexShrink:0}}>
+                <button onClick={()=>handleEdit(post)} style={{padding:"6px 12px",borderRadius:ds.radius.sm,border:`1px solid ${ds.color.border}`,background:"#fff",cursor:"pointer",fontSize:12,fontWeight:600,color:ds.color.textBody,fontFamily:ds.font.body}}>✏️ Edit</button>
+                <button onClick={()=>handleDelete(post.id, post.title)} style={{padding:"6px 12px",borderRadius:ds.radius.sm,border:`1px solid ${ds.color.redBorder}`,background:"#fff",cursor:"pointer",fontSize:12,fontWeight:600,color:ds.color.red,fontFamily:ds.font.body}}>🗑️</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+      
+      {/* Editor modal */}
+      {showEditor && (
+        <PostEditorModal post={editingPost} onClose={handleEditorClose} onSaved={handleEditorSaved}/>
+      )}
+    </div>
+  );
+}
+
+// v16.5: Article editor modal
+function PostEditorModal({ post, onClose, onSaved }) {
+  const [title, setTitle] = useState(post?.title || "");
+  const [slug, setSlug] = useState(post?.slug || "");
+  const [excerpt, setExcerpt] = useState(post?.excerpt || "");
+  const [content, setContent] = useState(post?.content || "");
+  const [category, setCategory] = useState(post?.category || "Industry Insights");
+  const [tags, setTags] = useState((post?.tags || []).join(", "));
+  const [author, setAuthor] = useState(post?.author || "DMEAST Team");
+  const [featuredImage, setFeaturedImage] = useState(post?.featuredImage || "");
+  const [metaDescription, setMetaDescription] = useState(post?.metaDescription || "");
+  const [status, setStatus] = useState(post?.status || "draft");
+  const [saving, setSaving] = useState(false);
+  const [errMsg, setErrMsg] = useState("");
+  const [autoSlug, setAutoSlug] = useState(!post?.slug);
+  
+  // Auto-generate slug from title (until user manually edits slug)
+  useEffect(() => {
+    if (autoSlug) setSlug(slugify(title));
+  }, [title, autoSlug]);
+  
+  const PRESET_CATEGORIES = ["Industry Insights", "Procurement Guide", "Healthcare Tips", "Company News", "Regulatory Updates", "Product Spotlight"];
+  
+  const handleSave = async (publishNow) => {
+    setErrMsg("");
+    if (!title.trim()) { setErrMsg("Title is required"); return; }
+    if (!content.trim()) { setErrMsg("Content cannot be empty"); return; }
+    if (!slug.trim()) { setErrMsg("Slug is required (auto-generated from title)"); return; }
+    
+    setSaving(true);
+    try {
+      const finalSlug = slugify(slug);
+      const finalStatus = publishNow ? "published" : status;
+      const tagArr = tags.split(",").map(t=>t.trim()).filter(Boolean);
+      
+      const data = {
+        title: title.trim(),
+        slug: finalSlug,
+        excerpt: excerpt.trim() || title.trim(),
+        content: content,
+        category: category,
+        tags: tagArr,
+        author: author.trim() || "DMEAST Team",
+        featuredImage: featuredImage.trim(),
+        metaDescription: metaDescription.trim() || excerpt.trim() || title.trim(),
+        readTime: estimateReadTime(content),
+        status: finalStatus,
+        updatedAt: serverTimestamp(),
+      };
+      
+      // Set publishedAt if publishing for first time
+      if (finalStatus === "published" && (!post || post.status !== "published")) {
+        data.publishedAt = serverTimestamp();
+      } else if (post?.publishedAt) {
+        data.publishedAt = post.publishedAt;
+      }
+      
+      if (post?.id) {
+        await updateDoc(doc(db, "posts", post.id), data);
+      } else {
+        data.createdAt = serverTimestamp();
+        await addDoc(collection(db, "posts"), data);
+      }
+      
+      onSaved();
+    } catch(e) {
+      console.error("Save failed:", e);
+      setErrMsg("Failed to save: " + e.message);
+    }
+    setSaving(false);
+  };
+  
+  const inp = {width:"100%",padding:"10px 14px",border:`1.5px solid ${ds.color.border}`,borderRadius:ds.radius.sm,fontSize:13.5,outline:"none",fontFamily:ds.font.body,boxSizing:"border-box"};
+  const lbl = {display:"block",fontSize:11.5,fontWeight:600,color:ds.color.textBody,marginBottom:6,letterSpacing:"0.02em"};
+  
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.65)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000,padding:20}}>
+      <div style={{background:"#fff",borderRadius:ds.radius.xl,maxWidth:920,width:"100%",maxHeight:"92vh",display:"flex",flexDirection:"column",boxShadow:ds.shadow.lg}}>
+        {/* Header */}
+        <div style={{padding:"22px 28px",borderBottom:`1px solid ${ds.color.borderLight}`,display:"flex",alignItems:"center",justifyContent:"space-between",gap:12}}>
+          <div>
+            <div style={{fontFamily:ds.font.display,fontSize:20,color:ds.color.textDark}}>{post ? "✏️ Edit Article" : "📝 New Article"}</div>
+            <div style={{fontSize:12,color:ds.color.textMuted,marginTop:3}}>{post ? `Editing: ${post.title}` : "Create a new blog post"}</div>
+          </div>
+          <button onClick={onClose} style={{background:"none",border:"none",fontSize:22,cursor:"pointer",color:ds.color.textMuted,padding:6}}>✕</button>
+        </div>
+        
+        {/* Body */}
+        <div style={{flex:1,overflowY:"auto",padding:"24px 28px"}}>
+          {errMsg && <div style={{padding:"10px 14px",background:ds.color.redLight,border:`1px solid ${ds.color.redBorder}`,borderRadius:ds.radius.sm,color:ds.color.red,fontSize:13,marginBottom:18}}>{errMsg}</div>}
+          
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"16px 20px"}}>
+            {/* Title */}
+            <div style={{gridColumn:"1/-1"}}>
+              <label style={lbl}>Article Title *</label>
+              <input value={title} onChange={e=>setTitle(e.target.value)} placeholder="e.g., 10 Essential Medical Supplies Every Philippine LGU Should Stock" style={inp}/>
+            </div>
+            
+            {/* Slug */}
+            <div style={{gridColumn:"1/-1"}}>
+              <label style={lbl}>URL Slug * <span style={{color:ds.color.textMuted,fontWeight:400}}>(auto-generated from title)</span></label>
+              <div style={{display:"flex",gap:6,alignItems:"center"}}>
+                <span style={{fontSize:13,color:ds.color.textMuted,padding:"10px 0"}}>dmeastph.com/blog/</span>
+                <input value={slug} onChange={e=>{setSlug(e.target.value);setAutoSlug(false);}} placeholder="article-url-slug" style={{...inp,flex:1}}/>
+                <button onClick={()=>{setAutoSlug(true);setSlug(slugify(title));}} style={{padding:"8px 12px",borderRadius:ds.radius.sm,border:`1px solid ${ds.color.border}`,background:"#fff",cursor:"pointer",fontSize:11,fontWeight:600,color:ds.color.textMuted,fontFamily:ds.font.body,whiteSpace:"nowrap"}}>↻ Auto</button>
+              </div>
+            </div>
+            
+            {/* Excerpt */}
+            <div style={{gridColumn:"1/-1"}}>
+              <label style={lbl}>Excerpt / Summary <span style={{color:ds.color.textMuted,fontWeight:400}}>(shown in article cards, ~150 chars)</span></label>
+              <textarea value={excerpt} onChange={e=>setExcerpt(e.target.value)} rows={2} placeholder="Brief summary of the article — appears on the blog listing page and in social previews." style={{...inp,resize:"vertical",fontFamily:ds.font.body}}/>
+              <div style={{fontSize:11,color:ds.color.textLight,marginTop:4,textAlign:"right"}}>{excerpt.length} / 200 characters</div>
+            </div>
+            
+            {/* Category */}
+            <div>
+              <label style={lbl}>Category</label>
+              <select value={category} onChange={e=>setCategory(e.target.value)} style={{...inp,cursor:"pointer"}}>
+                {PRESET_CATEGORIES.map(c=><option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+            
+            {/* Author */}
+            <div>
+              <label style={lbl}>Author</label>
+              <input value={author} onChange={e=>setAuthor(e.target.value)} placeholder="DMEAST Team" style={inp}/>
+            </div>
+            
+            {/* Tags */}
+            <div style={{gridColumn:"1/-1"}}>
+              <label style={lbl}>Tags <span style={{color:ds.color.textMuted,fontWeight:400}}>(comma-separated, e.g.: BIR, procurement, LGU)</span></label>
+              <input value={tags} onChange={e=>setTags(e.target.value)} placeholder="medical supplies, Philippines, LGU, BIR" style={inp}/>
+            </div>
+            
+            {/* Featured image URL */}
+            <div style={{gridColumn:"1/-1"}}>
+              <label style={lbl}>Featured Image URL <span style={{color:ds.color.textMuted,fontWeight:400}}>(optional, paste an image URL)</span></label>
+              <input value={featuredImage} onChange={e=>setFeaturedImage(e.target.value)} placeholder="https://..." style={inp}/>
+              {featuredImage && (
+                <div style={{marginTop:8,padding:8,border:`1px solid ${ds.color.border}`,borderRadius:ds.radius.sm,background:ds.color.canvas}}>
+                  <div style={{width:"100%",aspectRatio:"16/9",background:`url(${featuredImage}) center/cover no-repeat`,borderRadius:ds.radius.sm}}/>
+                </div>
+              )}
+            </div>
+            
+            {/* Content */}
+            <div style={{gridColumn:"1/-1"}}>
+              <label style={lbl}>Article Content (HTML supported) *</label>
+              <textarea value={content} onChange={e=>setContent(e.target.value)} rows={14} placeholder={`Write your article here. You can use HTML tags:\n\n<h2>Section Heading</h2>\n<p>A paragraph of text.</p>\n<p><strong>Bold</strong> or <em>italic</em>.</p>\n<ul>\n  <li>Bullet point</li>\n  <li>Another point</li>\n</ul>\n<a href="https://...">Link</a>\n<img src="https://..." alt="..."/>`} style={{...inp,fontFamily:"ui-monospace, monospace",fontSize:12.5,resize:"vertical"}}/>
+              <div style={{fontSize:11,color:ds.color.textLight,marginTop:6,lineHeight:1.5}}>
+                💡 <strong>Tip:</strong> Use HTML tags for formatting. Common: <code style={{background:ds.color.canvas,padding:"1px 4px",borderRadius:3}}>&lt;h2&gt;</code>, <code style={{background:ds.color.canvas,padding:"1px 4px",borderRadius:3}}>&lt;p&gt;</code>, <code style={{background:ds.color.canvas,padding:"1px 4px",borderRadius:3}}>&lt;strong&gt;</code>, <code style={{background:ds.color.canvas,padding:"1px 4px",borderRadius:3}}>&lt;ul&gt;&lt;li&gt;</code>, <code style={{background:ds.color.canvas,padding:"1px 4px",borderRadius:3}}>&lt;a href=""&gt;</code>
+              </div>
+              <div style={{fontSize:11,color:ds.color.textLight,marginTop:4,textAlign:"right"}}>
+                {content.replace(/<[^>]+>/g," ").trim().split(/\s+/).filter(Boolean).length} words · {estimateReadTime(content)}
+              </div>
+            </div>
+            
+            {/* SEO Meta description */}
+            <div style={{gridColumn:"1/-1"}}>
+              <label style={lbl}>Meta Description (SEO) <span style={{color:ds.color.textMuted,fontWeight:400}}>(150-160 chars optimal)</span></label>
+              <textarea value={metaDescription} onChange={e=>setMetaDescription(e.target.value)} rows={2} placeholder="Description shown in Google search results and social media previews. If left blank, the excerpt will be used." style={{...inp,resize:"vertical",fontFamily:ds.font.body}}/>
+              <div style={{fontSize:11,color:metaDescription.length>160?ds.color.red:ds.color.textLight,marginTop:4,textAlign:"right"}}>{metaDescription.length} / 160 characters {metaDescription.length>160 && "⚠️ too long"}</div>
+            </div>
+          </div>
+        </div>
+        
+        {/* Footer */}
+        <div style={{padding:"18px 28px",borderTop:`1px solid ${ds.color.borderLight}`,display:"flex",justifyContent:"space-between",alignItems:"center",gap:12,flexWrap:"wrap"}}>
+          <div style={{fontSize:12,color:ds.color.textMuted}}>
+            Status: <strong style={{color: status === "published" ? ds.color.success : ds.color.textBody}}>{status === "published" ? "Published" : "Draft"}</strong>
+          </div>
+          <div style={{display:"flex",gap:8}}>
+            <Btn variant="outline" size="md" disabled={saving} onClick={onClose}>Cancel</Btn>
+            <Btn variant="secondary" size="md" disabled={saving} onClick={()=>handleSave(false)}>{saving?"Saving…":"💾 Save as Draft"}</Btn>
+            <Btn variant="primary" size="md" disabled={saving} onClick={()=>handleSave(true)}>{saving?"Saving…":"🚀 Publish"}</Btn>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
 // v16.3: Cancellation/Termination of Service Policy (REQUIRED for Fiuu merchant onboarding)
 function CancellationPage(){
   const sections=[
@@ -8263,7 +9097,7 @@ function Footer({setPage}){
           </div>
           <div>
             <div style={{fontSize:11,fontWeight:700,color:"rgba(255,255,255,0.35)",textTransform:"uppercase",letterSpacing:"0.14em",marginBottom:16}}>Quick Links</div>
-            {[["home","Home"],["about","About Us"],["products","Shop"],["institutional","Institutional Orders"],["quote","Request Quote"],["track","Track Order"],["contact","Contact"]].map(([id,label])=>(
+            {[["home","Home"],["about","About Us"],["products","Shop"],["institutional","Institutional"],["blog","Blog"],["quote","Request Quote"],["track","Track Order"],["contact","Contact"]].map(([id,label])=>(
               <button key={id} onClick={()=>setPage(id)} style={{display:"block",background:"none",border:"none",cursor:"pointer",fontSize:13.5,color:"rgba(255,255,255,0.6)",fontFamily:ds.font.body,padding:"4px 0",textAlign:"left"}}
                 onMouseEnter={e=>e.target.style.color="#F0A81C"} onMouseLeave={e=>e.target.style.color="rgba(255,255,255,0.6)"}>{label}</button>
             ))}
@@ -8326,8 +9160,10 @@ function FloatingChat(){
 // ─── ROOT APP ────────────────────────────────────────────────────────────────
 export default function App(){
   const [page,setPageRaw]=useState("home");
-  // v16.4: Update meta tags on page change for SEO + social sharing
-  useSEO(page);
+  // v16.5: Currently viewed blog post (when page === "blogPost")
+  const [activePost,setActivePost]=useState(null);
+  // v16.4/v16.5: Update meta tags on page change for SEO + social sharing
+  useSEO(page, activePost);
   const [cart,setCart]=useState([]);
   const [activeCategory,setActiveCategory]=useState(null);
   const [user,setUser]=useState(null);
@@ -8371,7 +9207,7 @@ export default function App(){
   },[]);
 
   const cartCount=cart.reduce((s,i)=>s+i.qty,0);
-  const shared={setPage,addToCart,setActiveCategory,activeCategory,wishlist,toggleWishlist};
+  const shared={setPage,addToCart,setActiveCategory,activeCategory,wishlist,toggleWishlist,setActivePost};
 
   if(authLoading) return(
     <div style={{display:"flex",alignItems:"center",justifyContent:"center",minHeight:"100vh",background:"#fff",fontFamily:ds.font.body}}>
@@ -8402,6 +9238,8 @@ export default function App(){
         {page==="refunds"      &&<RefundPage/>}
         {page==="shipping"     &&<ShippingPage/>}
         {page==="cancellation" &&<CancellationPage/>}
+        {page==="blog"         &&<BlogPage setPage={setPage} setActivePost={setActivePost}/>}
+        {page==="blogPost"     &&<BlogPostPage post={activePost} setPage={setPage} setActivePost={setActivePost}/>}
         {page==="track"        &&<TrackOrderPage/>}
       </main>
       <Footer setPage={setPage}/>
