@@ -1,5 +1,9 @@
 /**
- * DMEAST — Medical Solutions Platform  v16.7
+ * DMEAST — Medical Solutions Platform  v16.7.1
+ *
+ * v16.7.1 HOTFIX:
+ * - 🙈 Import Full Catalog button auto-hides if catalog already imported
+ *   (checks for any product with seedImport===true)
  *
  * v16.7 BULK CATALOG IMPORT:
  * - 📦 130 product seed (23 medicines + 107 medical equipment)
@@ -5723,7 +5727,9 @@ function AdminDashboard({ user }){
               <div style={{display:"flex",gap:10,alignItems:"center",flexWrap:"wrap"}}>
                 {seedingMessage&&<span style={{fontSize:12,color:seedingMessage.startsWith("✓")?ds.color.success:ds.color.textMuted}}>{seedingMessage}</span>}
                 {PRODUCTS.length===0&&<Btn variant="gold" size="sm" onClick={seedProductsFromDefaults} disabled={seeding}>{seeding?"Seeding…":"🌱 Seed 63 Default Products"}</Btn>}
-                <Btn variant="secondary" size="sm" onClick={seedFullCatalog} disabled={seeding} title="Import 130 products (23 medicines + 107 equipment) from the catalog seed">{seeding?"Importing…":"📦 Import Full Catalog (130)"}</Btn>
+                {!PRODUCTS.some(p=>p.seedImport===true) && (
+                  <Btn variant="secondary" size="sm" onClick={seedFullCatalog} disabled={seeding} title="Import 130 products (23 medicines + 107 equipment) from the catalog seed">{seeding?"Importing…":"📦 Import Full Catalog (130)"}</Btn>
+                )}
                 <Btn variant="primary" size="sm" onClick={()=>setEditingProduct({_new:true,id:"",name:"",desc:"",price:null,cta:"buy",imageSrc:"",category:"pharma",featured:false,requiresPrescription:false,rxCategory:null,tag:"",visible:true,available:"available"})}>+ Add New Product</Btn>
               </div>
             </div>
