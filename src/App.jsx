@@ -1,5 +1,12 @@
 /**
- * DMEAST — Medical Solutions Platform  v16.6
+ * DMEAST — Medical Solutions Platform  v16.7
+ *
+ * v16.7 BULK CATALOG IMPORT:
+ * - 📦 130 product seed (23 medicines + 107 medical equipment)
+ * - 🌱 New "Import Full Catalog" button in admin Products tab
+ * - 🦽 New categories added: Mobility, Hospital Beds, Respiratory Care
+ * - 🖼️ Product images delivered as static files in public/seed/ folder
+ * - ❓ All seeded products show "Price upon request" → Quote button (no prices yet)
  *
  * v16.6 LIVE CHAT WIDGET:
  * - 💬 Floating chat bubble (bottom-right) on every page
@@ -671,12 +678,187 @@ const CATEGORIES = [
   {id:"beauty",     label:"Beauty & Wellness",     color:"#880E4F",accent:"#D81B60",icon:"✨", institutional:false},
   {id:"monitoring", label:"Diagnostic Devices",    color:"#8B2635",accent:"#CC2F3C",icon:"🩺", institutional:false},
   {id:"obgyne",     label:"OB Gyne & Pediatrics",  color:"#C2185B",accent:"#E91E8C",icon:"👶", institutional:false},
+  // v16.7: New categories for equipment catalog
+  {id:"mobility",   label:"Mobility & Walking Aids",color:"#0277BD",accent:"#0288D1",icon:"🦽", institutional:false},
+  {id:"beds",       label:"Hospital Beds & Furniture",color:"#37474F",accent:"#546E7A",icon:"🛏️", institutional:false},
+  {id:"respiratory",label:"Respiratory Care",      color:"#00695C",accent:"#00897B",icon:"💨", institutional:false},
   {id:"laboratory", label:"Laboratory Equipment",  color:"#0F4C81",accent:"#1A7BB4",icon:"🔬", institutional:true},
   {id:"imaging",    label:"Imaging & Radiology",   color:"#5C3317",accent:"#8B5E3C",icon:"🩻", institutional:true},
   {id:"icu",        label:"ICU & Emergency",       color:"#7B1FA2",accent:"#AB47BC",icon:"🚨", institutional:true},
   {id:"specialized",label:"Specialized Systems",   color:"#004D40",accent:"#00897B",icon:"⚙️", institutional:true},
   {id:"vehicles",   label:"Medical Vehicles",      color:"#BF360C",accent:"#F4511E",icon:"🚑", institutional:true},
 ];
+
+// v16.7: Catalog seed data — 130 products (23 medicines + 107 equipment)
+const CATALOG_SEED_PRODUCTS = [
+  { id: "med_01", name: "Atorvastatin 20mg (Ranvast)", category: "pharma", desc: "HMG-CoA Reductase Inhibitor (cholesterol-lowering). Film-Coated Tablet - 20mg. Pack: 100 Tablets. ⚠️ Prescription required.", imageSrc: "/seed/med_01.jpg", price: null, requiresPrescription: true, cta: "quote", tag: "Pharmaceuticals", available: "available", featured: false },
+  { id: "med_02", name: "Atorvastatin 10mg (Vazi2r)", category: "pharma", desc: "HMG-CoA Reductase Inhibitor (cholesterol-lowering). Film-Coated Tablet - 10mg. Pack: 100 Tablets. ⚠️ Prescription required.", imageSrc: "/seed/med_02.jpg", price: null, requiresPrescription: true, cta: "quote", tag: "Pharmaceuticals", available: "available", featured: false },
+  { id: "med_03", name: "Atorvastatin 10mg (Fredtor)", category: "pharma", desc: "HMG-CoA Reductase Inhibitor (cholesterol-lowering). Film-Coated Tablet - 10mg. Pack: 100 Tablets. ⚠️ Prescription required.", imageSrc: "/seed/med_03.jpg", price: null, requiresPrescription: true, cta: "quote", tag: "Pharmaceuticals", available: "available", featured: false },
+  { id: "med_04", name: "Atorvastatin 10mg (Atorsaph 10)", category: "pharma", desc: "HMG-CoA Reductase Inhibitor (cholesterol-lowering). Film-Coated Tablet - 10mg. Pack: 100 Tablets. ⚠️ Prescription required.", imageSrc: "/seed/med_04.jpg", price: null, requiresPrescription: true, cta: "quote", tag: "Pharmaceuticals", available: "available", featured: false },
+  { id: "med_05", name: "Aspirin 80mg (Scheeprin)", category: "pharma", desc: "Antithrombotic / Antiplatelet. Tablet - 80mg. Pack: 100 Tablets. ⚠️ Prescription required.", imageSrc: "/seed/med_05.jpg", price: null, requiresPrescription: true, cta: "quote", tag: "Pharmaceuticals", available: "available", featured: false },
+  { id: "med_06", name: "Ascorbic Acid 500mg (Regicee)", category: "pharma", desc: "Vitamin C / Dietary Supplement. Tablet - 500mg. Pack: 100 Tablets. Dietary supplement.", imageSrc: "/seed/med_06.jpg", price: null, requiresPrescription: false, cta: "quote", tag: "Pharmaceuticals", available: "available", featured: false },
+  { id: "med_07", name: "Ascorbic Acid 100mg Syrup (Raph C) 250ml", category: "pharma", desc: "Vitamin C / Dietary Supplement. Syrup - 100mg/5mL. Pack: 250 mL. Dietary supplement.", imageSrc: "/seed/med_07.jpg", price: null, requiresPrescription: false, cta: "quote", tag: "Pharmaceuticals", available: "available", featured: false },
+  { id: "med_08", name: "Ascorbic Acid 100mg Syrup (Raph C) 60ml", category: "pharma", desc: "Vitamin C / Dietary Supplement. Syrup - 100mg/5mL. Pack: 60 mL. Dietary supplement.", imageSrc: "/seed/med_08.jpg", price: null, requiresPrescription: false, cta: "quote", tag: "Pharmaceuticals", available: "available", featured: false },
+  { id: "med_09", name: "Apixaban 5mg (Thromboxain 5)", category: "pharma", desc: "Antithrombotic Agent (Direct Factor Xa Inhibitor). Film-Coated Tablet - 5mg. Pack: 10 Tablets. ⚠️ Prescription required.", imageSrc: "/seed/med_09.jpg", price: null, requiresPrescription: true, cta: "quote", tag: "Pharmaceuticals", available: "available", featured: false },
+  { id: "med_10", name: "Apixaban 5mg (Carepixban)", category: "pharma", desc: "Antithrombotic Agent (Direct Factor Xa Inhibitor). Film-Coated Tablet - 5mg. Pack: 30 Tablets. ⚠️ Prescription required.", imageSrc: "/seed/med_10.jpg", price: null, requiresPrescription: true, cta: "quote", tag: "Pharmaceuticals", available: "available", featured: false },
+  { id: "med_11", name: "Amoxicillin 500mg (Savermox)", category: "pharma", desc: "Antibacterial (Penicillin with extended spectrum). Capsule - 500mg. Pack: 100 Capsules. ⚠️ Prescription required.", imageSrc: "/seed/med_11.jpg", price: null, requiresPrescription: true, cta: "quote", tag: "Pharmaceuticals", available: "available", featured: false },
+  { id: "med_12", name: "Amlodipine 10mg (Sitivax)", category: "pharma", desc: "Calcium Channel Blocker (antihypertensive). Tablet - 10mg. Pack: 100 Tablets. ⚠️ Prescription required.", imageSrc: "/seed/med_12.jpg", price: null, requiresPrescription: true, cta: "quote", tag: "Pharmaceuticals", available: "available", featured: false },
+  { id: "med_13", name: "Aciclovir 400mg (Zealor)", category: "pharma", desc: "Antiviral. Tablet - 400mg. Pack: 30 Tablets. ⚠️ Prescription required.", imageSrc: "/seed/med_13.jpg", price: null, requiresPrescription: true, cta: "quote", tag: "Pharmaceuticals", available: "available", featured: false },
+  { id: "med_14", name: "Aciclovir 200mg (Zealor)", category: "pharma", desc: "Antiviral. Tablet - 200mg. Pack: 100 Tablets. ⚠️ Prescription required.", imageSrc: "/seed/med_14.jpg", price: null, requiresPrescription: true, cta: "quote", tag: "Pharmaceuticals", available: "available", featured: false },
+  { id: "med_15", name: "Amoxicillin 500mg (Ambimox)", category: "pharma", desc: "Antibacterial. Capsule - 500mg. Pack: 100 Capsules. ⚠️ Prescription required.", imageSrc: "/seed/med_15.jpg", price: null, requiresPrescription: true, cta: "quote", tag: "Pharmaceuticals", available: "available", featured: false },
+  { id: "med_16", name: "Ascorbic Acid 100mg + Zinc (Marlum C Plus)", category: "pharma", desc: "Vitamin + Mineral Supplement. Syrup - 100mg/10mg per 5mL. Pack: 120 mL. Dietary supplement.", imageSrc: "/seed/med_16.jpg", price: null, requiresPrescription: false, cta: "quote", tag: "Pharmaceuticals", available: "available", featured: false },
+  { id: "med_17", name: "Ampalaya 500mg (Better Ampalaya)", category: "pharma", desc: "Herbal Food Supplement. Capsule - 500mg. Pack: 100 Capsules. Dietary supplement.", imageSrc: "/seed/med_17.jpg", price: null, requiresPrescription: false, cta: "quote", tag: "Pharmaceuticals", available: "available", featured: false },
+  { id: "med_18", name: "Ampalaya 500mg (Amplas)", category: "pharma", desc: "Herbal Food Supplement. Capsule - 500mg. Pack: 30 Capsules. Dietary supplement.", imageSrc: "/seed/med_18.jpg", price: null, requiresPrescription: false, cta: "quote", tag: "Pharmaceuticals", available: "available", featured: false },
+  { id: "med_19", name: "Allopurinol 100mg (Urisol)", category: "pharma", desc: "Antigout (Xanthine Oxidase Inhibitor). Tablet - 100mg. Pack: 100 Tablets. ⚠️ Prescription required.", imageSrc: "/seed/med_19.jpg", price: null, requiresPrescription: true, cta: "quote", tag: "Pharmaceuticals", available: "available", featured: false },
+  { id: "med_20", name: "Aciclovir 400mg (Xyclovirax)", category: "pharma", desc: "Antiviral. Tablet - 400mg. Pack: 30 Tablets. ⚠️ Prescription required.", imageSrc: "/seed/med_20.jpg", price: null, requiresPrescription: true, cta: "quote", tag: "Pharmaceuticals", available: "available", featured: false },
+  { id: "med_21", name: "Aciclovir 200mg (Xyclovirax)", category: "pharma", desc: "Antiviral. Tablet - 200mg. Pack: 100 Tablets. ⚠️ Prescription required.", imageSrc: "/seed/med_21.jpg", price: null, requiresPrescription: true, cta: "quote", tag: "Pharmaceuticals", available: "available", featured: false },
+  { id: "med_22", name: "Acetylcysteine 600mg (Ac-Lyte 600)", category: "pharma", desc: "Mucolytic. Powder for Oral Solution - 600mg. Pack: 10 Sachets. ⚠️ Prescription required.", imageSrc: "/seed/med_22.jpg", price: null, requiresPrescription: true, cta: "quote", tag: "Pharmaceuticals", available: "available", featured: false },
+  { id: "med_23", name: "Acetylcysteine 600mg (Cysaphteine 600)", category: "pharma", desc: "Mucolytic. Powder for Oral Solution - 600mg. Pack: 10 Sachets. ⚠️ Prescription required.", imageSrc: "/seed/med_23.jpg", price: null, requiresPrescription: true, cta: "quote", tag: "Pharmaceuticals", available: "available", featured: false },
+  { id: "eqp_001", name: "Walker - Silver", category: "mobility", desc: "Lightweight aluminum walker with adjustable height. Helps patients with balance and mobility support.", imageSrc: "/seed/eqp_001.jpg", price: null, requiresPrescription: false, cta: "quote", tag: "Equipment", available: "available", featured: false },
+  { id: "eqp_002", name: "Infusion Pump", category: "icu", desc: "Medical-grade infusion pump for controlled IV fluid and medication delivery in hospital and clinic settings.", imageSrc: "/seed/eqp_002.jpg", price: null, requiresPrescription: false, cta: "quote", tag: "Equipment", available: "available", featured: false },
+  { id: "eqp_003", name: "Vital Sign Monitor", category: "monitoring", desc: "Multi-parameter vital sign monitor for measuring blood pressure, pulse, temperature, SpO2, and respiratory rate.", imageSrc: "/seed/eqp_003.jpg", price: null, requiresPrescription: false, cta: "quote", tag: "Equipment", available: "available", featured: false },
+  { id: "eqp_004", name: "Vein Finder", category: "monitoring", desc: "Portable infrared vein visualization device. Improves IV insertion success rate and patient comfort.", imageSrc: "/seed/eqp_004.jpg", price: null, requiresPrescription: false, cta: "quote", tag: "Equipment", available: "available", featured: false },
+  { id: "eqp_005", name: "Vacuum Stretcher Mattress", category: "icu", desc: "Vacuum stretcher mattress for safe immobilization and transport of trauma patients.", imageSrc: "/seed/eqp_005.jpg", price: null, requiresPrescription: false, cta: "quote", tag: "Equipment", available: "available", featured: false },
+  { id: "eqp_006", name: "Uprise Medical Folding Walker (Without Wheels)", category: "mobility", desc: "Folding walker without wheels. Adjustable height. Foldable for easy storage and transport.", imageSrc: "/seed/eqp_006.jpg", price: null, requiresPrescription: false, cta: "quote", tag: "Equipment", available: "available", featured: false },
+  { id: "eqp_007", name: "Under Arm Crutches", category: "mobility", desc: "Adult underarm crutches with adjustable height. Pair, ergonomic grip and rubber tips.", imageSrc: "/seed/eqp_007.jpg", price: null, requiresPrescription: false, cta: "quote", tag: "Equipment", available: "available", featured: false },
+  { id: "eqp_008", name: "Pedia Crutches", category: "mobility", desc: "Pediatric underarm crutches sized for younger users. Adjustable height and lightweight aluminum frame.", imageSrc: "/seed/eqp_008.jpg", price: null, requiresPrescription: false, cta: "quote", tag: "Equipment", available: "available", featured: false },
+  { id: "eqp_009", name: "Trolley Infusion Pump", category: "icu", desc: "Mobile trolley-mounted infusion pump for ICU, ER, and ward use.", imageSrc: "/seed/eqp_009.jpg", price: null, requiresPrescription: false, cta: "quote", tag: "Equipment", available: "available", featured: false },
+  { id: "eqp_010", name: "ECG Trolley", category: "monitoring", desc: "Mobile cart designed for ECG machines. Includes cable management and accessory drawers.", imageSrc: "/seed/eqp_010.jpg", price: null, requiresPrescription: false, cta: "quote", tag: "Equipment", available: "available", featured: false },
+  { id: "eqp_011", name: "Vertical Pressure Sterilizer 50L", category: "specialized", desc: "50-liter vertical autoclave for medical instrument sterilization. Ideal for clinics and small hospitals.", imageSrc: "/seed/eqp_011.jpg", price: null, requiresPrescription: false, cta: "quote", tag: "Equipment", available: "available", featured: false },
+  { id: "eqp_012", name: "Table Top Steam Sterilizer 24L", category: "specialized", desc: "Compact 24-liter tabletop steam autoclave. Suitable for dental clinics, small medical practices.", imageSrc: "/seed/eqp_012.jpg", price: null, requiresPrescription: false, cta: "quote", tag: "Equipment", available: "available", featured: false },
+  { id: "eqp_013", name: "Horizontal Cylindrical Pressure Steam Sterilizer 100L", category: "specialized", desc: "Large-capacity 100-liter horizontal autoclave for hospital sterilization needs.", imageSrc: "/seed/eqp_013.jpg", price: null, requiresPrescription: false, cta: "quote", tag: "Equipment", available: "available", featured: false },
+  { id: "eqp_014", name: "Syringe Pump", category: "icu", desc: "Precision syringe pump for accurate, low-volume medication delivery in pediatrics and ICU.", imageSrc: "/seed/eqp_014.jpg", price: null, requiresPrescription: false, cta: "quote", tag: "Equipment", available: "available", featured: false },
+  { id: "eqp_015", name: "Suction Machine", category: "respiratory", desc: "Medical suction machine for clearing airways and surgical sites. Adjustable vacuum, portable.", imageSrc: "/seed/eqp_015.jpg", price: null, requiresPrescription: false, cta: "quote", tag: "Equipment", available: "available", featured: false },
+  { id: "eqp_016", name: "Suction Catheter", category: "respiratory", desc: "Disposable suction catheter (sold by box). Various French sizes available.", imageSrc: "/seed/eqp_016.jpg", price: null, requiresPrescription: false, cta: "quote", tag: "Equipment", available: "available", featured: false },
+  { id: "eqp_017", name: "Stethoscope", category: "monitoring", desc: "Dual-head stethoscope for adult auscultation. Quality acoustic chest piece, comfortable earpieces.", imageSrc: "/seed/eqp_017.jpg", price: null, requiresPrescription: false, cta: "quote", tag: "Equipment", available: "available", featured: false },
+  { id: "eqp_018", name: "Dialysis Chair", category: "beds", desc: "Reclining dialysis chair with adjustable backrest, leg rest, and armrests for patient comfort during treatment.", imageSrc: "/seed/eqp_018.jpg", price: null, requiresPrescription: false, cta: "quote", tag: "Equipment", available: "available", featured: false },
+  { id: "eqp_019", name: "Star Chair Stretcher", category: "icu", desc: "Star chair stretcher for emergency transport in tight spaces (stairs, narrow corridors).", imageSrc: "/seed/eqp_019.jpg", price: null, requiresPrescription: false, cta: "quote", tag: "Equipment", available: "available", featured: false },
+  { id: "eqp_020", name: "Travel Wheelchair", category: "mobility", desc: "Lightweight travel wheelchair, foldable, available in colors: orange, green, blue, red, pink, purple.", imageSrc: "/seed/eqp_020.jpg", price: null, requiresPrescription: false, cta: "quote", tag: "Equipment", available: "available", featured: false },
+  { id: "eqp_021", name: "Electric Wheelchair", category: "mobility", desc: "Battery-powered electric wheelchair. Joystick control, foldable for transport.", imageSrc: "/seed/eqp_021.jpg", price: null, requiresPrescription: false, cta: "quote", tag: "Equipment", available: "available", featured: false },
+  { id: "eqp_022", name: "Standard Wheelchair with IV Pole", category: "mobility", desc: "Standard adult wheelchair with attached IV pole for hospital patient transfer.", imageSrc: "/seed/eqp_022.jpg", price: null, requiresPrescription: false, cta: "quote", tag: "Equipment", available: "available", featured: false },
+  { id: "eqp_023", name: "Standard Wheelchair Chrome", category: "mobility", desc: "Standard adult wheelchair, chrome-plated frame, foldable.", imageSrc: "/seed/eqp_023.jpg", price: null, requiresPrescription: false, cta: "quote", tag: "Equipment", available: "available", featured: false },
+  { id: "eqp_024", name: "Mag Wheelchair Chrome", category: "mobility", desc: "Mag wheel adult wheelchair with chrome frame. Heavy-duty, foldable design.", imageSrc: "/seed/eqp_024.jpg", price: null, requiresPrescription: false, cta: "quote", tag: "Equipment", available: "available", featured: false },
+  { id: "eqp_025", name: "Mag Wheelchair Black", category: "mobility", desc: "Mag wheel adult wheelchair with black frame. Heavy-duty, foldable design.", imageSrc: "/seed/eqp_025.jpg", price: null, requiresPrescription: false, cta: "quote", tag: "Equipment", available: "available", featured: false },
+  { id: "eqp_026", name: "Standard Wheelchair Chrome (with IV Pole)", category: "mobility", desc: "Standard wheelchair, chrome frame, with attached IV pole for clinical use.", imageSrc: "/seed/eqp_026.jpg", price: null, requiresPrescription: false, cta: "quote", tag: "Equipment", available: "available", featured: false },
+  { id: "eqp_027", name: "Wheelchair Black", category: "mobility", desc: "Standard adult wheelchair with black frame, foldable.", imageSrc: "/seed/eqp_027.jpg", price: null, requiresPrescription: false, cta: "quote", tag: "Equipment", available: "available", featured: false },
+  { id: "eqp_028", name: "Pedia Mag Wheelchair Chrome", category: "mobility", desc: "Pediatric mag wheelchair with chrome frame, sized for children.", imageSrc: "/seed/eqp_028.jpg", price: null, requiresPrescription: false, cta: "quote", tag: "Equipment", available: "available", featured: false },
+  { id: "eqp_029", name: "Pedia Mag Wheelchair Black", category: "mobility", desc: "Pediatric mag wheelchair with black frame, sized for children.", imageSrc: "/seed/eqp_029.jpg", price: null, requiresPrescription: false, cta: "quote", tag: "Equipment", available: "available", featured: false },
+  { id: "eqp_030", name: "Reclining Commode Wheelchair", category: "mobility", desc: "Reclining commode wheelchair with detachable bedpan. Adjustable backrest.", imageSrc: "/seed/eqp_030.jpg", price: null, requiresPrescription: false, cta: "quote", tag: "Equipment", available: "available", featured: false },
+  { id: "eqp_031", name: "Standard E-Cart", category: "icu", desc: "Standard emergency cart / crash cart for hospitals. Multiple drawers, lockable.", imageSrc: "/seed/eqp_031.jpg", price: null, requiresPrescription: false, cta: "quote", tag: "Equipment", available: "available", featured: false },
+  { id: "eqp_032", name: "E-Cart (Luxurious)", category: "icu", desc: "Premium emergency cart / crash cart with enhanced features and durable construction.", imageSrc: "/seed/eqp_032.jpg", price: null, requiresPrescription: false, cta: "quote", tag: "Equipment", available: "available", featured: false },
+  { id: "eqp_033", name: "Stainless Basket Stretcher", category: "icu", desc: "Stainless steel basket stretcher for rescue and patient extraction. Durable, water-resistant.", imageSrc: "/seed/eqp_033.jpg", price: null, requiresPrescription: false, cta: "quote", tag: "Equipment", available: "available", featured: false },
+  { id: "eqp_034", name: "Spine Board", category: "icu", desc: "Rigid spine board for spinal injury immobilization and patient transport.", imageSrc: "/seed/eqp_034.jpg", price: null, requiresPrescription: false, cta: "quote", tag: "Equipment", available: "available", featured: false },
+  { id: "eqp_035", name: "Folding Dental Chair", category: "beds", desc: "Portable folding dental chair for mobile clinics and outreach programs.", imageSrc: "/seed/eqp_035.jpg", price: null, requiresPrescription: false, cta: "quote", tag: "Equipment", available: "available", featured: false },
+  { id: "eqp_036", name: "Hydraulic Stretcher Cart", category: "icu", desc: "Hydraulic patient stretcher cart with adjustable height. For hospital and ER use.", imageSrc: "/seed/eqp_036.jpg", price: null, requiresPrescription: false, cta: "quote", tag: "Equipment", available: "available", featured: false },
+  { id: "eqp_037", name: "Hydraulic Massage Bed", category: "beds", desc: "Hydraulic massage / treatment bed for clinics, spas, physiotherapy.", imageSrc: "/seed/eqp_037.jpg", price: null, requiresPrescription: false, cta: "quote", tag: "Equipment", available: "available", featured: false },
+  { id: "eqp_038", name: "5-Function Electric Nursing Bed", category: "beds", desc: "Premium hospital bed with 5 electric adjustment functions: head, foot, height, Trendelenburg, reverse Trendelenburg.", imageSrc: "/seed/eqp_038.jpg", price: null, requiresPrescription: false, cta: "quote", tag: "Equipment", available: "available", featured: false },
+  { id: "eqp_039", name: "Extrication Device", category: "icu", desc: "KED-style extrication device for spinal immobilization during vehicle accidents.", imageSrc: "/seed/eqp_039.jpg", price: null, requiresPrescription: false, cta: "quote", tag: "Equipment", available: "available", featured: false },
+  { id: "eqp_040", name: "Single Cane with Flashlight", category: "mobility", desc: "Single-point cane with built-in LED flashlight for nighttime use. Adjustable height.", imageSrc: "/seed/eqp_040.jpg", price: null, requiresPrescription: false, cta: "quote", tag: "Equipment", available: "available", featured: false },
+  { id: "eqp_041", name: "Single Cane", category: "mobility", desc: "Standard single-point walking cane. Adjustable height, ergonomic handle.", imageSrc: "/seed/eqp_041.jpg", price: null, requiresPrescription: false, cta: "quote", tag: "Equipment", available: "available", featured: false },
+  { id: "eqp_042", name: "Quad Cane", category: "mobility", desc: "Quad-base cane for enhanced stability. Wide or narrow base options.", imageSrc: "/seed/eqp_042.jpg", price: null, requiresPrescription: false, cta: "quote", tag: "Equipment", available: "available", featured: false },
+  { id: "eqp_043", name: "Quad Cane U-Type Wide Base Bronze", category: "mobility", desc: "Quad cane with U-shaped wide base in bronze finish. Provides maximum stability.", imageSrc: "/seed/eqp_043.jpg", price: null, requiresPrescription: false, cta: "quote", tag: "Equipment", available: "available", featured: false },
+  { id: "eqp_044", name: "Pedia Walker", category: "mobility", desc: "Pediatric walker for children. Adjustable height, foldable, lightweight.", imageSrc: "/seed/eqp_044.jpg", price: null, requiresPrescription: false, cta: "quote", tag: "Equipment", available: "available", featured: false },
+  { id: "eqp_045", name: "IV Stand", category: "specialized", desc: "Adjustable height IV stand on castors. Stainless steel construction.", imageSrc: "/seed/eqp_045.jpg", price: null, requiresPrescription: false, cta: "quote", tag: "Equipment", available: "available", featured: false },
+  { id: "eqp_046", name: "Foldable Cane", category: "mobility", desc: "Foldable walking cane that collapses for travel. Adjustable height.", imageSrc: "/seed/eqp_046.jpg", price: null, requiresPrescription: false, cta: "quote", tag: "Equipment", available: "available", featured: false },
+  { id: "eqp_047", name: "Foot Stool", category: "specialized", desc: "Medical foot stool / step stool for patient access to exam tables.", imageSrc: "/seed/eqp_047.jpg", price: null, requiresPrescription: false, cta: "quote", tag: "Equipment", available: "available", featured: false },
+  { id: "eqp_048", name: "Single Arm OR Light LED", category: "specialized", desc: "Single-arm operating room LED surgical light. Bright, shadowless illumination.", imageSrc: "/seed/eqp_048.jpg", price: null, requiresPrescription: false, cta: "quote", tag: "Equipment", available: "available", featured: false },
+  { id: "eqp_049", name: "LED Examination Light (Fixed Brightness)", category: "monitoring", desc: "Fixed-brightness LED examination light for clinics and exam rooms.", imageSrc: "/seed/eqp_049.jpg", price: null, requiresPrescription: false, cta: "quote", tag: "Equipment", available: "available", featured: false },
+  { id: "eqp_050", name: "Gooseneck Examination Lamp (with Net)", category: "monitoring", desc: "Gooseneck examination lamp with mesh netting. Flexible positioning.", imageSrc: "/seed/eqp_050.jpg", price: null, requiresPrescription: false, cta: "quote", tag: "Equipment", available: "available", featured: false },
+  { id: "eqp_051", name: "Infant Phototherapy", category: "specialized", desc: "Infant phototherapy unit for treating neonatal jaundice. Blue LED lighting.", imageSrc: "/seed/eqp_051.jpg", price: null, requiresPrescription: false, cta: "quote", tag: "Equipment", available: "available", featured: false },
+  { id: "eqp_052", name: "Silver Walker with Wheels", category: "mobility", desc: "Silver walker with front wheels for easier mobility. Adjustable height.", imageSrc: "/seed/eqp_052.jpg", price: null, requiresPrescription: false, cta: "quote", tag: "Equipment", available: "available", featured: false },
+  { id: "eqp_053", name: "Scoop Stretcher PE", category: "icu", desc: "Polyethylene scoop stretcher for trauma patient transfer. Splits in half for easy loading.", imageSrc: "/seed/eqp_053.jpg", price: null, requiresPrescription: false, cta: "quote", tag: "Equipment", available: "available", featured: false },
+  { id: "eqp_054", name: "Scoop Stretcher Aluminum Alloy", category: "icu", desc: "Aluminum alloy scoop stretcher. Durable, lightweight, and X-ray translucent.", imageSrc: "/seed/eqp_054.jpg", price: null, requiresPrescription: false, cta: "quote", tag: "Equipment", available: "available", featured: false },
+  { id: "eqp_055", name: "Folding Stretcher (2 Folds)", category: "icu", desc: "Two-fold folding stretcher for compact storage and ambulance use.", imageSrc: "/seed/eqp_055.jpg", price: null, requiresPrescription: false, cta: "quote", tag: "Equipment", available: "available", featured: false },
+  { id: "eqp_056", name: "Folding Stretcher", category: "icu", desc: "Standard folding stretcher for emergency response and patient transport.", imageSrc: "/seed/eqp_056.jpg", price: null, requiresPrescription: false, cta: "quote", tag: "Equipment", available: "available", featured: false },
+  { id: "eqp_057", name: "Emergency Table", category: "icu", desc: "Emergency examination table for trauma and ER use.", imageSrc: "/seed/eqp_057.jpg", price: null, requiresPrescription: false, cta: "quote", tag: "Equipment", available: "available", featured: false },
+  { id: "eqp_058", name: "Emergency Stretcher with Weighing Scale", category: "icu", desc: "Emergency stretcher with built-in weighing scale for critical patient assessment.", imageSrc: "/seed/eqp_058.jpg", price: null, requiresPrescription: false, cta: "quote", tag: "Equipment", available: "available", featured: false },
+  { id: "eqp_059", name: "Emergency Hospital Stretcher", category: "icu", desc: "Hospital emergency stretcher with side rails and IV pole holder.", imageSrc: "/seed/eqp_059.jpg", price: null, requiresPrescription: false, cta: "quote", tag: "Equipment", available: "available", featured: false },
+  { id: "eqp_060", name: "Emergency Hospital Stretcher (Premium)", category: "icu", desc: "Premium hospital emergency stretcher with enhanced features and adjustable height.", imageSrc: "/seed/eqp_060.jpg", price: null, requiresPrescription: false, cta: "quote", tag: "Equipment", available: "available", featured: false },
+  { id: "eqp_061", name: "Eco Bed", category: "beds", desc: "Economy hospital bed - manually adjustable. Suitable for clinics and home care.", imageSrc: "/seed/eqp_061.jpg", price: null, requiresPrescription: false, cta: "quote", tag: "Equipment", available: "available", featured: false },
+  { id: "eqp_062", name: "Emergency Blanket", category: "icu", desc: "Mylar emergency / thermal blanket. Reflective, retains body heat.", imageSrc: "/seed/eqp_062.jpg", price: null, requiresPrescription: false, cta: "quote", tag: "Equipment", available: "available", featured: false },
+  { id: "eqp_063", name: "Foldable Baby Weighing Scale", category: "monitoring", desc: "Portable foldable infant weighing scale. Digital display, accurate to grams.", imageSrc: "/seed/eqp_063.jpg", price: null, requiresPrescription: false, cta: "quote", tag: "Equipment", available: "available", featured: false },
+  { id: "eqp_064", name: "Head Immobilizer", category: "icu", desc: "Head immobilizer for spinal injury management. Used with spine boards.", imageSrc: "/seed/eqp_064.jpg", price: null, requiresPrescription: false, cta: "quote", tag: "Equipment", available: "available", featured: false },
+  { id: "eqp_065", name: "Pedia Pulse Oximeter", category: "monitoring", desc: "Pediatric pulse oximeter for measuring SpO2 and pulse rate in children.", imageSrc: "/seed/eqp_065.jpg", price: null, requiresPrescription: false, cta: "quote", tag: "Equipment", available: "available", featured: false },
+  { id: "eqp_066", name: "Pulse Oximeter", category: "monitoring", desc: "Standard fingertip pulse oximeter. Measures SpO2 and pulse rate, battery-powered.", imageSrc: "/seed/eqp_066.jpg", price: null, requiresPrescription: false, cta: "quote", tag: "Equipment", available: "available", featured: false },
+  { id: "eqp_067", name: "Handheld Pulse Oximeter", category: "monitoring", desc: "Professional handheld pulse oximeter with detachable probe. For clinical use.", imageSrc: "/seed/eqp_067.jpg", price: null, requiresPrescription: false, cta: "quote", tag: "Equipment", available: "available", featured: false },
+  { id: "eqp_068", name: "Fully Automatic Multifunctional Thermometer", category: "monitoring", desc: "Multifunction medical thermometer - forehead, ear, ambient temperature.", imageSrc: "/seed/eqp_068.jpg", price: null, requiresPrescription: false, cta: "quote", tag: "Equipment", available: "available", featured: false },
+  { id: "eqp_069", name: "Fetal Doppler", category: "monitoring", desc: "Pocket fetal doppler for monitoring fetal heart rate. Built-in speaker.", imageSrc: "/seed/eqp_069.jpg", price: null, requiresPrescription: false, cta: "quote", tag: "Equipment", available: "available", featured: false },
+  { id: "eqp_070", name: "Hemoglobin Meter", category: "monitoring", desc: "Portable hemoglobin meter for quick blood hemoglobin level testing.", imageSrc: "/seed/eqp_070.jpg", price: null, requiresPrescription: false, cta: "quote", tag: "Equipment", available: "available", featured: false },
+  { id: "eqp_071", name: "Oxygen Concentrator - 5L", category: "respiratory", desc: "5-liter oxygen concentrator. Continuous oxygen supply for home and clinical use.", imageSrc: "/seed/eqp_071.jpg", price: null, requiresPrescription: false, cta: "quote", tag: "Equipment", available: "available", featured: false },
+  { id: "eqp_072", name: "Oxygen Mask with Tube", category: "respiratory", desc: "Adult oxygen mask with connecting tube. Disposable, sterile.", imageSrc: "/seed/eqp_072.jpg", price: null, requiresPrescription: false, cta: "quote", tag: "Equipment", available: "available", featured: false },
+  { id: "eqp_073", name: "Oxygen Concentrator (10L / 20L / 40L)", category: "respiratory", desc: "High-capacity oxygen concentrators available in 10L, 20L, and 40L variants for hospital and ICU use.", imageSrc: "/seed/eqp_073.jpg", price: null, requiresPrescription: false, cta: "quote", tag: "Equipment", available: "available", featured: false },
+  { id: "eqp_074", name: "Overbed Table (Wooden)", category: "specialized", desc: "Adjustable wooden overbed table for hospital and home patient meals.", imageSrc: "/seed/eqp_074.jpg", price: null, requiresPrescription: false, cta: "quote", tag: "Equipment", available: "available", featured: false },
+  { id: "eqp_075", name: "Operating Table", category: "specialized", desc: "Surgical operating table with multiple position adjustments for various procedures.", imageSrc: "/seed/eqp_075.jpg", price: null, requiresPrescription: false, cta: "quote", tag: "Equipment", available: "available", featured: false },
+  { id: "eqp_076", name: "Obstetric Table", category: "specialized", desc: "Obstetric / gynecology examination and delivery table.", imageSrc: "/seed/eqp_076.jpg", price: null, requiresPrescription: false, cta: "quote", tag: "Equipment", available: "available", featured: false },
+  { id: "eqp_077", name: "Non-Touch Thermometer", category: "monitoring", desc: "Infrared non-contact thermometer. Hygienic, fast forehead temperature reading.", imageSrc: "/seed/eqp_077.jpg", price: null, requiresPrescription: false, cta: "quote", tag: "Equipment", available: "available", featured: false },
+  { id: "eqp_078", name: "Digital Thermometer", category: "monitoring", desc: "Standard digital thermometer with LCD display.", imageSrc: "/seed/eqp_078.jpg", price: null, requiresPrescription: false, cta: "quote", tag: "Equipment", available: "available", featured: false },
+  { id: "eqp_079", name: "Nebulizer Kit (with Mouthpiece and Connector)", category: "respiratory", desc: "Nebulizer treatment kit with mouthpiece, tubing, and connectors.", imageSrc: "/seed/eqp_079.jpg", price: null, requiresPrescription: false, cta: "quote", tag: "Equipment", available: "available", featured: false },
+  { id: "eqp_080", name: "Nebulizer Kit with Mask", category: "respiratory", desc: "Nebulizer treatment kit with mask, tubing, and medication cup.", imageSrc: "/seed/eqp_080.jpg", price: null, requiresPrescription: false, cta: "quote", tag: "Equipment", available: "available", featured: false },
+  { id: "eqp_081", name: "Nasal Oxygen Cannula", category: "respiratory", desc: "Disposable nasal oxygen cannula. Comfortable, sterile, single-use.", imageSrc: "/seed/eqp_081.jpg", price: null, requiresPrescription: false, cta: "quote", tag: "Equipment", available: "available", featured: false },
+  { id: "eqp_082", name: "Multisure GCTU Meter", category: "monitoring", desc: "Multifunction Glucose / Cholesterol / Triglyceride / Uric Acid meter.", imageSrc: "/seed/eqp_082.jpg", price: null, requiresPrescription: false, cta: "quote", tag: "Equipment", available: "available", featured: false },
+  { id: "eqp_083", name: "Medical Oxygen Regulator", category: "respiratory", desc: "Medical-grade oxygen regulator with flow meter and pressure gauge.", imageSrc: "/seed/eqp_083.jpg", price: null, requiresPrescription: false, cta: "quote", tag: "Equipment", available: "available", featured: false },
+  { id: "eqp_084", name: "Solitaire Mag Wheelchair Black (RST-OE-11)", category: "mobility", desc: "Solitaire premium mag wheelchair, black frame, model RST-OE-11. Heavy-duty wheelchair with chromed steel frame, fixed armrest, aluminum footrest. Net weight 19kg. With 8\'\' front wheel and 24\'\' rear wheel. Foldable, ideal for home and hospital use.", imageSrc: "/seed/eqp_084.jpg", price: null, requiresPrescription: false, cta: "quote", tag: "Equipment", available: "available", featured: false },
+  { id: "eqp_085", name: "Digital BP Monitor", category: "monitoring", desc: "Digital arm blood pressure monitor with memory function.", imageSrc: "/seed/eqp_085.jpg", price: null, requiresPrescription: false, cta: "quote", tag: "Equipment", available: "available", featured: false },
+  { id: "eqp_086", name: "CPR Mask", category: "icu", desc: "CPR pocket mask with one-way valve for emergency rescue breathing.", imageSrc: "/seed/eqp_086.jpg", price: null, requiresPrescription: false, cta: "quote", tag: "Equipment", available: "available", featured: false },
+  { id: "eqp_087", name: "Compressor Nebulizer", category: "respiratory", desc: "Standard compressor nebulizer machine for respiratory medication delivery.", imageSrc: "/seed/eqp_087.jpg", price: null, requiresPrescription: false, cta: "quote", tag: "Equipment", available: "available", featured: false },
+  { id: "eqp_088", name: "Compressor Nebulizer Mini", category: "respiratory", desc: "Compact mini compressor nebulizer. Portable for travel and home use.", imageSrc: "/seed/eqp_088.jpg", price: null, requiresPrescription: false, cta: "quote", tag: "Equipment", available: "available", featured: false },
+  { id: "eqp_089", name: "Commode Chair with Wheels", category: "mobility", desc: "Commode chair with wheels for bedside or bathroom use. Adjustable height.", imageSrc: "/seed/eqp_089.jpg", price: null, requiresPrescription: false, cta: "quote", tag: "Equipment", available: "available", featured: false },
+  { id: "eqp_090", name: "Commode Chair with Foam", category: "mobility", desc: "Commode chair with cushioned foam seat for added comfort.", imageSrc: "/seed/eqp_090.jpg", price: null, requiresPrescription: false, cta: "quote", tag: "Equipment", available: "available", featured: false },
+  { id: "eqp_091", name: "Child Traction Set", category: "specialized", desc: "Pediatric traction set for orthopedic treatment in children.", imageSrc: "/seed/eqp_091.jpg", price: null, requiresPrescription: false, cta: "quote", tag: "Equipment", available: "available", featured: false },
+  { id: "eqp_092", name: "Cervical Collar", category: "icu", desc: "Adjustable cervical collar / neck brace for cervical spine immobilization.", imageSrc: "/seed/eqp_092.jpg", price: null, requiresPrescription: false, cta: "quote", tag: "Equipment", available: "available", featured: false },
+  { id: "eqp_093", name: "Cerebral Palsy Wheelchair Adult", category: "mobility", desc: "Specialized wheelchair for adults with cerebral palsy. Padded supports, headrest.", imageSrc: "/seed/eqp_093.jpg", price: null, requiresPrescription: false, cta: "quote", tag: "Equipment", available: "available", featured: false },
+  { id: "eqp_094", name: "Cerebral Palsy Wheelchair Pedia", category: "mobility", desc: "Specialized pediatric wheelchair for children with cerebral palsy. Padded supports.", imageSrc: "/seed/eqp_094.jpg", price: null, requiresPrescription: false, cta: "quote", tag: "Equipment", available: "available", featured: false },
+  { id: "eqp_095", name: "Blind Cane", category: "mobility", desc: "White cane for visually impaired users. Foldable, lightweight.", imageSrc: "/seed/eqp_095.jpg", price: null, requiresPrescription: false, cta: "quote", tag: "Equipment", available: "available", featured: false },
+  { id: "eqp_096", name: "Bedside Table with Wheels", category: "specialized", desc: "Mobile bedside table with wheels for hospital and home patient use.", imageSrc: "/seed/eqp_096.jpg", price: null, requiresPrescription: false, cta: "quote", tag: "Equipment", available: "available", featured: false },
+  { id: "eqp_097", name: "Basket Stretcher", category: "icu", desc: "Standard basket stretcher for vertical and rescue extraction.", imageSrc: "/seed/eqp_097.jpg", price: null, requiresPrescription: false, cta: "quote", tag: "Equipment", available: "available", featured: false },
+  { id: "eqp_098", name: "Basket Stretcher (Separable)", category: "icu", desc: "Separable two-part basket stretcher for tight space rescues.", imageSrc: "/seed/eqp_098.jpg", price: null, requiresPrescription: false, cta: "quote", tag: "Equipment", available: "available", featured: false },
+  { id: "eqp_099", name: "Anesthesia Trolley", category: "specialized", desc: "Mobile anesthesia trolley with multiple drawers for anesthetic supplies.", imageSrc: "/seed/eqp_099.jpg", price: null, requiresPrescription: false, cta: "quote", tag: "Equipment", available: "available", featured: false },
+  { id: "eqp_100", name: "Ambulance Stretcher", category: "icu", desc: "Standard ambulance stretcher with adjustable backrest and IV pole holder.", imageSrc: "/seed/eqp_100.jpg", price: null, requiresPrescription: false, cta: "quote", tag: "Equipment", available: "available", featured: false },
+  { id: "eqp_101", name: "Ambulance Stretcher (8 Wheels)", category: "icu", desc: "Ambulance stretcher with 8-wheel system for smooth maneuvering.", imageSrc: "/seed/eqp_101.jpg", price: null, requiresPrescription: false, cta: "quote", tag: "Equipment", available: "available", featured: false },
+  { id: "eqp_102", name: "Ambulance Stretcher (10 Wheels)", category: "icu", desc: "Premium ambulance stretcher with 10-wheel system for ultimate stability.", imageSrc: "/seed/eqp_102.jpg", price: null, requiresPrescription: false, cta: "quote", tag: "Equipment", available: "available", featured: false },
+  { id: "eqp_103", name: "ABS Overbed Table", category: "specialized", desc: "Lightweight ABS plastic overbed table. Easy to clean, height adjustable.", imageSrc: "/seed/eqp_103.jpg", price: null, requiresPrescription: false, cta: "quote", tag: "Equipment", available: "available", featured: false },
+  { id: "eqp_104", name: "4 Wheels Rolator with Foot Rest", category: "mobility", desc: "Four-wheel rollator walker with built-in seat and foot rest. Folding, with brakes.", imageSrc: "/seed/eqp_104.jpg", price: null, requiresPrescription: false, cta: "quote", tag: "Equipment", available: "available", featured: false },
+  { id: "eqp_105", name: "4 Fold Screen Panel", category: "specialized", desc: "Four-panel folding privacy screen for hospital wards and exam rooms.", imageSrc: "/seed/eqp_105.jpg", price: null, requiresPrescription: false, cta: "quote", tag: "Equipment", available: "available", featured: false },
+  { id: "eqp_106", name: "2 Crank Paramount Bed", category: "beds", desc: "Hospital bed with 2-crank manual height and position adjustment.", imageSrc: "/seed/eqp_106.jpg", price: null, requiresPrescription: false, cta: "quote", tag: "Equipment", available: "available", featured: false },
+  { id: "eqp_107", name: "2 Crank Manual Bed", category: "beds", desc: "Standard 2-crank manually-operated hospital bed.", imageSrc: "/seed/eqp_107.jpg", price: null, requiresPrescription: false, cta: "quote", tag: "Equipment", available: "available", featured: false }
+];
+
+// v16.7: Bulk import all CATALOG_SEED_PRODUCTS into Firestore
+async function bulkImportCatalog(onProgress) {
+  let success = 0;
+  let failed = 0;
+  const total = CATALOG_SEED_PRODUCTS.length;
+  const errors = [];
+  for (let i = 0; i < total; i++) {
+    const p = CATALOG_SEED_PRODUCTS[i];
+    try {
+      await setDoc(doc(db, "products", p.id), {
+        name: p.name,
+        slug: p.id,
+        category: p.category,
+        desc: p.desc,
+        imageSrc: p.imageSrc,
+        price: p.price,
+        requiresPrescription: p.requiresPrescription,
+        cta: p.cta,
+        tag: p.tag,
+        available: p.available,
+        featured: p.featured,
+        visible: true,
+        rxCategory: null,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+        seedImport: true,  // marker so we know these came from bulk import
+      }, { merge: true });
+      success++;
+    } catch(e) {
+      failed++;
+      errors.push(p.name + ": " + e.message);
+    }
+    if (onProgress) onProgress(i + 1, total, success, failed);
+  }
+  return { success, failed, total, errors };
+}
 
 const CLIENT_TYPES = [
   {icon:"🏥",label:"Clinics & Medical Practices", desc:"Private clinics, dental offices, specialty practices, and medical centers across the Philippines."},
@@ -5010,6 +5192,26 @@ function AdminDashboard({ user }){
     setSeeding(false);
     setTimeout(()=>setSeedingMessage(""), 3500);
   };
+  
+  // v16.7: Bulk import the 130-product catalog (medicines + equipment) from PDFs
+  const seedFullCatalog = async () => {
+    if (!confirm("This will import "+CATALOG_SEED_PRODUCTS.length+" products (medicines + equipment) into your catalog. Existing products with matching IDs will be updated. Continue?")) return;
+    setSeeding(true); setSeedingMessage("⏳ Importing 0/"+CATALOG_SEED_PRODUCTS.length+"…");
+    try {
+      const result = await bulkImportCatalog((current, total, success, failed) => {
+        setSeedingMessage("⏳ Importing "+current+"/"+total+" ("+success+" ok"+(failed?", "+failed+" failed":"")+")");
+      });
+      if (result.failed === 0) {
+        setSeedingMessage("✓ Imported "+result.success+" products successfully");
+      } else {
+        setSeedingMessage("⚠ "+result.success+" imported, "+result.failed+" failed");
+        console.warn("Bulk import errors:", result.errors);
+      }
+      await refreshProducts();
+    } catch (e) { setSeedingMessage("⚠ "+e.message); }
+    setSeeding(false);
+    setTimeout(()=>setSeedingMessage(""), 6000);
+  };
 
   const saveProduct = async (productData) => {
     try {
@@ -5521,6 +5723,7 @@ function AdminDashboard({ user }){
               <div style={{display:"flex",gap:10,alignItems:"center",flexWrap:"wrap"}}>
                 {seedingMessage&&<span style={{fontSize:12,color:seedingMessage.startsWith("✓")?ds.color.success:ds.color.textMuted}}>{seedingMessage}</span>}
                 {PRODUCTS.length===0&&<Btn variant="gold" size="sm" onClick={seedProductsFromDefaults} disabled={seeding}>{seeding?"Seeding…":"🌱 Seed 63 Default Products"}</Btn>}
+                <Btn variant="secondary" size="sm" onClick={seedFullCatalog} disabled={seeding} title="Import 130 products (23 medicines + 107 equipment) from the catalog seed">{seeding?"Importing…":"📦 Import Full Catalog (130)"}</Btn>
                 <Btn variant="primary" size="sm" onClick={()=>setEditingProduct({_new:true,id:"",name:"",desc:"",price:null,cta:"buy",imageSrc:"",category:"pharma",featured:false,requiresPrescription:false,rxCategory:null,tag:"",visible:true,available:"available"})}>+ Add New Product</Btn>
               </div>
             </div>
