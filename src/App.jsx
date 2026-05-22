@@ -1,5 +1,11 @@
 /**
- * DMEAST — Medical Solutions Platform  v16.7.1
+ * DMEAST — Medical Solutions Platform  v16.8
+ *
+ * v16.8 RX BULK HIDE/SHOW (for Fiuu approval):
+ * - 🙈 Bulk-hide all Rx products from public shop (one click)
+ * - 👁️ Bulk-show them back later (one click)
+ * - 📝 Products remain in admin, just hidden from /products page
+ * - ✅ Reversible workaround for payment gateway requirements
  *
  * v16.7.1 HOTFIX:
  * - 🙈 Import Full Catalog button auto-hides if catalog already imported
@@ -5216,6 +5222,56 @@ function AdminDashboard({ user }){
     setSeeding(false);
     setTimeout(()=>setSeedingMessage(""), 6000);
   };
+  
+  // v16.8: Bulk hide all Rx products (for Fiuu payment gateway approval)
+  const bulkHideRxProducts = async () => {
+    const rxProducts = PRODUCTS.filter(p => p.requiresPrescription === true && p.visible !== false);
+    if (rxProducts.length === 0) {
+      setSeedingMessage("ℹ No visible Rx products to hide");
+      setTimeout(()=>setSeedingMessage(""), 3500);
+      return;
+    }
+    if (!confirm("This will HIDE "+rxProducts.length+" prescription medicines from the public shop. They remain in admin and can be re-shown anytime. Continue?")) return;
+    setSeeding(true); setSeedingMessage("⏳ Hiding "+rxProducts.length+" Rx products…");
+    try {
+      const batch = writeBatch(db);
+      rxProducts.forEach(p => {
+        const docId = p._docId || p.id;
+        const ref = doc(db, "products", docId);
+        batch.update(ref, { visible: false, hiddenReason: "rx_pending_approval", hiddenAt: serverTimestamp() });
+      });
+      await batch.commit();
+      setSeedingMessage("✓ Hidden "+rxProducts.length+" Rx products from public shop");
+      await refreshProducts();
+    } catch (e) { setSeedingMessage("⚠ "+e.message); }
+    setSeeding(false);
+    setTimeout(()=>setSeedingMessage(""), 5000);
+  };
+  
+  // v16.8: Re-show previously hidden Rx products
+  const bulkShowRxProducts = async () => {
+    const hiddenRx = PRODUCTS.filter(p => p.requiresPrescription === true && p.visible === false);
+    if (hiddenRx.length === 0) {
+      setSeedingMessage("ℹ No hidden Rx products to restore");
+      setTimeout(()=>setSeedingMessage(""), 3500);
+      return;
+    }
+    if (!confirm("This will RESTORE visibility for "+hiddenRx.length+" prescription medicines on the public shop. Continue?")) return;
+    setSeeding(true); setSeedingMessage("⏳ Restoring "+hiddenRx.length+" Rx products…");
+    try {
+      const batch = writeBatch(db);
+      hiddenRx.forEach(p => {
+        const docId = p._docId || p.id;
+        const ref = doc(db, "products", docId);
+        batch.update(ref, { visible: true, hiddenReason: null });
+      });
+      await batch.commit();
+      setSeedingMessage("✓ Restored "+hiddenRx.length+" Rx products to public shop");
+      await refreshProducts();
+    } catch (e) { setSeedingMessage("⚠ "+e.message); }
+    setSeeding(false);
+    setTimeout(()=>setSeedingMessage(""), 5000);
+  };
 
   const saveProduct = async (productData) => {
     try {
@@ -5730,6 +5786,18 @@ function AdminDashboard({ user }){
                 {!PRODUCTS.some(p=>p.seedImport===true) && (
                   <Btn variant="secondary" size="sm" onClick={seedFullCatalog} disabled={seeding} title="Import 130 products (23 medicines + 107 equipment) from the catalog seed">{seeding?"Importing…":"📦 Import Full Catalog (130)"}</Btn>
                 )}
+                {/* v16.8: Bulk hide/show Rx products (Fiuu approval workaround) */}
+                {(()=>{
+                  const visibleRx = PRODUCTS.filter(p => p.requiresPrescription === true && p.visible !== false).length;
+                  const hiddenRx = PRODUCTS.filter(p => p.requiresPrescription === true && p.visible === false).length;
+                  if (visibleRx > 0) {
+                    return <Btn variant="outline" size="sm" onClick={bulkHideRxProducts} disabled={seeding} title="Hide all Rx products from the public shop (for Fiuu / payment gateway approval)">{seeding?"Hiding…":`🙈 Hide ${visibleRx} Rx Product${visibleRx!==1?"s":""}`}</Btn>;
+                  }
+                  if (hiddenRx > 0) {
+                    return <Btn variant="gold" size="sm" onClick={bulkShowRxProducts} disabled={seeding} title="Re-show all hidden Rx products">{seeding?"Restoring…":`👁️ Show ${hiddenRx} Hidden Rx Product${hiddenRx!==1?"s":""}`}</Btn>;
+                  }
+                  return null;
+                })()}
                 <Btn variant="primary" size="sm" onClick={()=>setEditingProduct({_new:true,id:"",name:"",desc:"",price:null,cta:"buy",imageSrc:"",category:"pharma",featured:false,requiresPrescription:false,rxCategory:null,tag:"",visible:true,available:"available"})}>+ Add New Product</Btn>
               </div>
             </div>
