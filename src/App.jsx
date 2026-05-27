@@ -1,5 +1,13 @@
 /**
- * DMEAST — Medical Solutions Platform  v16.9
+ * DMEAST — Medical Solutions Platform  v16.10
+ *
+ * v16.10 MAYA PAYMENT INTEGRATION (FRONTEND):
+ * - 💳 Customer clicks GCash/Maya/Visa/MC/QR Ph → redirected to Maya Checkout
+ * - 🔄 Pre-creates order in Firestore before redirect (status: redirecting_to_maya)
+ * - 🎯 PaymentReturnPage handles success/failure/cancel returns from Maya
+ * - 🧹 URL params cleaned up after processing (no leftover ?payment=success in URL)
+ * - ✅ Bank Transfer flow unchanged (still works for non-Maya customers)
+ * - 🔐 All secret keys stay server-side via /api/maya-create-checkout
  *
  * v16.9 SANDBOX-READY ARCHITECTURE:
  * - 🔧 Firebase config moved to environment variables (VITE_FIREBASE_*)
@@ -7376,6 +7384,142 @@ const PAYMENT_METHODS_DATA = [
    logo: <svg viewBox="0 0 70 28" fill="none" style={{height:22,width:"auto"}}><rect x="2" y="2" width="11" height="11" rx="1.5" stroke="#CC2F3C" strokeWidth="2" fill="none"/><rect x="5" y="5" width="5" height="5" rx="0.5" fill="#CC2F3C"/><rect x="17" y="2" width="11" height="11" rx="1.5" stroke="#CC2F3C" strokeWidth="2" fill="none"/><rect x="20" y="5" width="5" height="5" rx="0.5" fill="#CC2F3C"/><rect x="2" y="17" width="11" height="11" rx="1.5" stroke="#CC2F3C" strokeWidth="2" fill="none"/><rect x="5" y="20" width="5" height="5" rx="0.5" fill="#CC2F3C"/><rect x="17" y="17" width="3" height="3" fill="#CC2F3C"/><rect x="22" y="17" width="3" height="3" fill="#CC2F3C"/><rect x="25" y="20" width="3" height="3" fill="#CC2F3C"/><rect x="17" y="25" width="3" height="3" fill="#CC2F3C"/><rect x="22" y="22" width="3" height="6" fill="#CC2F3C"/><text x="34" y="21" fontFamily="Arial,sans-serif" fontWeight="700" fontSize="14" fill="#CC2F3C">QR Ph</text></svg>},
 ];
 
+// ─── v16.10: MAYA PAYMENT INTEGRATION ────────────────────────────────────────
+// Methods that go through Maya Checkout (instead of manual bank transfer)
+const MAYA_METHODS = ["Maya", "GCash", "Visa", "Mastercard", "QR Ph"];
+const isMayaMethod = (method) => MAYA_METHODS.includes(method);
+
+// Call backend to create Maya checkout session, return redirect URL
+async function createMayaCheckout({ orderId, totalAmount, items, buyer }){
+  const res = await fetch("/api/maya-create-checkout", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      orderId,
+      totalAmount,
+      items: items.map(i => ({
+        name: i.name,
+        quantity: i.qty,
+        amount: i.price,
+        code: i.id,
+      })),
+      buyerEmail:     buyer.email,
+      buyerFirstName: buyer.firstName,
+      buyerLastName:  buyer.lastName,
+      buyerPhone:     buyer.phone,
+    }),
+  });
+  const data = await res.json();
+  if (!res.ok || !data.success) {
+    throw new Error(data.error || data.hint || "Failed to create Maya checkout");
+  }
+  return data;  // { success, checkoutId, redirectUrl, requestReferenceNumber }
+}
+
+// Manually verify a Maya payment via our backend (fallback if webhook delayed)
+async function verifyMayaPayment(checkoutId){
+  const res = await fetch(`/api/maya-verify?checkoutId=${encodeURIComponent(checkoutId)}`);
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || "Verification failed");
+  return data;
+}
+
+// v16.10: Payment return page (shown when customer comes back from Maya)
+function PaymentReturnPage({ status, orderId, setPage }){
+  const [verifying, setVerifying] = useState(false);
+  const [orderData, setOrderData] = useState(null);
+  const [error, setError] = useState("");
+  
+  useEffect(() => {
+    if (!orderId) return;
+    setVerifying(true);
+    (async () => {
+      try {
+        // Wait briefly for webhook to potentially fire first
+        await new Promise(r => setTimeout(r, 1500));
+        const snap = await getDoc(doc(db, "orders", orderId));
+        if (snap.exists()) {
+          setOrderData({ id: snap.id, ...snap.data() });
+        }
+      } catch (e) {
+        setError("Couldn't fetch order details: " + e.message);
+      }
+      setVerifying(false);
+    })();
+  }, [orderId]);
+  
+  const isSuccess = status === "success";
+  const isFailure = status === "failure";
+  const isCancel  = status === "cancel";
+  
+  const iconBg = isSuccess ? ds.color.success : isFailure ? ds.color.red : ds.color.gold;
+  const icon = isSuccess ? "✓" : isFailure ? "✕" : "⊘";
+  const title = isSuccess ? "Payment Successful!" : isFailure ? "Payment Failed" : "Payment Cancelled";
+  const subtitle = isSuccess 
+    ? "Your order has been confirmed and will be processed shortly."
+    : isFailure
+      ? "We weren't able to process your payment. You can try again or use a different method."
+      : "You cancelled the payment. Your order is still pending — you can complete payment anytime.";
+  
+  return (
+    <div style={{paddingTop:67,minHeight:"calc(100vh - 67px)",background:ds.color.canvas}}>
+      <div style={{maxWidth:580,margin:"0 auto",padding:"60px 28px"}}>
+        <div style={{background:"#fff",borderRadius:ds.radius.xl,padding:"48px 36px",boxShadow:ds.shadow.md,textAlign:"center",border:`1px solid ${ds.color.borderLight}`}}>
+          <div style={{
+            width:80,height:80,borderRadius:"50%",
+            background:iconBg,color:"#fff",
+            display:"inline-flex",alignItems:"center",justifyContent:"center",
+            fontSize:42,fontWeight:700,marginBottom:24,
+          }}>{icon}</div>
+          
+          <h1 style={{fontFamily:ds.font.display,fontSize:28,color:ds.color.textDark,marginBottom:12}}>{title}</h1>
+          <p style={{fontSize:15,color:ds.color.textMuted,lineHeight:1.6,marginBottom:28}}>{subtitle}</p>
+          
+          {orderId && (
+            <div style={{background:ds.color.canvas,borderRadius:ds.radius.md,padding:"14px 18px",marginBottom:24,border:`1px solid ${ds.color.borderLight}`}}>
+              <div style={{fontSize:11,fontWeight:700,color:ds.color.textMuted,letterSpacing:"0.08em",textTransform:"uppercase",marginBottom:4}}>Reference</div>
+              <div style={{fontSize:15,fontWeight:700,color:ds.color.textDark,fontFamily:"ui-monospace,monospace"}}>{orderId}</div>
+              {verifying && <div style={{fontSize:12,color:ds.color.textMuted,marginTop:8}}>⏳ Verifying with bank…</div>}
+              {orderData && orderData.status === "paid" && <div style={{fontSize:12,color:ds.color.success,marginTop:8,fontWeight:600}}>✓ Payment confirmed</div>}
+              {orderData && orderData.status === "pending" && isSuccess && <div style={{fontSize:12,color:ds.color.gold,marginTop:8,fontWeight:600}}>⏳ Awaiting bank confirmation (may take a few minutes)</div>}
+            </div>
+          )}
+          
+          {error && <div style={{padding:"12px 16px",background:ds.color.redLight,border:`1px solid ${ds.color.redBorder}`,borderRadius:ds.radius.md,color:ds.color.red,fontSize:13,marginBottom:18}}>{error}</div>}
+          
+          <div style={{display:"flex",gap:10,justifyContent:"center",flexWrap:"wrap"}}>
+            {isSuccess && (
+              <>
+                <Btn variant="primary" size="md" onClick={()=>setPage("track")}>Track Order</Btn>
+                <Btn variant="outline" size="md" onClick={()=>setPage("home")}>Continue Shopping</Btn>
+              </>
+            )}
+            {isFailure && (
+              <>
+                <Btn variant="primary" size="md" onClick={()=>setPage("cart")}>Try Again</Btn>
+                <Btn variant="outline" size="md" onClick={()=>setPage("home")}>Back to Home</Btn>
+              </>
+            )}
+            {isCancel && (
+              <>
+                <Btn variant="primary" size="md" onClick={()=>setPage("track")}>View Order Status</Btn>
+                <Btn variant="outline" size="md" onClick={()=>setPage("home")}>Back to Home</Btn>
+              </>
+            )}
+          </div>
+          
+          {isSuccess && (
+            <p style={{fontSize:12,color:ds.color.textLight,marginTop:24,lineHeight:1.6}}>
+              📧 A confirmation email has been sent to your inbox.<br/>
+              You'll be notified once your order ships.
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── CART PAGE (v11) ─────────────────────────────────────────────────────────
 // Major v11 changes:
 // - Auto-populate name/email/phone from logged-in user profile (editable)
@@ -7539,7 +7683,50 @@ function CartPage({cart,removeFromCart,updateQty,setPage,user,onOrderComplete}){
 
     try {
       const orderRef = await withTimeout(addDoc(collection(db,"orders"), orderData));
-
+      
+      // v16.10: If Maya-supported method, redirect to Maya Checkout instead of regular flow
+      if (isMayaMethod(method)) {
+        try {
+          // Split name into first + last for Maya buyer info
+          const nameParts = (details.name || "").trim().split(/\s+/);
+          const firstName = nameParts[0] || "Customer";
+          const lastName = nameParts.slice(1).join(" ") || "";
+          
+          // Use Firestore doc ID as orderId reference
+          const mayaResult = await createMayaCheckout({
+            orderId: orderRef.id,
+            totalAmount: total,
+            items: cart,
+            buyer: {
+              email: details.email,
+              firstName,
+              lastName,
+              phone,
+            },
+          });
+          
+          // Update order with Maya checkout ID before redirect
+          try {
+            await updateDoc(doc(db, "orders", orderRef.id), {
+              mayaCheckoutId: mayaResult.checkoutId,
+              paymentStatus: "redirecting_to_maya",
+            });
+          } catch(_){}
+          
+          // Redirect customer to Maya hosted checkout
+          window.location.href = mayaResult.redirectUrl;
+          return;  // Stop here — customer is leaving the site
+        } catch (mayaErr) {
+          console.error("Maya checkout failed:", mayaErr);
+          setErrMsg("Couldn't connect to " + method + " payment gateway: " + mayaErr.message + ". Please try a different payment method or contact us.");
+          setSending(false);
+          // Note: order is still created in Firestore with paymentStatus "awaiting"
+          // Customer can retry with a different method
+          return;
+        }
+      }
+      
+      // Non-Maya flow continues here (Bank Transfer, etc.)
       if(user){
         const earnedPts = Math.floor(total * POINTS_PER_PHP);
         try {
@@ -9598,11 +9785,31 @@ function SandboxBanner(){
 }
 
 export default function App(){
-  const [page,setPageRaw]=useState("home");
+  // v16.10: Detect payment return URL params (Maya redirects back with these)
+  const [paymentReturn, setPaymentReturn] = useState(()=>{
+    if (typeof window === "undefined") return null;
+    const params = new URLSearchParams(window.location.search);
+    const status = params.get("payment");  // "success" | "failure" | "cancel"
+    const orderId = params.get("orderId");
+    if (status && orderId) return { status, orderId };
+    return null;
+  });
+  
+  // Initial page is "paymentReturn" if URL has payment params, else "home"
+  const [page,setPageRaw]=useState(paymentReturn ? "paymentReturn" : "home");
   // v16.5: Currently viewed blog post (when page === "blogPost")
   const [activePost,setActivePost]=useState(null);
   // v16.4/v16.5: Update meta tags on page change for SEO + social sharing
   useSEO(page, activePost);
+  
+  // v16.10: Clean up URL after we've processed payment return params
+  useEffect(() => {
+    if (paymentReturn && typeof window !== "undefined") {
+      // Remove query params from URL bar (keeps the user on same page conceptually)
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+  }, [paymentReturn]);
+  
   const [cart,setCart]=useState([]);
   const [activeCategory,setActiveCategory]=useState(null);
   const [user,setUser]=useState(null);
@@ -9680,6 +9887,7 @@ export default function App(){
         {page==="blog"         &&<BlogPage setPage={setPage} setActivePost={setActivePost}/>}
         {page==="blogPost"     &&<BlogPostPage post={activePost} setPage={setPage} setActivePost={setActivePost}/>}
         {page==="track"        &&<TrackOrderPage/>}
+        {page==="paymentReturn"&&<PaymentReturnPage status={paymentReturn?.status} orderId={paymentReturn?.orderId} setPage={setPage}/>}
       </main>
       <Footer setPage={setPage}/>
       <FloatingChat hidden={page === "admin"}/>
