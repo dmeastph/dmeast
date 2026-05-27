@@ -1,5 +1,12 @@
 /**
- * DMEAST — Medical Solutions Platform  v16.8
+ * DMEAST — Medical Solutions Platform  v16.9
+ *
+ * v16.9 SANDBOX-READY ARCHITECTURE:
+ * - 🔧 Firebase config moved to environment variables (VITE_FIREBASE_*)
+ * - 🌍 IS_SANDBOX detection (env flag + hostname auto-detect)
+ * - 🧪 SandboxBanner: prominent visual indicator on sandbox/preview deploys
+ * - 💛 Yellow striped borders + center badge — IMPOSSIBLE to confuse with prod
+ * - 🔄 Backward compatible: falls back to hardcoded production config if env missing
  *
  * v16.8 RX BULK HIDE/SHOW (for Fiuu approval):
  * - 🙈 Bulk-hide all Rx products from public shop (one click)
@@ -177,16 +184,30 @@ import {
 } from "firebase/firestore";
 import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
 
+// v16.9: Firebase config now read from environment variables (Vite exposes VITE_* to client)
+// Falls back to production config if env vars missing (e.g., legacy deploys)
+// This allows production + sandbox to share the same code with different env values
 const firebaseConfig = {
-  apiKey: "AIzaSyAV30NWtnxAnj8jIjN4f5Pa6je43oM4rrw",
-  authDomain: "dmeast-516cc.firebaseapp.com",
-  databaseURL: "https://dmeast-516cc-default-rtdb.asia-southeast1.firebasedatabase.app",
-  projectId: "dmeast-516cc",
-  storageBucket: "dmeast-516cc.firebasestorage.app",
-  messagingSenderId: "805825630764",
-  appId: "1:805825630764:web:9aa00bf55ece3b3f37b789",
-  measurementId: "G-904XX7S1HY",
+  apiKey:            import.meta.env.VITE_FIREBASE_API_KEY            || "AIzaSyAV30NWtnxAnj8jIjN4f5Pa6je43oM4rrw",
+  authDomain:        import.meta.env.VITE_FIREBASE_AUTH_DOMAIN        || "dmeast-516cc.firebaseapp.com",
+  databaseURL:       import.meta.env.VITE_FIREBASE_DATABASE_URL       || "https://dmeast-516cc-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId:         import.meta.env.VITE_FIREBASE_PROJECT_ID         || "dmeast-516cc",
+  storageBucket:     import.meta.env.VITE_FIREBASE_STORAGE_BUCKET     || "dmeast-516cc.firebasestorage.app",
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID|| "805825630764",
+  appId:             import.meta.env.VITE_FIREBASE_APP_ID             || "1:805825630764:web:9aa00bf55ece3b3f37b789",
+  measurementId:     import.meta.env.VITE_FIREBASE_MEASUREMENT_ID     || "G-904XX7S1HY",
 };
+
+// v16.9: Detect environment (sandbox vs production) for visual indicator + behavior
+const IS_SANDBOX = (
+  // Explicit env flag (set in Vercel for sandbox deploy)
+  import.meta.env.VITE_ENVIRONMENT === "sandbox" ||
+  // Auto-detect by hostname (fallback if env var not set)
+  (typeof window !== "undefined" && window.location.hostname.includes("sandbox.")) ||
+  // Vercel preview deployments are also non-production
+  (typeof window !== "undefined" && window.location.hostname.includes(".vercel.app"))
+);
+
 const firebaseApp = initializeApp(firebaseConfig);
 const auth    = getAuth(firebaseApp);
 const db      = getFirestore(firebaseApp);
@@ -9511,6 +9532,71 @@ function FloatingChat({ hidden }){
 }
 
 // ─── ROOT APP ────────────────────────────────────────────────────────────────
+// v16.9: Sandbox visual indicator — appears on sandbox.dmeastph.com & vercel preview deploys
+function SandboxBanner(){
+  const [collapsed, setCollapsed] = useState(false);
+  if (!IS_SANDBOX) return null;
+  if (collapsed) {
+    return (
+      <button 
+        onClick={()=>setCollapsed(false)}
+        style={{
+          position:"fixed", top:8, right:8, zIndex:9999,
+          background:"#FFC107", color:"#1A1A1A",
+          border:"none", borderRadius:6, padding:"4px 10px",
+          fontSize:11, fontWeight:800, cursor:"pointer",
+          fontFamily:"system-ui, sans-serif",
+          boxShadow:"0 2px 8px rgba(0,0,0,0.2)",
+          letterSpacing:"0.05em",
+        }}
+        title="Show sandbox indicator"
+      >🧪 SANDBOX</button>
+    );
+  }
+  return (
+    <>
+      {/* Top warning stripe */}
+      <div style={{
+        position:"fixed", top:0, left:0, right:0, zIndex:9999,
+        background:"repeating-linear-gradient(45deg, #FFC107, #FFC107 12px, #1A1A1A 12px, #1A1A1A 24px)",
+        height:4, pointerEvents:"none",
+      }}/>
+      {/* Floating sandbox badge */}
+      <div style={{
+        position:"fixed", top:10, left:"50%", transform:"translateX(-50%)",
+        zIndex:9999,
+        background:"#FFC107", color:"#1A1A1A",
+        padding:"8px 18px",
+        borderRadius:24,
+        fontSize:12, fontWeight:800,
+        fontFamily:"system-ui, sans-serif",
+        letterSpacing:"0.06em",
+        boxShadow:"0 4px 12px rgba(0,0,0,0.25)",
+        display:"flex", alignItems:"center", gap:10,
+        border:"2px solid #1A1A1A",
+      }}>
+        <span style={{fontSize:16}}>🧪</span>
+        <span>SANDBOX ENVIRONMENT — NOT PRODUCTION</span>
+        <button 
+          onClick={()=>setCollapsed(true)} 
+          title="Minimize"
+          style={{
+            background:"rgba(0,0,0,0.15)", border:"none", color:"#1A1A1A",
+            width:18, height:18, borderRadius:9, fontSize:11, lineHeight:1,
+            cursor:"pointer", padding:0, fontWeight:700,
+          }}
+        >−</button>
+      </div>
+      {/* Bottom warning stripe */}
+      <div style={{
+        position:"fixed", bottom:0, left:0, right:0, zIndex:9999,
+        background:"repeating-linear-gradient(45deg, #FFC107, #FFC107 12px, #1A1A1A 12px, #1A1A1A 24px)",
+        height:4, pointerEvents:"none",
+      }}/>
+    </>
+  );
+}
+
 export default function App(){
   const [page,setPageRaw]=useState("home");
   // v16.5: Currently viewed blog post (when page === "blogPost")
@@ -9597,6 +9683,7 @@ export default function App(){
       </main>
       <Footer setPage={setPage}/>
       <FloatingChat hidden={page === "admin"}/>
+      <SandboxBanner/>
       {showAuth&&<AuthModal onClose={()=>setShowAuth(false)} onSuccess={handleAuthSuccess}/>}
     </div>
     </ProductsProvider>
