@@ -1,14 +1,27 @@
 // /api/maya-create-checkout.js
-// DEBUG VERSION v16.10.1 — adds detailed logging to diagnose 401 errors
-// This logs key fingerprints (first 8 chars + last 4 chars) and length
-// SAFE: doesn't log full keys, only enough to verify they loaded correctly
+// Vercel serverless function — creates a Maya Checkout session and returns the redirect URL.
+//
+// HOW IT WORKS:
+//   1. Frontend calls this endpoint with order details (amount, items, customer info)
+//   2. This function calls Maya's API server-to-server (keeping secret key safe)
+//   3. Maya returns a redirectUrl + checkoutId
+//   4. We return those to the frontend
+//   5. Frontend redirects customer to the redirectUrl (Maya's payment page)
+//
+// ENVIRONMENT VARIABLES REQUIRED (set in Vercel):
+//   MAYA_PUBLIC_KEY   = pk-XXXXX (from Maya Business Manager)
+//   MAYA_SECRET_KEY   = sk-XXXXX (from Maya Business Manager — NEVER expose to client)
+//   MAYA_API_URL      = https://pg-sandbox.paymaya.com  (sandbox) or  https://pg.paymaya.com  (production)
+//   APP_BASE_URL      = https://sandbox.dmeastph.com  (or https://dmeastph.com for prod)
 
 export default async function handler(req, res) {
+  // Only allow POST
   if (req.method !== "POST") {
     res.setHeader("Allow", ["POST"]);
     return res.status(405).json({ error: "Method not allowed" });
   }
 
+  // CORS — allow our own domain to call this
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
@@ -19,34 +32,6 @@ export default async function handler(req, res) {
     const MAYA_API_URL = process.env.MAYA_API_URL || "https://pg-sandbox.paymaya.com";
     const APP_BASE_URL = process.env.APP_BASE_URL || "https://dmeastph.com";
 
-    // ============ DEBUG LOGGING ============
-    console.log("=== MAYA CHECKOUT DEBUG ===");
-    console.log("MAYA_API_URL:", MAYA_API_URL);
-    console.log("APP_BASE_URL:", APP_BASE_URL);
-    
-    if (!MAYA_PUBLIC_KEY) {
-      console.log("MAYA_PUBLIC_KEY: NOT SET (undefined)");
-    } else {
-      console.log("MAYA_PUBLIC_KEY length:", MAYA_PUBLIC_KEY.length);
-      console.log("MAYA_PUBLIC_KEY starts with:", MAYA_PUBLIC_KEY.substring(0, 8));
-      console.log("MAYA_PUBLIC_KEY ends with:", "..." + MAYA_PUBLIC_KEY.substring(MAYA_PUBLIC_KEY.length - 4));
-      console.log("MAYA_PUBLIC_KEY has leading whitespace:", MAYA_PUBLIC_KEY !== MAYA_PUBLIC_KEY.trimStart());
-      console.log("MAYA_PUBLIC_KEY has trailing whitespace:", MAYA_PUBLIC_KEY !== MAYA_PUBLIC_KEY.trimEnd());
-      console.log("MAYA_PUBLIC_KEY contains newline:", MAYA_PUBLIC_KEY.includes("\n") || MAYA_PUBLIC_KEY.includes("\r"));
-    }
-    
-    if (!MAYA_SECRET_KEY) {
-      console.log("MAYA_SECRET_KEY: NOT SET (undefined)");
-    } else {
-      console.log("MAYA_SECRET_KEY length:", MAYA_SECRET_KEY.length);
-      console.log("MAYA_SECRET_KEY starts with:", MAYA_SECRET_KEY.substring(0, 8));
-      console.log("MAYA_SECRET_KEY ends with:", "..." + MAYA_SECRET_KEY.substring(MAYA_SECRET_KEY.length - 4));
-      console.log("MAYA_SECRET_KEY has leading whitespace:", MAYA_SECRET_KEY !== MAYA_SECRET_KEY.trimStart());
-      console.log("MAYA_SECRET_KEY has trailing whitespace:", MAYA_SECRET_KEY !== MAYA_SECRET_KEY.trimEnd());
-      console.log("MAYA_SECRET_KEY contains newline:", MAYA_SECRET_KEY.includes("\n") || MAYA_SECRET_KEY.includes("\r"));
-    }
-    // ============ END DEBUG ============
-
     if (!MAYA_PUBLIC_KEY || !MAYA_SECRET_KEY) {
       return res.status(500).json({ 
         error: "Maya credentials not configured", 
@@ -54,14 +39,10 @@ export default async function handler(req, res) {
       });
     }
 
-    // Trim any accidental whitespace from keys (defensive)
-    const cleanSecretKey = MAYA_SECRET_KEY.trim();
-    const cleanPublicKey = MAYA_PUBLIC_KEY.trim();
-
     const { 
-      orderId,
-      totalAmount,
-      items,
+      orderId,        // e.g., "SO-2026-0001"
+      totalAmount,    // number in PHP (e.g., 2160.00)
+      items,          // [{ name, quantity, amount, currency: "PHP" }]
       buyerEmail,
       buyerFirstName,
       buyerLastName,
@@ -75,6 +56,7 @@ export default async function handler(req, res) {
       });
     }
 
+    // Maya Checkout API payload
     const payload = {
       totalAmount: {
         value: Number(totalAmount).toFixed(2),
@@ -89,7 +71,7 @@ export default async function handler(req, res) {
         },
       },
       items: items.map(item => ({
-        name: String(item.name).substring(0, 256),
+        name: String(item.name).substring(0, 256),  // Maya limits item name length
         quantity: item.quantity || 1,
         code: item.code || "ITEM",
         amount: {
@@ -112,19 +94,8 @@ export default async function handler(req, res) {
       },
     };
 
-    // ============ AUTH HEADER DEBUG ============
-    // Maya uses Basic auth: base64(SECRET_KEY + ":")
-    // IMPORTANT: According to Maya docs, the PUBLIC key is for client-side ops,
-    // SECRET key is for server-side (creating checkouts). We use SECRET key.
-    const authString = `${cleanSecretKey}:`;
-    const base64Auth = Buffer.from(authString).toString("base64");
-    const authHeader = "Basic " + base64Auth;
-    
-    console.log("Auth string length (secret + colon):", authString.length);
-    console.log("Base64 auth length:", base64Auth.length);
-    console.log("Auth header preview:", authHeader.substring(0, 20) + "..." + authHeader.substring(authHeader.length - 8));
-    console.log("Calling URL:", `${MAYA_API_URL}/checkout/v1/checkouts`);
-    // ============ END AUTH DEBUG ============
+    // Maya uses Basic auth with secret key (base64 encoded with trailing colon)
+    const authHeader = "Basic " + Buffer.from(`${MAYA_SECRET_KEY}:`).toString("base64");
 
     const response = await fetch(`${MAYA_API_URL}/checkout/v1/checkouts`, {
       method: "POST",
@@ -137,26 +108,16 @@ export default async function handler(req, res) {
 
     const data = await response.json();
 
-    // ============ RESPONSE DEBUG ============
-    console.log("Maya response status:", response.status);
-    console.log("Maya response body:", JSON.stringify(data));
-    console.log("=== END DEBUG ===");
-    // ============ END ============
-
     if (!response.ok) {
       console.error("Maya API error:", response.status, data);
       return res.status(response.status).json({ 
         error: "Maya API rejected the checkout", 
         details: data,
         hint: data.message || data.error || "Check Maya credentials and payload format",
-        debug: {
-          mayaStatus: response.status,
-          mayaMessage: data.message || data.error,
-          urlCalled: `${MAYA_API_URL}/checkout/v1/checkouts`,
-        }
       });
     }
 
+    // Success — return the redirect URL to frontend
     return res.status(200).json({
       success: true,
       checkoutId: data.checkoutId,
