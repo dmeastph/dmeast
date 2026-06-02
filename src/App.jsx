@@ -1,5 +1,18 @@
 /**
- * DMEAST — Medical Solutions Platform  v16.10
+ * DMEAST — Medical Solutions Platform  v16.11
+ *
+ * v16.11 INTERNATIONAL ORDER INQUIRY OVERHAUL:
+ * - 👤 Auto-populate from user account (if signed in) with radio toggle:
+ *      "Same as my account" (gold) | "Different contact person" (red)
+ * - 🌍 Country dropdown — all ~195 countries with flag emojis (ISO 3166-1)
+ * - 🏙️ City/Port — free text (flexible for ports vs cities worldwide)
+ * - 📮 ZIP/Postal Code field — always optional, smart placeholder per country
+ * - 💱 Expanded currency dropdown (USD/PHP/SGD/AED/EUR/GBP/JPY/AUD)
+ * - 🛒 Editable cart on inquiry page: qty +/- AND remove item (with confirm)
+ * - 🚫 Submit disabled if cart empty (with friendly empty state + link to shop)
+ * - 📦 Order doc now stores granular intlCountry/intlCountryISO/intlZip fields
+ * - 📧 EmailJS template enriched with full country code phone + ZIP
+ * - ✅ Default currency changed PHP → USD (more sensible for intl)
  *
  * v16.10 MAYA PAYMENT INTEGRATION (FRONTEND):
  * - 💳 Customer clicks GCash/Maya/Visa/MC/QR Ph → redirected to Maya Checkout
@@ -7384,6 +7397,72 @@ const PAYMENT_METHODS_DATA = [
    logo: <svg viewBox="0 0 70 28" fill="none" style={{height:22,width:"auto"}}><rect x="2" y="2" width="11" height="11" rx="1.5" stroke="#CC2F3C" strokeWidth="2" fill="none"/><rect x="5" y="5" width="5" height="5" rx="0.5" fill="#CC2F3C"/><rect x="17" y="2" width="11" height="11" rx="1.5" stroke="#CC2F3C" strokeWidth="2" fill="none"/><rect x="20" y="5" width="5" height="5" rx="0.5" fill="#CC2F3C"/><rect x="2" y="17" width="11" height="11" rx="1.5" stroke="#CC2F3C" strokeWidth="2" fill="none"/><rect x="5" y="20" width="5" height="5" rx="0.5" fill="#CC2F3C"/><rect x="17" y="17" width="3" height="3" fill="#CC2F3C"/><rect x="22" y="17" width="3" height="3" fill="#CC2F3C"/><rect x="25" y="20" width="3" height="3" fill="#CC2F3C"/><rect x="17" y="25" width="3" height="3" fill="#CC2F3C"/><rect x="22" y="22" width="3" height="6" fill="#CC2F3C"/><text x="34" y="21" fontFamily="Arial,sans-serif" fontWeight="700" fontSize="14" fill="#CC2F3C">QR Ph</text></svg>},
 ];
 
+// ─── v16.11: COUNTRY LIST FOR INTERNATIONAL DROPDOWN ────────────────────────
+// ISO 3166-1 alpha-2 codes with flag emojis, sorted alphabetically by common name
+// Common ports/major shipping destinations are flagged with a star prefix for display
+const COUNTRIES = [
+  {c:"AF",n:"Afghanistan",f:"🇦🇫"},{c:"AL",n:"Albania",f:"🇦🇱"},{c:"DZ",n:"Algeria",f:"🇩🇿"},{c:"AD",n:"Andorra",f:"🇦🇩"},
+  {c:"AO",n:"Angola",f:"🇦🇴"},{c:"AG",n:"Antigua and Barbuda",f:"🇦🇬"},{c:"AR",n:"Argentina",f:"🇦🇷"},{c:"AM",n:"Armenia",f:"🇦🇲"},
+  {c:"AU",n:"Australia",f:"🇦🇺"},{c:"AT",n:"Austria",f:"🇦🇹"},{c:"AZ",n:"Azerbaijan",f:"🇦🇿"},{c:"BS",n:"Bahamas",f:"🇧🇸"},
+  {c:"BH",n:"Bahrain",f:"🇧🇭"},{c:"BD",n:"Bangladesh",f:"🇧🇩"},{c:"BB",n:"Barbados",f:"🇧🇧"},{c:"BY",n:"Belarus",f:"🇧🇾"},
+  {c:"BE",n:"Belgium",f:"🇧🇪"},{c:"BZ",n:"Belize",f:"🇧🇿"},{c:"BJ",n:"Benin",f:"🇧🇯"},{c:"BT",n:"Bhutan",f:"🇧🇹"},
+  {c:"BO",n:"Bolivia",f:"🇧🇴"},{c:"BA",n:"Bosnia and Herzegovina",f:"🇧🇦"},{c:"BW",n:"Botswana",f:"🇧🇼"},{c:"BR",n:"Brazil",f:"🇧🇷"},
+  {c:"BN",n:"Brunei",f:"🇧🇳"},{c:"BG",n:"Bulgaria",f:"🇧🇬"},{c:"BF",n:"Burkina Faso",f:"🇧🇫"},{c:"BI",n:"Burundi",f:"🇧🇮"},
+  {c:"KH",n:"Cambodia",f:"🇰🇭"},{c:"CM",n:"Cameroon",f:"🇨🇲"},{c:"CA",n:"Canada",f:"🇨🇦"},{c:"CV",n:"Cape Verde",f:"🇨🇻"},
+  {c:"CF",n:"Central African Republic",f:"🇨🇫"},{c:"TD",n:"Chad",f:"🇹🇩"},{c:"CL",n:"Chile",f:"🇨🇱"},{c:"CN",n:"China",f:"🇨🇳"},
+  {c:"CO",n:"Colombia",f:"🇨🇴"},{c:"KM",n:"Comoros",f:"🇰🇲"},{c:"CG",n:"Congo (Republic)",f:"🇨🇬"},{c:"CD",n:"Congo (DR)",f:"🇨🇩"},
+  {c:"CR",n:"Costa Rica",f:"🇨🇷"},{c:"CI",n:"Côte d'Ivoire",f:"🇨🇮"},{c:"HR",n:"Croatia",f:"🇭🇷"},{c:"CU",n:"Cuba",f:"🇨🇺"},
+  {c:"CY",n:"Cyprus",f:"🇨🇾"},{c:"CZ",n:"Czechia",f:"🇨🇿"},{c:"DK",n:"Denmark",f:"🇩🇰"},{c:"DJ",n:"Djibouti",f:"🇩🇯"},
+  {c:"DM",n:"Dominica",f:"🇩🇲"},{c:"DO",n:"Dominican Republic",f:"🇩🇴"},{c:"EC",n:"Ecuador",f:"🇪🇨"},{c:"EG",n:"Egypt",f:"🇪🇬"},
+  {c:"SV",n:"El Salvador",f:"🇸🇻"},{c:"GQ",n:"Equatorial Guinea",f:"🇬🇶"},{c:"ER",n:"Eritrea",f:"🇪🇷"},{c:"EE",n:"Estonia",f:"🇪🇪"},
+  {c:"SZ",n:"Eswatini",f:"🇸🇿"},{c:"ET",n:"Ethiopia",f:"🇪🇹"},{c:"FJ",n:"Fiji",f:"🇫🇯"},{c:"FI",n:"Finland",f:"🇫🇮"},
+  {c:"FR",n:"France",f:"🇫🇷"},{c:"GA",n:"Gabon",f:"🇬🇦"},{c:"GM",n:"Gambia",f:"🇬🇲"},{c:"GE",n:"Georgia",f:"🇬🇪"},
+  {c:"DE",n:"Germany",f:"🇩🇪"},{c:"GH",n:"Ghana",f:"🇬🇭"},{c:"GR",n:"Greece",f:"🇬🇷"},{c:"GD",n:"Grenada",f:"🇬🇩"},
+  {c:"GT",n:"Guatemala",f:"🇬🇹"},{c:"GN",n:"Guinea",f:"🇬🇳"},{c:"GW",n:"Guinea-Bissau",f:"🇬🇼"},{c:"GY",n:"Guyana",f:"🇬🇾"},
+  {c:"HT",n:"Haiti",f:"🇭🇹"},{c:"HN",n:"Honduras",f:"🇭🇳"},{c:"HK",n:"Hong Kong",f:"🇭🇰"},{c:"HU",n:"Hungary",f:"🇭🇺"},
+  {c:"IS",n:"Iceland",f:"🇮🇸"},{c:"IN",n:"India",f:"🇮🇳"},{c:"ID",n:"Indonesia",f:"🇮🇩"},{c:"IR",n:"Iran",f:"🇮🇷"},
+  {c:"IQ",n:"Iraq",f:"🇮🇶"},{c:"IE",n:"Ireland",f:"🇮🇪"},{c:"IL",n:"Israel",f:"🇮🇱"},{c:"IT",n:"Italy",f:"🇮🇹"},
+  {c:"JM",n:"Jamaica",f:"🇯🇲"},{c:"JP",n:"Japan",f:"🇯🇵"},{c:"JO",n:"Jordan",f:"🇯🇴"},{c:"KZ",n:"Kazakhstan",f:"🇰🇿"},
+  {c:"KE",n:"Kenya",f:"🇰🇪"},{c:"KI",n:"Kiribati",f:"🇰🇮"},{c:"KW",n:"Kuwait",f:"🇰🇼"},{c:"KG",n:"Kyrgyzstan",f:"🇰🇬"},
+  {c:"LA",n:"Laos",f:"🇱🇦"},{c:"LV",n:"Latvia",f:"🇱🇻"},{c:"LB",n:"Lebanon",f:"🇱🇧"},{c:"LS",n:"Lesotho",f:"🇱🇸"},
+  {c:"LR",n:"Liberia",f:"🇱🇷"},{c:"LY",n:"Libya",f:"🇱🇾"},{c:"LI",n:"Liechtenstein",f:"🇱🇮"},{c:"LT",n:"Lithuania",f:"🇱🇹"},
+  {c:"LU",n:"Luxembourg",f:"🇱🇺"},{c:"MO",n:"Macao",f:"🇲🇴"},{c:"MG",n:"Madagascar",f:"🇲🇬"},{c:"MW",n:"Malawi",f:"🇲🇼"},
+  {c:"MY",n:"Malaysia",f:"🇲🇾"},{c:"MV",n:"Maldives",f:"🇲🇻"},{c:"ML",n:"Mali",f:"🇲🇱"},{c:"MT",n:"Malta",f:"🇲🇹"},
+  {c:"MH",n:"Marshall Islands",f:"🇲🇭"},{c:"MR",n:"Mauritania",f:"🇲🇷"},{c:"MU",n:"Mauritius",f:"🇲🇺"},{c:"MX",n:"Mexico",f:"🇲🇽"},
+  {c:"FM",n:"Micronesia",f:"🇫🇲"},{c:"MD",n:"Moldova",f:"🇲🇩"},{c:"MC",n:"Monaco",f:"🇲🇨"},{c:"MN",n:"Mongolia",f:"🇲🇳"},
+  {c:"ME",n:"Montenegro",f:"🇲🇪"},{c:"MA",n:"Morocco",f:"🇲🇦"},{c:"MZ",n:"Mozambique",f:"🇲🇿"},{c:"MM",n:"Myanmar",f:"🇲🇲"},
+  {c:"NA",n:"Namibia",f:"🇳🇦"},{c:"NR",n:"Nauru",f:"🇳🇷"},{c:"NP",n:"Nepal",f:"🇳🇵"},{c:"NL",n:"Netherlands",f:"🇳🇱"},
+  {c:"NZ",n:"New Zealand",f:"🇳🇿"},{c:"NI",n:"Nicaragua",f:"🇳🇮"},{c:"NE",n:"Niger",f:"🇳🇪"},{c:"NG",n:"Nigeria",f:"🇳🇬"},
+  {c:"KP",n:"North Korea",f:"🇰🇵"},{c:"MK",n:"North Macedonia",f:"🇲🇰"},{c:"NO",n:"Norway",f:"🇳🇴"},{c:"OM",n:"Oman",f:"🇴🇲"},
+  {c:"PK",n:"Pakistan",f:"🇵🇰"},{c:"PW",n:"Palau",f:"🇵🇼"},{c:"PS",n:"Palestine",f:"🇵🇸"},{c:"PA",n:"Panama",f:"🇵🇦"},
+  {c:"PG",n:"Papua New Guinea",f:"🇵🇬"},{c:"PY",n:"Paraguay",f:"🇵🇾"},{c:"PE",n:"Peru",f:"🇵🇪"},{c:"PH",n:"Philippines",f:"🇵🇭"},
+  {c:"PL",n:"Poland",f:"🇵🇱"},{c:"PT",n:"Portugal",f:"🇵🇹"},{c:"QA",n:"Qatar",f:"🇶🇦"},{c:"RO",n:"Romania",f:"🇷🇴"},
+  {c:"RU",n:"Russia",f:"🇷🇺"},{c:"RW",n:"Rwanda",f:"🇷🇼"},{c:"KN",n:"Saint Kitts and Nevis",f:"🇰🇳"},{c:"LC",n:"Saint Lucia",f:"🇱🇨"},
+  {c:"VC",n:"Saint Vincent and the Grenadines",f:"🇻🇨"},{c:"WS",n:"Samoa",f:"🇼🇸"},{c:"SM",n:"San Marino",f:"🇸🇲"},{c:"ST",n:"São Tomé and Príncipe",f:"🇸🇹"},
+  {c:"SA",n:"Saudi Arabia",f:"🇸🇦"},{c:"SN",n:"Senegal",f:"🇸🇳"},{c:"RS",n:"Serbia",f:"🇷🇸"},{c:"SC",n:"Seychelles",f:"🇸🇨"},
+  {c:"SL",n:"Sierra Leone",f:"🇸🇱"},{c:"SG",n:"Singapore",f:"🇸🇬"},{c:"SK",n:"Slovakia",f:"🇸🇰"},{c:"SI",n:"Slovenia",f:"🇸🇮"},
+  {c:"SB",n:"Solomon Islands",f:"🇸🇧"},{c:"SO",n:"Somalia",f:"🇸🇴"},{c:"ZA",n:"South Africa",f:"🇿🇦"},{c:"KR",n:"South Korea",f:"🇰🇷"},
+  {c:"SS",n:"South Sudan",f:"🇸🇸"},{c:"ES",n:"Spain",f:"🇪🇸"},{c:"LK",n:"Sri Lanka",f:"🇱🇰"},{c:"SD",n:"Sudan",f:"🇸🇩"},
+  {c:"SR",n:"Suriname",f:"🇸🇷"},{c:"SE",n:"Sweden",f:"🇸🇪"},{c:"CH",n:"Switzerland",f:"🇨🇭"},{c:"SY",n:"Syria",f:"🇸🇾"},
+  {c:"TW",n:"Taiwan",f:"🇹🇼"},{c:"TJ",n:"Tajikistan",f:"🇹🇯"},{c:"TZ",n:"Tanzania",f:"🇹🇿"},{c:"TH",n:"Thailand",f:"🇹🇭"},
+  {c:"TL",n:"Timor-Leste",f:"🇹🇱"},{c:"TG",n:"Togo",f:"🇹🇬"},{c:"TO",n:"Tonga",f:"🇹🇴"},{c:"TT",n:"Trinidad and Tobago",f:"🇹🇹"},
+  {c:"TN",n:"Tunisia",f:"🇹🇳"},{c:"TR",n:"Türkiye",f:"🇹🇷"},{c:"TM",n:"Turkmenistan",f:"🇹🇲"},{c:"TV",n:"Tuvalu",f:"🇹🇻"},
+  {c:"UG",n:"Uganda",f:"🇺🇬"},{c:"UA",n:"Ukraine",f:"🇺🇦"},{c:"AE",n:"United Arab Emirates",f:"🇦🇪"},{c:"GB",n:"United Kingdom",f:"🇬🇧"},
+  {c:"US",n:"United States",f:"🇺🇸"},{c:"UY",n:"Uruguay",f:"🇺🇾"},{c:"UZ",n:"Uzbekistan",f:"🇺🇿"},{c:"VU",n:"Vanuatu",f:"🇻🇺"},
+  {c:"VA",n:"Vatican City",f:"🇻🇦"},{c:"VE",n:"Venezuela",f:"🇻🇪"},{c:"VN",n:"Vietnam",f:"🇻🇳"},{c:"YE",n:"Yemen",f:"🇾🇪"},
+  {c:"ZM",n:"Zambia",f:"🇿🇲"},{c:"ZW",n:"Zimbabwe",f:"🇿🇼"},
+];
+
+// Helper: get ZIP placeholder hint based on country code
+const ZIP_HINTS = {
+  US:"e.g., 94105", CA:"e.g., M5V 3A8", GB:"e.g., SW1A 1AA", AU:"e.g., 2000", 
+  DE:"e.g., 10115", FR:"e.g., 75001", JP:"e.g., 100-0001", IN:"e.g., 110001",
+  SG:"e.g., 049145", PH:"e.g., 1014", CN:"e.g., 100000", BR:"e.g., 01310-100",
+  IT:"e.g., 00100", ES:"e.g., 28001", MX:"e.g., 06000", KR:"e.g., 04524",
+  TH:"e.g., 10100", ID:"e.g., 10110", MY:"e.g., 50000", VN:"e.g., 100000",
+};
+const getZipHint = (countryCode) => ZIP_HINTS[countryCode] || "Optional";
+
 // ─── v16.10: MAYA PAYMENT INTEGRATION ────────────────────────────────────────
 // Methods that go through Maya Checkout (instead of manual bank transfer)
 const MAYA_METHODS = ["Maya", "GCash", "Visa", "Mastercard", "QR Ph"];
@@ -7541,7 +7620,9 @@ function CartPage({cart,removeFromCart,updateQty,setPage,user,onOrderComplete}){
   const [sending,setSending]   = useState(false);
   const [errMsg,setErrMsg]     = useState("");
   const [prescription,setPrescription] = useState(null);
-  const [intlForm,setIntlForm] = useState({name:"",company:"",email:"",phone:"",country:"",city:"",shippingMethod:"",currency:"PHP",details:""});
+  const [intlForm,setIntlForm] = useState({name:"",company:"",email:"",phone:"",countryCode:"+1",country:"",countryISO:"",city:"",zip:"",shippingMethod:"",currency:"USD",details:""});
+  // v16.11: For international — same as account holder or different contact person?
+  const [intlForSomeoneElse,setIntlForSomeoneElse] = useState(false);
   const [intlSending,setIntlSending] = useState(false);
   const [intlErr,setIntlErr]   = useState("");
   const [intlDone,setIntlDone] = useState(false);
@@ -7585,11 +7666,40 @@ function CartPage({cart,removeFromCart,updateQty,setPage,user,onOrderComplete}){
     })();
   },[user, profileLoaded]);
 
+  // v16.11: Auto-populate international form from user profile (when same as account holder)
+  useEffect(()=>{
+    if(!user||intlForSomeoneElse) return;
+    if(!profileLoaded) return;  // Wait until profile loaded
+    (async()=>{
+      try{
+        const snap = await getDoc(doc(db,"customers",user.uid));
+        if(snap.exists()){
+          const d = snap.data();
+          setIntlForm(prev=>({
+            ...prev,
+            name:  d.name  || prev.name,
+            email: d.email || user.email || prev.email,
+            phone: d.phone || prev.phone,
+          }));
+        } else {
+          setIntlForm(prev=>({...prev, email: user.email||""}));
+        }
+      }catch(_){}
+    })();
+  },[user, intlForSomeoneElse, profileLoaded]);
+  
+  // v16.11: When toggling "for someone else", clear the prefilled fields
+  useEffect(()=>{
+    if(intlForSomeoneElse){
+      setIntlForm(prev=>({...prev, name:"", email:"", phone:""}));
+    }
+  },[intlForSomeoneElse]);
+
   const fullPhone = countryCode + details.phoneNum.replace(/^0+/,"");
   const fullRecipientPhone = recipient.phoneCode + recipient.phoneNum.replace(/^0+/,"");
   const total     = cart.reduce((s,i)=>s+i.price*i.qty,0);
   const hasRx     = cart.some(i=>i.requiresPrescription);
-  const intlFilled = intlForm.name&&intlForm.email&&intlForm.phone&&intlForm.country;
+  const intlFilled = intlForm.name&&intlForm.email&&intlForm.phone&&intlForm.countryISO;
   const orderSummary = cart.map(i=>`${i.name} x${i.qty} — ${formatPHP(i.price*i.qty)}`).join("\n");
 
   const validateFields = () => {
@@ -7803,20 +7913,38 @@ function CartPage({cart,removeFromCart,updateQty,setPage,user,onOrderComplete}){
 
   const handleIntlSubmit = async () => {
     if(!intlFilled) return;
+    if(cart.length===0){ setIntlErr("Cart is empty. Please add products before submitting."); return; }
     setIntlSending(true); setIntlErr("");
     try {
+      // v16.11: Build full phone with country code
+      const fullIntlPhone = (intlForm.countryCode || "+1") + " " + intlForm.phone.replace(/^0+/, "").trim();
+      // v16.11: Build address line with ZIP if provided
+      const addressLine = intlForm.zip 
+        ? `${intlForm.city||"—"}, ${intlForm.country} ${intlForm.zip}`
+        : `${intlForm.city||"—"}, ${intlForm.country}`;
+      
       await emailjs.send(EMAILJS_CONFIG.serviceId, EMAILJS_CONFIG.templateId, {
         from_name:intlForm.name, company:intlForm.company||"N/A",
-        from_email:intlForm.email, phone:intlForm.phone,
+        from_email:intlForm.email, phone:fullIntlPhone,
         product:orderSummary, quantity:cart.reduce((s,i)=>s+i.qty,0)+" items",
         budget:`${formatPHP(total)} — INTERNATIONAL ORDER`,
-        location:`${intlForm.city}, ${intlForm.country}`, timeline:"International Inquiry",
-        details:`🌍 INTERNATIONAL\n\nCountry: ${intlForm.country}\nCity: ${intlForm.city}\nShipping: ${intlForm.shippingMethod||"Advise"}\nCurrency: ${intlForm.currency}\n\nItems:\n${orderSummary}\n\nValue: ${formatPHP(total)} (${formatUSD(total)} indicative)\n\nNotes:\n${intlForm.details||"None"}`,
+        location:addressLine, timeline:"International Inquiry",
+        details:`🌍 INTERNATIONAL\n\nCountry: ${intlForm.country} (${intlForm.countryISO||"—"})\nCity/Port: ${intlForm.city||"—"}\nZIP/Postal: ${intlForm.zip||"—"}\nShipping: ${intlForm.shippingMethod||"Let DMEAST advise"}\nCurrency: ${intlForm.currency}\n\nItems:\n${orderSummary}\n\nValue: ${formatPHP(total)} (${formatUSD(total)} indicative)\n\nNotes:\n${intlForm.details||"None"}`,
         reply_to:intlForm.email,
       }, EMAILJS_CONFIG.publicKey);
       await addDoc(collection(db,"orders"),{
-        name:intlForm.name, email:intlForm.email, phone:intlForm.phone,
-        address:`${intlForm.city}, ${intlForm.country}`, paymentMethod:"International Inquiry",
+        name:intlForm.name, email:intlForm.email, phone:fullIntlPhone,
+        company: intlForm.company || "",
+        address:addressLine,
+        // v16.11: Granular international fields for reporting / shipping integration
+        intlCountry: intlForm.country,
+        intlCountryISO: intlForm.countryISO,
+        intlCity: intlForm.city,
+        intlZip: intlForm.zip,
+        intlShipping: intlForm.shippingMethod || "advise",
+        intlCurrency: intlForm.currency,
+        intlNotes: intlForm.details || "",
+        paymentMethod:"International Inquiry",
         items:cart.map(i=>({id:i.id,name:i.name,price:i.price,qty:i.qty})),
         total, status:"international_inquiry",
         paymentStatus:"awaiting",
@@ -8065,8 +8193,33 @@ function CartPage({cart,removeFromCart,updateQty,setPage,user,onOrderComplete}){
               <div style={{fontSize:13,color:ds.color.textMuted,marginTop:2}}>We'll prepare a Proforma Invoice with full landed cost.</div>
             </div>
           </div>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 300px",gap:24,alignItems:"start"}}>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 320px",gap:24,alignItems:"start"}}>
             <div style={{background:"#fff",borderRadius:ds.radius.xl,padding:"32px 36px",boxShadow:ds.shadow.sm,border:`1px solid ${ds.color.borderLight}`}}>
+              
+              {/* v16.11: Auto-populate radio toggle (only shown if user is signed in) */}
+              {user&&(
+                <div style={{marginBottom:24,padding:"14px 16px",background:ds.color.canvas,borderRadius:ds.radius.md,border:`1px solid ${ds.color.borderLight}`}}>
+                  <div style={{fontSize:12,fontWeight:700,color:ds.color.textMuted,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:10}}>Contact for this inquiry</div>
+                  <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
+                    <label style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer",padding:"8px 14px",borderRadius:ds.radius.md,border:`1.5px solid ${!intlForSomeoneElse?ds.color.gold:ds.color.border}`,background:!intlForSomeoneElse?"#fff8e6":"#fff",fontSize:13,fontWeight:600,color:!intlForSomeoneElse?"#8B6914":ds.color.textBody}}>
+                      <input type="radio" name="intlOrderFor" checked={!intlForSomeoneElse} onChange={()=>setIntlForSomeoneElse(false)} style={{accentColor:ds.color.gold}}/>
+                      👤 Same as my account
+                    </label>
+                    <label style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer",padding:"8px 14px",borderRadius:ds.radius.md,border:`1.5px solid ${intlForSomeoneElse?ds.color.red:ds.color.border}`,background:intlForSomeoneElse?ds.color.redLight:"#fff",fontSize:13,fontWeight:600,color:intlForSomeoneElse?ds.color.red:ds.color.textBody}}>
+                      <input type="radio" name="intlOrderFor" checked={intlForSomeoneElse} onChange={()=>setIntlForSomeoneElse(true)} style={{accentColor:ds.color.red}}/>
+                      🏢 Different contact person
+                    </label>
+                  </div>
+                  {!intlForSomeoneElse && (
+                    <div style={{fontSize:12,color:ds.color.textMuted,marginTop:10,lineHeight:1.5}}>
+                      ✓ Your account details will auto-fill below. Edit any field if needed.
+                    </div>
+                  )}
+                </div>
+              )}
+              
+              <div style={{fontSize:11,fontWeight:700,color:ds.color.textMuted,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:12}}>Contact Information</div>
+              
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"16px 20px",marginBottom:16}}>
                 {[["Full Name *","name","text","Your full name"],["Company / Organization","company","text","Hospital, clinic…"],["Email Address *","email","email","you@email.com"]].map(([l,k,t,ph])=>(
                   <div key={k}><label style={lbl}>{l}</label><input type={t} value={intlForm[k]} onChange={setI(k)} placeholder={ph} style={inp} onFocus={fo} onBlur={e=>e.target.style.borderColor=ds.color.border}/></div>
@@ -8074,37 +8227,113 @@ function CartPage({cart,removeFromCart,updateQty,setPage,user,onOrderComplete}){
                 <div>
                   <label style={lbl}>Phone / WhatsApp *</label>
                   <div style={{display:"flex",gap:8}}>
-                    <select value={intlForm.countryCode||"+63"} onChange={e=>setIntlForm(p=>({...p,countryCode:e.target.value}))} style={{...inp,width:"auto",minWidth:90,flexShrink:0,padding:"11px 10px"}}>
+                    <select value={intlForm.countryCode||"+1"} onChange={e=>setIntlForm(p=>({...p,countryCode:e.target.value}))} style={{...inp,width:"auto",minWidth:90,flexShrink:0,padding:"11px 10px",cursor:"pointer"}}>
                       {COUNTRY_CODES.map(c=><option key={c.code} value={c.code}>{c.flag} {c.code}</option>)}
                     </select>
-                    <input value={intlForm.phone} onChange={setI("phone")} placeholder="9XX XXX XXXX" style={inp} onFocus={fo} onBlur={e=>e.target.style.borderColor=ds.color.border}/>
+                    <input value={intlForm.phone} onChange={setI("phone")} placeholder="Phone number" style={inp} onFocus={fo} onBlur={e=>e.target.style.borderColor=ds.color.border}/>
                   </div>
                 </div>
               </div>
+              
+              <div style={{fontSize:11,fontWeight:700,color:ds.color.textMuted,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:12,marginTop:24}}>Delivery Destination</div>
+              
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"16px 20px",marginBottom:16}}>
-                {[["Country *","country","text","e.g. Singapore, UAE…"],["City / Port","city","text","e.g. Dubai, Singapore…"]].map(([l,k,t,ph])=>(
-                  <div key={k}><label style={lbl}>{l}</label><input type={t} value={intlForm[k]} onChange={setI(k)} placeholder={ph} style={inp} onFocus={fo} onBlur={e=>e.target.style.borderColor=ds.color.border}/></div>
-                ))}
-                <div><label style={lbl}>Preferred Shipping</label>
-                  <select value={intlForm.shippingMethod} onChange={setI("shippingMethod")} style={{...inp,cursor:"pointer"}}>
-                    <option value="">Let DMEAST advise</option><option>Air Cargo (5–10 days)</option><option>Sea Cargo (15–45 days)</option><option>FedEx / DHL Express</option>
+                {/* v16.11: Country dropdown with flags */}
+                <div>
+                  <label style={lbl}>Country *</label>
+                  <select 
+                    value={intlForm.countryISO} 
+                    onChange={e=>{
+                      const iso=e.target.value;
+                      const country=COUNTRIES.find(c=>c.c===iso);
+                      setIntlForm(p=>({...p,countryISO:iso,country:country?country.n:""}));
+                    }} 
+                    style={{...inp,cursor:"pointer"}}
+                  >
+                    <option value="">Select country…</option>
+                    {COUNTRIES.map(c=><option key={c.c} value={c.c}>{c.f} {c.n}</option>)}
                   </select>
                 </div>
-                <div><label style={lbl}>Preferred Currency</label>
+                <div>
+                  <label style={lbl}>City / Port</label>
+                  <input value={intlForm.city} onChange={setI("city")} placeholder="e.g. Dubai, Singapore, New York…" style={inp} onFocus={fo} onBlur={e=>e.target.style.borderColor=ds.color.border}/>
+                </div>
+                {/* v16.11: ZIP / postal code field — always optional */}
+                <div>
+                  <label style={lbl}>ZIP / Postal Code <span style={{fontWeight:400,color:ds.color.textLight}}>(optional)</span></label>
+                  <input value={intlForm.zip} onChange={setI("zip")} placeholder={getZipHint(intlForm.countryISO)} style={inp} onFocus={fo} onBlur={e=>e.target.style.borderColor=ds.color.border}/>
+                </div>
+                <div>
+                  <label style={lbl}>Preferred Shipping</label>
+                  <select value={intlForm.shippingMethod} onChange={setI("shippingMethod")} style={{...inp,cursor:"pointer"}}>
+                    <option value="">Let DMEAST advise</option>
+                    <option>Air Cargo (5–10 days)</option>
+                    <option>Sea Cargo (15–45 days)</option>
+                    <option>FedEx / DHL Express (3–7 days)</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={lbl}>Preferred Currency</label>
                   <select value={intlForm.currency} onChange={setI("currency")} style={{...inp,cursor:"pointer"}}>
-                    <option value="PHP">PHP (₱)</option><option value="USD">USD ($)</option><option value="SGD">SGD (S$)</option><option value="AED">AED</option>
+                    <option value="USD">USD ($)</option>
+                    <option value="PHP">PHP (₱)</option>
+                    <option value="SGD">SGD (S$)</option>
+                    <option value="AED">AED</option>
+                    <option value="EUR">EUR (€)</option>
+                    <option value="GBP">GBP (£)</option>
+                    <option value="JPY">JPY (¥)</option>
+                    <option value="AUD">AUD (A$)</option>
                   </select>
                 </div>
               </div>
-              <div style={{marginBottom:20}}><label style={lbl}>Additional Notes</label><textarea value={intlForm.details} onChange={setI("details")} rows={3} placeholder="Delivery port, special requirements…" style={{...inp,resize:"vertical",lineHeight:1.65}} onFocus={fo} onBlur={e=>e.target.style.borderColor=ds.color.border}/></div>
+              
+              <div style={{marginBottom:20}}>
+                <label style={lbl}>Additional Notes</label>
+                <textarea value={intlForm.details} onChange={setI("details")} rows={3} placeholder="Delivery port, special requirements, expected use…" style={{...inp,resize:"vertical",lineHeight:1.65}} onFocus={fo} onBlur={e=>e.target.style.borderColor=ds.color.border}/>
+              </div>
+              
               {intlErr&&<div style={{marginBottom:14,padding:"12px 16px",background:ds.color.redLight,borderRadius:ds.radius.md,fontSize:13,color:ds.color.red}}>{intlErr}</div>}
-              <Btn variant={intlFilled?"gold":"outline"} size="lg" fullWidth disabled={!intlFilled||intlSending} onClick={handleIntlSubmit}>{intlSending?"Sending…":"Submit International Inquiry →"}</Btn>
+              
+              <Btn variant={(intlFilled&&cart.length>0)?"gold":"outline"} size="lg" fullWidth disabled={!intlFilled||intlSending||cart.length===0} onClick={handleIntlSubmit}>{intlSending?"Sending…":cart.length===0?"Cart is empty":"Submit International Inquiry →"}</Btn>
             </div>
-            <div style={{background:"#fff",borderRadius:ds.radius.xl,padding:"24px",border:`1px solid ${ds.color.border}`}}>
+            
+            {/* v16.11: Editable cart summary (qty +/- and remove) */}
+            <div style={{background:"#fff",borderRadius:ds.radius.xl,padding:"24px",border:`1px solid ${ds.color.border}`,position:"sticky",top:90}}>
               <div style={{fontSize:11,fontWeight:700,color:ds.color.textMuted,textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:14}}>Order Summary</div>
-              {cart.map(item=><div key={item.id} style={{display:"flex",justifyContent:"space-between",fontSize:12.5,color:ds.color.textBody,marginBottom:6}}><span style={{flex:1}}>{item.name} × {item.qty}</span><span style={{fontWeight:600,marginLeft:8}}>{formatPHP(item.price*item.qty)}</span></div>)}
-              <div style={{borderTop:`1px solid ${ds.color.border}`,marginTop:10,paddingTop:10,display:"flex",justifyContent:"space-between",fontWeight:700,fontSize:14}}><span>Subtotal</span><span>{formatPHP(total)}</span></div>
-              <div style={{fontSize:11,color:ds.color.textLight,marginTop:6}}>{formatUSD(total)} · indicative</div>
+              
+              {cart.length===0 ? (
+                <div style={{padding:"20px 0",textAlign:"center",color:ds.color.textMuted,fontSize:13}}>
+                  Your cart is empty.<br/>
+                  <button onClick={()=>{setOrderMode(null);setPage("products");}} style={{marginTop:10,background:"none",border:"none",color:ds.color.gold,fontSize:13,fontWeight:600,cursor:"pointer",textDecoration:"underline"}}>Browse products →</button>
+                </div>
+              ) : (
+                <>
+                  {cart.map(item=>(
+                    <div key={item.id} style={{marginBottom:14,paddingBottom:14,borderBottom:`1px solid ${ds.color.borderLight}`}}>
+                      <div style={{fontSize:12.5,color:ds.color.textBody,marginBottom:8,fontWeight:500,lineHeight:1.4}}>{item.name}</div>
+                      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:6}}>
+                        {/* Qty controls */}
+                        <div style={{display:"flex",alignItems:"center",border:`1px solid ${ds.color.border}`,borderRadius:ds.radius.sm,overflow:"hidden"}}>
+                          <button onClick={()=>updateQty(item.id,Math.max(1,item.qty-1))} disabled={item.qty<=1} style={{width:26,height:26,border:"none",background:item.qty<=1?ds.color.canvas:"#fff",cursor:item.qty<=1?"not-allowed":"pointer",fontSize:14,fontWeight:600,color:item.qty<=1?ds.color.textLight:ds.color.textDark}}>−</button>
+                          <span style={{padding:"0 10px",fontSize:13,fontWeight:600,minWidth:26,textAlign:"center"}}>{item.qty}</span>
+                          <button onClick={()=>updateQty(item.id,item.qty+1)} style={{width:26,height:26,border:"none",background:"#fff",cursor:"pointer",fontSize:14,fontWeight:600,color:ds.color.textDark}}>+</button>
+                        </div>
+                        <span style={{fontWeight:600,fontSize:13,color:ds.color.textDark}}>{formatPHP(item.price*item.qty)}</span>
+                        {/* Remove button */}
+                        <button onClick={()=>{if(confirm(`Remove "${item.name}" from your inquiry?`))removeFromCart(item.id);}} title="Remove from inquiry" style={{background:"none",border:"none",cursor:"pointer",fontSize:14,color:ds.color.textLight,padding:4,borderRadius:ds.radius.sm}} onMouseEnter={e=>{e.currentTarget.style.color=ds.color.red;e.currentTarget.style.background=ds.color.redLight;}} onMouseLeave={e=>{e.currentTarget.style.color=ds.color.textLight;e.currentTarget.style.background="none";}}>🗑️</button>
+                      </div>
+                    </div>
+                  ))}
+                  <div style={{display:"flex",justifyContent:"space-between",fontWeight:700,fontSize:14,marginTop:6}}>
+                    <span>Subtotal</span>
+                    <span>{formatPHP(total)}</span>
+                  </div>
+                  <div style={{fontSize:11,color:ds.color.textLight,marginTop:4}}>{formatUSD(total)} · indicative</div>
+                  <div style={{fontSize:11,color:ds.color.textMuted,marginTop:10,padding:"8px 10px",background:ds.color.canvas,borderRadius:ds.radius.sm,lineHeight:1.5}}>
+                    💡 Shipping, duties & taxes will be added on the proforma invoice.
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>
