@@ -621,7 +621,8 @@ const GLOBAL_CSS = `
   @media(max-width:480px){.dm-grid-4{grid-template-columns:1fr}}
   .dm-hero-grid{display:grid;grid-template-columns:1.1fr 1fr;gap:60px;align-items:center}
   @media(max-width:1100px){.dm-hero-grid{grid-template-columns:1fr;gap:40px}}
-  @media(max-width:768px){.dm-hero-grid{gap:32px}.dm-hero-visual{min-height:380px}}
+  @media(max-width:768px){.dm-hero-grid{gap:32px;padding:0 4px}.dm-hero-visual{min-height:380px}.dm-hero-right{display:none}}
+  @media(max-width:480px){.dm-hero-grid{gap:24px}.dm-hero-section{padding:40px 0 48px !important}}
   .dm-cat-pills::-webkit-scrollbar{height:4px}
   .dm-cat-pills::-webkit-scrollbar-thumb{background:rgba(0,0,0,0.15);border-radius:2px}
   @keyframes dm-chat-pulse{0%{transform:scale(1);opacity:0.4}100%{transform:scale(1.7);opacity:0}}
@@ -7007,7 +7008,7 @@ function TopAnnouncementBar(){
 // v16.0: Modern hero with photo slot, trust badges, dual CTA
 function HeroSectionV16({setPage}){
   return (
-    <section style={{
+    <section className="dm-hero-section" style={{
       background: `linear-gradient(150deg, ${ds.color.canvasWarm} 0%, ${ds.color.white} 60%, ${ds.color.canvasGold} 100%)`,
       padding: "72px 0 80px",
       position: "relative",
@@ -7018,7 +7019,7 @@ function HeroSectionV16({setPage}){
       <div style={{position:"absolute",bottom:"-160px",left:"-100px",width:380,height:380,borderRadius:"50%",background:`radial-gradient(circle, ${ds.color.redLight} 0%, transparent 70%)`,opacity:0.6,pointerEvents:"none"}}/>
       
       <div style={{maxWidth:1280,margin:"0 auto",padding:"0 28px",position:"relative",zIndex:1}}>
-        <div className="dm-hero-grid" style={{display:"grid",gridTemplateColumns:"1.1fr 1fr",gap:60,alignItems:"center"}}>
+        <div className="dm-hero-grid">
           
           {/* LEFT: Text content */}
           <div>
@@ -7096,8 +7097,8 @@ function HeroSectionV16({setPage}){
             </div>
           </div>
           
-          {/* RIGHT: v15-style stat tiles + dark info panel (user preferred this) */}
-          <div style={{display:"flex",flexDirection:"column",gap:16}}>
+          {/* RIGHT: v15-style stat tiles + dark info panel — hidden on mobile via dm-hero-right */}
+          <div className="dm-hero-right" style={{display:"flex",flexDirection:"column",gap:16}}>
             <div className="dm-grid-4" style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:14}}>
               {[
                 {v:"5+",l:"Years Serving PH",accent:ds.color.red},
