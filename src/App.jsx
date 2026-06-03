@@ -1,5 +1,18 @@
 /**
- * DMEAST — Medical Solutions Platform  v16.11
+ * DMEAST — Medical Solutions Platform  v16.12
+ *
+ * v16.12 INTERNATIONAL ORDER INQUIRY — BUG FIX + DELIVERY MODES:
+ * - 🐛 FIXED: International submit was failing 422 "recipients address is empty"
+ *           Root cause: EmailJS payload missing required to_email field
+ *           Fix: pass to_email + to_name; also added admin notification (info@dmeastph.com)
+ * - 🚢 NEW: Port-to-Port vs Door-to-Door radio toggle
+ *           Port = wholesale/bulk, ends at customer's seaport/airport
+ *           Door = retail/personal, full DDP shipping with duties
+ * - 🏠 NEW: Conditional Street Address field (only when Door-to-Door mode)
+ *           Required for door delivery, not shown for port-to-port
+ * - 🏷️ Field label adapts: "Port of Entry" vs "City" based on mode
+ * - 🎯 Cart sidebar hint adapts to mode (DDP terms vs port clearance)
+ * - 📦 Firestore order doc stores intlDeliveryMode + intlStreetAddress fields
  *
  * v16.11 INTERNATIONAL ORDER INQUIRY OVERHAUL:
  * - 👤 Auto-populate from user account (if signed in) with radio toggle:
@@ -7620,9 +7633,11 @@ function CartPage({cart,removeFromCart,updateQty,setPage,user,onOrderComplete}){
   const [sending,setSending]   = useState(false);
   const [errMsg,setErrMsg]     = useState("");
   const [prescription,setPrescription] = useState(null);
-  const [intlForm,setIntlForm] = useState({name:"",company:"",email:"",phone:"",countryCode:"+1",country:"",countryISO:"",city:"",zip:"",shippingMethod:"",currency:"USD",details:""});
+  const [intlForm,setIntlForm] = useState({name:"",company:"",email:"",phone:"",countryCode:"+1",country:"",countryISO:"",city:"",zip:"",streetAddress:"",shippingMethod:"",currency:"USD",details:""});
   // v16.11: For international — same as account holder or different contact person?
   const [intlForSomeoneElse,setIntlForSomeoneElse] = useState(false);
+  // v16.12: Delivery mode — port-to-port (wholesale) or door-to-door (retail)
+  const [intlDeliveryMode,setIntlDeliveryMode] = useState("port"); // "port" or "door"
   const [intlSending,setIntlSending] = useState(false);
   const [intlErr,setIntlErr]   = useState("");
   const [intlDone,setIntlDone] = useState(false);
@@ -7699,7 +7714,7 @@ function CartPage({cart,removeFromCart,updateQty,setPage,user,onOrderComplete}){
   const fullRecipientPhone = recipient.phoneCode + recipient.phoneNum.replace(/^0+/,"");
   const total     = cart.reduce((s,i)=>s+i.price*i.qty,0);
   const hasRx     = cart.some(i=>i.requiresPrescription);
-  const intlFilled = intlForm.name&&intlForm.email&&intlForm.phone&&intlForm.countryISO;
+  const intlFilled = intlForm.name&&intlForm.email&&intlForm.phone&&intlForm.countryISO && (intlDeliveryMode==="port" || (intlDeliveryMode==="door" && intlForm.streetAddress.trim().length>0));
   const orderSummary = cart.map(i=>`${i.name} x${i.qty} — ${formatPHP(i.price*i.qty)}`).join("\n");
 
   const validateFields = () => {
@@ -7923,20 +7938,54 @@ function CartPage({cart,removeFromCart,updateQty,setPage,user,onOrderComplete}){
         ? `${intlForm.city||"—"}, ${intlForm.country} ${intlForm.zip}`
         : `${intlForm.city||"—"}, ${intlForm.country}`;
       
+      // v16.12: Notify customer (with to_email — this was the bug!)
+      // Customer gets a confirmation email with their submitted details
       await emailjs.send(EMAILJS_CONFIG.serviceId, EMAILJS_CONFIG.templateId, {
-        from_name:intlForm.name, company:intlForm.company||"N/A",
-        from_email:intlForm.email, phone:fullIntlPhone,
-        product:orderSummary, quantity:cart.reduce((s,i)=>s+i.qty,0)+" items",
+        to_email: intlForm.email,
+        to_name:  intlForm.name,
+        from_name:intlForm.name, 
+        company:intlForm.company||"N/A",
+        from_email:intlForm.email, 
+        phone:fullIntlPhone,
+        product:orderSummary, 
+        quantity:cart.reduce((s,i)=>s+i.qty,0)+" items",
         budget:`${formatPHP(total)} — INTERNATIONAL ORDER`,
-        location:addressLine, timeline:"International Inquiry",
-        details:`🌍 INTERNATIONAL\n\nCountry: ${intlForm.country} (${intlForm.countryISO||"—"})\nCity/Port: ${intlForm.city||"—"}\nZIP/Postal: ${intlForm.zip||"—"}\nShipping: ${intlForm.shippingMethod||"Let DMEAST advise"}\nCurrency: ${intlForm.currency}\n\nItems:\n${orderSummary}\n\nValue: ${formatPHP(total)} (${formatUSD(total)} indicative)\n\nNotes:\n${intlForm.details||"None"}`,
+        location:addressLine, 
+        timeline:"International Inquiry",
+        details:`🌍 INTERNATIONAL ORDER INQUIRY\n\nDelivery Mode: ${intlDeliveryMode==="door"?"Door-to-Door (Retail)":"Port-to-Port (Wholesale)"}\nCountry: ${intlForm.country} (${intlForm.countryISO||"—"})\nCity/Port: ${intlForm.city||"—"}\n${intlDeliveryMode==="door"?`Street Address: ${intlForm.streetAddress||"—"}\n`:""}ZIP/Postal: ${intlForm.zip||"—"}\nShipping: ${intlForm.shippingMethod||"Let DMEAST advise"}\nCurrency: ${intlForm.currency}\n\nItems:\n${orderSummary}\n\nValue: ${formatPHP(total)} (${formatUSD(total)} indicative)\n\nNotes:\n${intlForm.details||"None"}`,
         reply_to:intlForm.email,
       }, EMAILJS_CONFIG.publicKey);
+      
+      // v16.12: Also send admin notification (so DMEAST team gets the inquiry)
+      try {
+        await emailjs.send(EMAILJS_CONFIG.serviceId, EMAILJS_CONFIG.templateId, {
+          to_email: "info@dmeastph.com",
+          to_name:  "DMEAST Team",
+          from_name:intlForm.name, 
+          company:intlForm.company||"N/A",
+          from_email:intlForm.email, 
+          phone:fullIntlPhone,
+          product:orderSummary, 
+          quantity:cart.reduce((s,i)=>s+i.qty,0)+" items",
+          budget:`${formatPHP(total)} — INTERNATIONAL ORDER`,
+          location:addressLine, 
+          timeline:"International Inquiry — NEEDS PROFORMA INVOICE",
+          details:`🌍 NEW INTERNATIONAL INQUIRY — Please prepare proforma invoice\n\nCustomer: ${intlForm.name} <${intlForm.email}>\nPhone: ${fullIntlPhone}\nCompany: ${intlForm.company||"—"}\n\nDelivery Mode: ${intlDeliveryMode==="door"?"Door-to-Door (Retail)":"Port-to-Port (Wholesale)"}\nCountry: ${intlForm.country} (${intlForm.countryISO||"—"})\nCity/Port: ${intlForm.city||"—"}\n${intlDeliveryMode==="door"?`Street Address: ${intlForm.streetAddress||"—"}\n`:""}ZIP/Postal: ${intlForm.zip||"—"}\nShipping: ${intlForm.shippingMethod||"Let DMEAST advise"}\nCurrency: ${intlForm.currency}\n\nItems:\n${orderSummary}\n\nIndicative Value: ${formatPHP(total)} (${formatUSD(total)})\n\nCustomer Notes:\n${intlForm.details||"None"}`,
+          reply_to:intlForm.email,
+        }, EMAILJS_CONFIG.publicKey);
+      } catch(adminErr) {
+        // Admin email failure shouldn't block the inquiry — log but continue
+        console.warn("Admin notification failed:", adminErr);
+      }
       await addDoc(collection(db,"orders"),{
         name:intlForm.name, email:intlForm.email, phone:fullIntlPhone,
         company: intlForm.company || "",
-        address:addressLine,
-        // v16.11: Granular international fields for reporting / shipping integration
+        address: intlDeliveryMode==="door" && intlForm.streetAddress 
+          ? `${intlForm.streetAddress}, ${addressLine}` 
+          : addressLine,
+        // v16.11/16.12: Granular international fields for reporting / shipping integration
+        intlDeliveryMode,  // v16.12: "port" or "door"
+        intlStreetAddress: intlForm.streetAddress || "",  // v16.12: only relevant for door mode
         intlCountry: intlForm.country,
         intlCountryISO: intlForm.countryISO,
         intlCity: intlForm.city,
@@ -8237,6 +8286,27 @@ function CartPage({cart,removeFromCart,updateQty,setPage,user,onOrderComplete}){
               
               <div style={{fontSize:11,fontWeight:700,color:ds.color.textMuted,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:12,marginTop:24}}>Delivery Destination</div>
               
+              {/* v16.12: Delivery mode toggle — Port-to-Port vs Door-to-Door */}
+              <div style={{marginBottom:20,padding:"14px 16px",background:ds.color.canvas,borderRadius:ds.radius.md,border:`1px solid ${ds.color.borderLight}`}}>
+                <div style={{fontSize:12,fontWeight:700,color:ds.color.textMuted,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:10}}>How will you receive this order?</div>
+                <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
+                  <label style={{flex:"1 1 200px",display:"flex",alignItems:"flex-start",gap:10,cursor:"pointer",padding:"12px 14px",borderRadius:ds.radius.md,border:`1.5px solid ${intlDeliveryMode==="port"?ds.color.gold:ds.color.border}`,background:intlDeliveryMode==="port"?"#fff8e6":"#fff"}}>
+                    <input type="radio" name="intlDeliveryMode" checked={intlDeliveryMode==="port"} onChange={()=>setIntlDeliveryMode("port")} style={{accentColor:ds.color.gold,marginTop:3}}/>
+                    <div style={{flex:1}}>
+                      <div style={{fontSize:13,fontWeight:700,color:intlDeliveryMode==="port"?"#8B6914":ds.color.textBody,marginBottom:2}}>🚢 Port-to-Port</div>
+                      <div style={{fontSize:11.5,color:ds.color.textMuted,lineHeight:1.4}}>Wholesale/bulk. We deliver to your seaport or airport — you handle local clearance.</div>
+                    </div>
+                  </label>
+                  <label style={{flex:"1 1 200px",display:"flex",alignItems:"flex-start",gap:10,cursor:"pointer",padding:"12px 14px",borderRadius:ds.radius.md,border:`1.5px solid ${intlDeliveryMode==="door"?ds.color.red:ds.color.border}`,background:intlDeliveryMode==="door"?ds.color.redLight:"#fff"}}>
+                    <input type="radio" name="intlDeliveryMode" checked={intlDeliveryMode==="door"} onChange={()=>setIntlDeliveryMode("door")} style={{accentColor:ds.color.red,marginTop:3}}/>
+                    <div style={{flex:1}}>
+                      <div style={{fontSize:13,fontWeight:700,color:intlDeliveryMode==="door"?ds.color.red:ds.color.textBody,marginBottom:2}}>🚪 Door-to-Door</div>
+                      <div style={{fontSize:11.5,color:ds.color.textMuted,lineHeight:1.4}}>Direct to your address. We handle shipping + duties (DDP). Smaller orders, personal use.</div>
+                    </div>
+                  </label>
+                </div>
+              </div>
+              
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"16px 20px",marginBottom:16}}>
                 {/* v16.11: Country dropdown with flags */}
                 <div>
@@ -8255,9 +8325,26 @@ function CartPage({cart,removeFromCart,updateQty,setPage,user,onOrderComplete}){
                   </select>
                 </div>
                 <div>
-                  <label style={lbl}>City / Port</label>
-                  <input value={intlForm.city} onChange={setI("city")} placeholder="e.g. Dubai, Singapore, New York…" style={inp} onFocus={fo} onBlur={e=>e.target.style.borderColor=ds.color.border}/>
+                  <label style={lbl}>{intlDeliveryMode==="port"?"Port of Entry":"City"} {intlDeliveryMode==="door"?"*":""}</label>
+                  <input value={intlForm.city} onChange={setI("city")} placeholder={intlDeliveryMode==="port"?"e.g. Jebel Ali, Singapore Port, JFK…":"e.g. Dubai, Singapore, New York…"} style={inp} onFocus={fo} onBlur={e=>e.target.style.borderColor=ds.color.border}/>
                 </div>
+                
+                {/* v16.12: Conditional street address — only shown for door-to-door */}
+                {intlDeliveryMode==="door" && (
+                  <div style={{gridColumn:"1 / -1"}}>
+                    <label style={lbl}>Street Address *</label>
+                    <textarea 
+                      value={intlForm.streetAddress} 
+                      onChange={setI("streetAddress")} 
+                      rows={2}
+                      placeholder="Building/House No., Street, District/Suburb"
+                      style={{...inp,resize:"vertical",lineHeight:1.5}}
+                      onFocus={fo} 
+                      onBlur={e=>e.target.style.borderColor=ds.color.border}
+                    />
+                    <div style={{fontSize:11,color:ds.color.textLight,marginTop:4}}>Full delivery address (we'll calculate door-to-door shipping + duties on the proforma invoice).</div>
+                  </div>
+                )}
                 {/* v16.11: ZIP / postal code field — always optional */}
                 <div>
                   <label style={lbl}>ZIP / Postal Code <span style={{fontWeight:400,color:ds.color.textLight}}>(optional)</span></label>
@@ -8330,7 +8417,9 @@ function CartPage({cart,removeFromCart,updateQty,setPage,user,onOrderComplete}){
                   </div>
                   <div style={{fontSize:11,color:ds.color.textLight,marginTop:4}}>{formatUSD(total)} · indicative</div>
                   <div style={{fontSize:11,color:ds.color.textMuted,marginTop:10,padding:"8px 10px",background:ds.color.canvas,borderRadius:ds.radius.sm,lineHeight:1.5}}>
-                    💡 Shipping, duties & taxes will be added on the proforma invoice.
+                    💡 {intlDeliveryMode==="door" 
+                      ? "Door-to-door shipping + duties will be added on the proforma invoice (DDP terms)." 
+                      : "Port shipping costs will be added. You'll handle local customs clearance."}
                   </div>
                 </>
               )}
