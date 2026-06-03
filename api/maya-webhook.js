@@ -1,35 +1,29 @@
-// /api/maya-webhook.js
-// Vercel serverless function — receives payment status webhooks from Maya.
-// Updates the corresponding order in Firestore.
+// ============================================================
+// DMEAST — Maya Webhook Receiver  (Vercel Serverless Function)
+// File: api/maya-webhook.js
+// Version: v16.16
+// ============================================================
+// Maya calls this URL automatically when a customer pays.
+// It updates the Firestore order document to paymentStatus: "paid".
 //
-// HOW IT WORKS:
-//   1. Customer completes payment on Maya's page
-//   2. Maya sends a POST request to this endpoint with payment status
-//   3. We verify the signature (security)
-//   4. We update the Firestore order document with paid/failed status
-//   5. Return 200 OK so Maya doesn't retry
-//
-// SETUP IN MAYA BUSINESS MANAGER:
-//   - Go to: Developers → Webhooks
-//   - Add webhook URL: https://sandbox.dmeastph.com/api/maya-webhook  (and production URL too)
-//   - Subscribe to events: PAYMENT_SUCCESS, PAYMENT_FAILED, PAYMENT_EXPIRED, CHECKOUT_SUCCESS, CHECKOUT_FAILURE
-//
-// ENVIRONMENT VARIABLES REQUIRED:
-//   FIREBASE_SERVICE_ACCOUNT  = JSON string of Firebase Admin SDK service account
-//                                (Firebase Console → Project Settings → Service Accounts → Generate new private key)
-//   MAYA_WEBHOOK_SECRET       = (optional but recommended) Secret for signature verification
+// Register this URL in Maya Business Manager:
+//   Sandbox: https://YOUR-VERCEL-URL.vercel.app/api/maya-webhook
+//   (Settings → Webhooks → Payment Success URL)
+// ============================================================
 
-import { initializeApp, getApps, cert } from "firebase-admin/app";
-import { getFirestore, FieldValue } from "firebase-admin/firestore";
+import { initializeApp, cert, getApps } from 'firebase-admin/app';
+import { getFirestore } from 'firebase-admin/firestore';
 
-// Initialize Firebase Admin SDK (only once across function invocations)
+// ── Initialize Firebase Admin SDK (once) ─────────────────────
 function getDb() {
   if (!getApps().length) {
-    const serviceAccountStr = process.env.FIREBASE_SERVICE_ACCOUNT;
-    if (!serviceAccountStr) {
-      throw new Error("FIREBASE_SERVICE_ACCOUNT env var not set");
-    }
-    const serviceAccount = JSON.parse(serviceAccountStr);
+    // These env vars are set in Vercel dashboard (see DEPLOYMENT GUIDE)
+    const serviceAccount = {
+      projectId:     process.env.FIREBASE_PROJECT_ID,
+      clientEmail:   process.env.FIREBASE_CLIENT_EMAIL,
+      privateKey:    process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+    };
+
     initializeApp({
       credential: cert(serviceAccount),
     });
@@ -37,88 +31,102 @@ function getDb() {
   return getFirestore();
 }
 
+// ── Main handler ──────────────────────────────────────────────
 export default async function handler(req, res) {
-  if (req.method !== "POST") {
-    res.setHeader("Allow", ["POST"]);
-    return res.status(405).json({ error: "Method not allowed" });
+  // Maya sends POST requests
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
   }
 
   try {
-    const event = req.body;
-    console.log("Maya webhook received:", JSON.stringify(event, null, 2));
+    const payload = req.body;
 
-    // Extract payment info from webhook payload
-    // Maya webhook payload structure (typical):
-    // {
-    //   "id": "abc-123-checkout-id",
-    //   "isPaid": true/false,
-    //   "status": "PAYMENT_SUCCESS" | "PAYMENT_FAILED" | "PAYMENT_EXPIRED",
-    //   "requestReferenceNumber": "SO-2026-0001",
-    //   "paymentDetails": { ... }
-    // }
+    // ── Log incoming webhook (visible in Vercel logs) ─────────
+    console.log('Maya webhook received:', JSON.stringify(payload, null, 2));
 
-    const orderId = event.requestReferenceNumber || event.metadata?.orderId;
-    const status = event.status || event.paymentStatus;
-    const checkoutId = event.id || event.checkoutId;
+    // ── Parse Maya webhook payload ────────────────────────────
+    // Maya sends different formats depending on the event type.
+    // For payment success, the key fields are:
+    //   payload.status           → "PAYMENT_SUCCESS"
+    //   payload.id               → Maya's payment/checkout ID
+    //   payload.metadata.orderId → Your DMEAST order ID (we set this when creating invoice)
+    //   payload.totalAmount.value → Amount paid
+
+    const status = payload?.status || payload?.paymentStatus;
+
+    // Only process successful payments
+    if (status !== 'PAYMENT_SUCCESS' && status !== 'SUCCESS') {
+      console.log(`Ignoring webhook with status: ${status}`);
+      // Still return 200 so Maya doesn't keep retrying
+      return res.status(200).json({ received: true, processed: false, reason: `Status ${status} ignored` });
+    }
+
+    // Extract our order ID from metadata (we embedded it when creating the invoice)
+    const orderId = payload?.metadata?.orderId
+      || payload?.requestReferenceNumber?.replace(/^DMEAST-/, '').split('-')[0];
 
     if (!orderId) {
-      console.warn("Webhook missing orderId/requestReferenceNumber");
-      return res.status(200).json({ received: true, warning: "no orderId" });
+      console.error('Could not determine orderId from webhook payload');
+      return res.status(200).json({ received: true, processed: false, reason: 'No orderId found' });
     }
 
-    // Map Maya status to our internal status
-    let paymentStatus = "unknown";
-    let orderStatus = null;
-    if (status === "PAYMENT_SUCCESS" || event.isPaid === true) {
-      paymentStatus = "paid";
-      orderStatus = "paid";
-    } else if (status === "PAYMENT_FAILED") {
-      paymentStatus = "failed";
-    } else if (status === "PAYMENT_EXPIRED") {
-      paymentStatus = "expired";
-    } else if (status === "PAYMENT_CANCELLED") {
-      paymentStatus = "cancelled";
-    }
+    const amountPaid = payload?.totalAmount?.value || payload?.amount;
+    const mayaPaymentId = payload?.id || payload?.paymentId;
+    const paidAt = payload?.createdAt || new Date().toISOString();
 
-    // Update the order in Firestore
+    // ── Update Firestore order ────────────────────────────────
     const db = getDb();
-    const updateData = {
-      paymentMethod: "maya",
-      paymentStatus,
-      mayaCheckoutId: checkoutId,
-      mayaWebhookReceivedAt: FieldValue.serverTimestamp(),
-      mayaLastEvent: status,
-    };
-    if (orderStatus) {
-      updateData.status = orderStatus;
+
+    // Orders are stored in the 'orders' collection with orderId as doc ID
+    // Try both the raw orderId and search by orderNumber field
+    const ordersRef = db.collection('orders');
+
+    // First try direct doc lookup (if Firestore doc ID === orderId)
+    let orderDocRef = ordersRef.doc(orderId);
+    let orderSnap = await orderDocRef.get();
+
+    // If not found by doc ID, search by orderNumber field
+    if (!orderSnap.exists) {
+      const querySnap = await ordersRef
+        .where('orderNumber', '==', orderId)
+        .limit(1)
+        .get();
+
+      if (!querySnap.empty) {
+        orderDocRef = querySnap.docs[0].ref;
+        orderSnap = querySnap.docs[0];
+      }
     }
 
-    await db.collection("orders").doc(orderId).set(updateData, { merge: true });
+    if (!orderSnap.exists) {
+      console.error(`Order not found in Firestore: ${orderId}`);
+      // Return 200 anyway — we don't want Maya to keep retrying
+      return res.status(200).json({ received: true, processed: false, reason: `Order ${orderId} not found` });
+    }
 
-    console.log(`Order ${orderId} updated with status: ${paymentStatus}`);
+    // Update the order document
+    await orderDocRef.update({
+      paymentStatus: 'paid',
+      paymentMethod: 'maya',
+      mayaPaymentId: mayaPaymentId || null,
+      amountPaid: amountPaid || null,
+      paidAt: paidAt,
+      updatedAt: new Date().toISOString(),
+    });
 
-    return res.status(200).json({ 
-      received: true, 
-      orderId, 
-      paymentStatus,
+    console.log(`✅ Order ${orderId} marked as PAID via Maya (paymentId: ${mayaPaymentId})`);
+
+    return res.status(200).json({
+      received: true,
+      processed: true,
+      orderId,
+      mayaPaymentId,
     });
 
   } catch (err) {
-    console.error("maya-webhook error:", err);
-    // IMPORTANT: Even on error, return 200 to prevent Maya from retrying indefinitely
-    // (we can investigate logs later)
-    return res.status(200).json({ 
-      received: true, 
-      error: err.message,
-    });
+    console.error('Webhook processing error:', err);
+    // Return 200 to prevent Maya from retrying endlessly
+    // Log the error in Vercel logs for your review
+    return res.status(200).json({ received: true, processed: false, error: err.message });
   }
 }
-
-// Disable body size limits if Maya sends large payloads
-export const config = {
-  api: {
-    bodyParser: {
-      sizeLimit: "1mb",
-    },
-  },
-};

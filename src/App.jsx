@@ -1,5 +1,28 @@
 /**
- * DMEAST — Medical Solutions Platform  v16.15
+ * DMEAST — Medical Solutions Platform  v16.17
+ *
+ * v16.17 PAYMENT METHOD TOGGLES + MAYA LINK ON PI:
+ * - ⚙️ Admin Settings tab (Super Admin only) — 4 toggle switches:
+ *      🏦 Bank Wire Transfer (T/T)
+ *      💳 Fiuu QR Code (Credit/Debit Card)
+ *      💸 PayPal
+ *      📱 Maya Payment Link (static link, customer enters amount)
+ * - 💾 Toggles saved to Firestore: settings/paymentMethods
+ * - 📄 Proforma Invoice PDF respects toggles — only shows active methods
+ * - 🔗 Maya Link added as Option 4 on PI:
+ *      https://payments.maya.ph/invoice?id=7e50e078-1e45-4f3c-b431-2f8fa669a173
+ *      Customer enters PHP amount from the PI themselves
+ * - ✅ All existing payment flows unchanged
+ *
+ * v16.16 MAYA INVOICE PAYMENT INTEGRATION:
+ * - 💳 Admin can send Maya payment link directly from OrderEditorModal
+ *      "Details" tab → 💳 Maya Payment section
+ * - 🔗 Calls /api/maya-invoice (Vercel serverless) — secret key stays server-side
+ * - 📧 Payment link auto-emailed to customer via EmailJS on send
+ * - 💾 Link + status saved to Firestore on order doc
+ * - 🔄 Payment status: awaiting → link_sent → paid (auto via webhook)
+ * - ✅ Fiuu stays as QR-on-PDF — no API needed
+ * - ✅ All existing flows unchanged (bank transfer, manual proof upload, etc.)
  *
  * v16.15 FIUU QR EMBEDDED:
  * - 💳 Real Fiuu in-store QR code is now embedded as base64 PNG (~110KB)
@@ -312,7 +335,7 @@ const ROLE_PERMISSIONS = {
     icon: "👑",
     color: "#7C3AED",
     description: "Full access to all features",
-    tabs: ["overview","orders","receivables","expenses","billings","margin","products","customers","rx","blog"],
+    tabs: ["overview","orders","receivables","expenses","billings","margin","products","customers","rx","blog","settings"],
     canEditOrders: true,
     canDeleteOrders: true,
     canEditProducts: true,
@@ -2439,6 +2462,17 @@ const DMEAST_PAYPAL_INFO = {
   holdWarning:  "Important: PayPal holds transactions over $500 USD for up to 21 days. For faster processing on larger orders, please use wire transfer or credit/debit card instead.",
 };
 
+// v16.17: Maya static payment link (customer enters their own amount)
+const DMEAST_MAYA_LINK = "https://payments.maya.ph/invoice?id=7e50e078-1e45-4f3c-b431-2f8fa669a173";
+
+// v16.17: Default payment method toggle settings (used if Firestore not yet set)
+const DEFAULT_PAYMENT_METHODS = {
+  wireTransfer: true,
+  fiuuQR:       true,
+  paypal:       true,
+  mayaLink:     true,
+};
+
 // v16.14: Fiuu in-store QR code (base64-encoded PNG)
 // To update: convert your Fiuu QR PNG to base64 and replace the empty string below.
 // Quick conversion: use https://www.base64-image.de or run in terminal:
@@ -2925,139 +2959,196 @@ async function generateDocumentPDF({ order, docType, docNumber, validityDays = 3
     const foreignAmountFmt = formatPI(phpAmount);
     
     // ── Choose Payment Method Header ────────────────────────────
-    ensureSpace(30);
-    setColor(colors.dark);
-    pdf.setFont("helvetica", "bold");
-    pdf.setFontSize(11);
-    pdf.text("CHOOSE YOUR PAYMENT METHOD", margin, y); y += 6;
-    setDraw(colors.gold);
-    pdf.setLineWidth(1.5);
-    pdf.line(margin, y, margin + 160, y);
-    pdf.setLineWidth(0.5);
-    y += 12;
+    // v16.17: Read payment method toggles (passed in via intlOptions or use defaults)
+    const pm = (intlOptions && intlOptions.paymentMethods) ? intlOptions.paymentMethods : DEFAULT_PAYMENT_METHODS;
     
-    setColor(colors.muted);
-    pdf.setFont("helvetica", "italic");
-    pdf.setFontSize(8);
-    pdf.text(`Total amount due: ${foreignAmountFmt}  (≈ ${phpAmountFmt})  ·  Reference: PI #${docNumber}`, margin, y);
-    y += 16;
+    // Build list of active methods with sequential option numbers
+    const activeMethods = [
+      { key: "wireTransfer", enabled: pm.wireTransfer },
+      { key: "fiuuQR",       enabled: pm.fiuuQR },
+      { key: "paypal",       enabled: pm.paypal },
+      { key: "mayaLink",     enabled: pm.mayaLink },
+    ].filter(m => m.enabled);
     
-    // ── Option 1: WIRE TRANSFER ────────────────────────────────
-    ensureSpace(135);
-    setFill([254, 243, 199]); // light yellow
-    pdf.rect(margin, y, contentWidth, 125, "F");
-    setColor([146, 64, 14]); // dark amber
-    pdf.setFont("helvetica", "bold");
-    pdf.setFontSize(10);
-    pdf.text("OPTION 1  —  BANK WIRE TRANSFER (T/T)  ·  Recommended for orders over $1,000", margin + 10, y + 14);
-    
-    setColor(colors.dark);
-    pdf.setFont("helvetica", "normal");
-    pdf.setFontSize(8.5);
-    let py = y + 28;
-    pdf.text(`Beneficiary:     ${DMEAST_BANK_INFO.beneficiary}`, margin + 10, py); py += 11;
-    pdf.text(`Bank Name:       ${DMEAST_BANK_INFO.bankName}`, margin + 10, py); py += 11;
-    pdf.text(`Bank Address:    ${DMEAST_BANK_INFO.bankAddress}`, margin + 10, py); py += 11;
-    pdf.text(`SWIFT Code:      ${DMEAST_BANK_INFO.swiftCode}`, margin + 10, py); py += 11;
-    pdf.text(`Account Number:  ${DMEAST_BANK_INFO.accountNo}`, margin + 10, py); py += 11;
-    pdf.text(`Account Type:    ${DMEAST_BANK_INFO.accountType}`, margin + 10, py); py += 11;
-    
-    setColor([146, 64, 14]);
-    pdf.setFont("helvetica", "italic");
-    pdf.setFontSize(7.5);
-    pdf.text(`Please include "PI #${docNumber}" in the wire transfer reference. Funds clear in 3-5 banking days.`, margin + 10, py);
-    
-    y += 135;
-    
-    // ── Option 2: CREDIT / DEBIT CARD (Fiuu QR) ────────────────
-    ensureSpace(170);
-    setFill([224, 242, 254]); // light blue
-    pdf.rect(margin, y, contentWidth, 160, "F");
-    setColor([7, 89, 133]); // dark blue
-    pdf.setFont("helvetica", "bold");
-    pdf.setFontSize(10);
-    pdf.text("OPTION 2  —  CREDIT / DEBIT CARD  ·  Visa & Mastercard accepted", margin + 10, y + 14);
-    
-    // QR area (left side ~110pt wide)
-    const qrSize = 100;
-    const qrX = margin + 10;
-    const qrY = y + 25;
-    try {
-      if (FIUU_QR_IMAGE_DATA && FIUU_QR_IMAGE_DATA.length > 100) {
-        pdf.addImage(FIUU_QR_IMAGE_DATA, "PNG", qrX, qrY, qrSize, qrSize);
-      } else {
-        // Placeholder when no QR data yet
-        setDraw([7, 89, 133]);
-        pdf.setLineWidth(1);
-        pdf.rect(qrX, qrY, qrSize, qrSize);
-        pdf.setLineWidth(0.5);
-        setColor([7, 89, 133]);
-        pdf.setFont("helvetica", "italic");
-        pdf.setFontSize(7);
-        pdf.text("[ Fiuu Payment", qrX + qrSize/2, qrY + qrSize/2 - 6, { align: "center" });
-        pdf.text("QR Code ]", qrX + qrSize/2, qrY + qrSize/2 + 6, { align: "center" });
-        pdf.text("Will appear here", qrX + qrSize/2, qrY + qrSize/2 + 18, { align: "center" });
-      }
-    } catch(e) {
-      console.warn("QR render failed:", e);
+    if (activeMethods.length > 0) {
+      ensureSpace(30);
+      setColor(colors.dark);
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(11);
+      pdf.text("CHOOSE YOUR PAYMENT METHOD", margin, y); y += 6;
+      setDraw(colors.gold);
+      pdf.setLineWidth(1.5);
+      pdf.line(margin, y, margin + 160, y);
+      pdf.setLineWidth(0.5);
+      y += 12;
+      
+      setColor(colors.muted);
+      pdf.setFont("helvetica", "italic");
+      pdf.setFontSize(8);
+      pdf.text(`Total amount due: ${foreignAmountFmt}  (≈ ${phpAmountFmt})  ·  Reference: PI #${docNumber}`, margin, y);
+      y += 16;
     }
     
-    // Instructions (right side, starting at qrX + qrSize + 15)
-    const instX = qrX + qrSize + 15;
-    const instY = y + 28;
-    setColor(colors.dark);
-    pdf.setFont("helvetica", "bold");
-    pdf.setFontSize(8.5);
-    pdf.text("How to pay by card:", instX, instY);
+    let optionNum = 0;
     
-    pdf.setFont("helvetica", "normal");
-    pdf.setFontSize(8);
-    let iy = instY + 12;
-    const cardSteps = [
-      `1. Scan QR code with your phone camera (or use Fiuu app)`,
-      `2. Enter amount:  ${phpAmountFmt}  (PHP only)`,
-      `3. Enter reference:  PI-${docNumber.replace(/^PI-/, "")}`,
-      `4. Enter your card details + complete 3D Secure verification`,
-      `5. Forward the Fiuu confirmation receipt to info@dmeastph.com`,
-    ];
-    cardSteps.forEach(step => {
-      const stepLines = pdf.splitTextToSize(step, contentWidth - qrSize - 35);
-      stepLines.forEach(line => { pdf.text(line, instX, iy); iy += 10; });
-    });
+    // ── Option: WIRE TRANSFER ────────────────────────────────
+    if (pm.wireTransfer) {
+      optionNum++;
+      ensureSpace(135);
+      setFill([254, 243, 199]); // light yellow
+      pdf.rect(margin, y, contentWidth, 125, "F");
+      setColor([146, 64, 14]); // dark amber
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(10);
+      pdf.text(`OPTION ${optionNum}  —  BANK WIRE TRANSFER (T/T)  ·  Recommended for orders over $1,000`, margin + 10, y + 14);
+      
+      setColor(colors.dark);
+      pdf.setFont("helvetica", "normal");
+      pdf.setFontSize(8.5);
+      let py = y + 28;
+      pdf.text(`Beneficiary:     ${DMEAST_BANK_INFO.beneficiary}`, margin + 10, py); py += 11;
+      pdf.text(`Bank Name:       ${DMEAST_BANK_INFO.bankName}`, margin + 10, py); py += 11;
+      pdf.text(`Bank Address:    ${DMEAST_BANK_INFO.bankAddress}`, margin + 10, py); py += 11;
+      pdf.text(`SWIFT Code:      ${DMEAST_BANK_INFO.swiftCode}`, margin + 10, py); py += 11;
+      pdf.text(`Account Number:  ${DMEAST_BANK_INFO.accountNo}`, margin + 10, py); py += 11;
+      pdf.text(`Account Type:    ${DMEAST_BANK_INFO.accountType}`, margin + 10, py); py += 11;
+      
+      setColor([146, 64, 14]);
+      pdf.setFont("helvetica", "italic");
+      pdf.setFontSize(7.5);
+      pdf.text(`Please include "PI #${docNumber}" in the wire transfer reference. Funds clear in 3-5 banking days.`, margin + 10, py);
+      
+      y += 135;
+    }
     
-    // FX warning at the bottom of the card block
-    setColor([7, 89, 133]);
-    pdf.setFont("helvetica", "italic");
-    pdf.setFontSize(7);
-    pdf.text(`Important: Card will be charged in PHP. Your bank converts to your local currency at its own FX rate (typically 1-3% above market). Final amount on your card statement may vary slightly.`, margin + 10, y + 145, { maxWidth: contentWidth - 20 });
+    // ── Option: CREDIT / DEBIT CARD (Fiuu QR) ────────────────
+    if (pm.fiuuQR) {
+      optionNum++;
+      ensureSpace(170);
+      setFill([224, 242, 254]); // light blue
+      pdf.rect(margin, y, contentWidth, 160, "F");
+      setColor([7, 89, 133]); // dark blue
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(10);
+      pdf.text(`OPTION ${optionNum}  —  CREDIT / DEBIT CARD  ·  Visa & Mastercard accepted`, margin + 10, y + 14);
+      
+      // QR area (left side ~110pt wide)
+      const qrSize = 100;
+      const qrX = margin + 10;
+      const qrY = y + 25;
+      try {
+        if (FIUU_QR_IMAGE_DATA && FIUU_QR_IMAGE_DATA.length > 100) {
+          pdf.addImage(FIUU_QR_IMAGE_DATA, "PNG", qrX, qrY, qrSize, qrSize);
+        } else {
+          setDraw([7, 89, 133]);
+          pdf.setLineWidth(1);
+          pdf.rect(qrX, qrY, qrSize, qrSize);
+          pdf.setLineWidth(0.5);
+          setColor([7, 89, 133]);
+          pdf.setFont("helvetica", "italic");
+          pdf.setFontSize(7);
+          pdf.text("[ Fiuu Payment", qrX + qrSize/2, qrY + qrSize/2 - 6, { align: "center" });
+          pdf.text("QR Code ]", qrX + qrSize/2, qrY + qrSize/2 + 6, { align: "center" });
+          pdf.text("Will appear here", qrX + qrSize/2, qrY + qrSize/2 + 18, { align: "center" });
+        }
+      } catch(e) {
+        console.warn("QR render failed:", e);
+      }
+      
+      const instX = qrX + qrSize + 15;
+      const instY = y + 28;
+      setColor(colors.dark);
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(8.5);
+      pdf.text("How to pay by card:", instX, instY);
+      
+      pdf.setFont("helvetica", "normal");
+      pdf.setFontSize(8);
+      let iy = instY + 12;
+      const cardSteps = [
+        `1. Scan QR code with your phone camera (or use Fiuu app)`,
+        `2. Enter amount:  ${phpAmountFmt}  (PHP only)`,
+        `3. Enter reference:  PI-${docNumber.replace(/^PI-/, "")}`,
+        `4. Enter your card details + complete 3D Secure verification`,
+        `5. Forward the Fiuu confirmation receipt to info@dmeastph.com`,
+      ];
+      cardSteps.forEach(step => {
+        const stepLines = pdf.splitTextToSize(step, contentWidth - qrSize - 35);
+        stepLines.forEach(line => { pdf.text(line, instX, iy); iy += 10; });
+      });
+      
+      setColor([7, 89, 133]);
+      pdf.setFont("helvetica", "italic");
+      pdf.setFontSize(7);
+      pdf.text(`Important: Card will be charged in PHP. Your bank converts to your local currency at its own FX rate (typically 1-3% above market). Final amount on your card statement may vary slightly.`, margin + 10, y + 145, { maxWidth: contentWidth - 20 });
+      
+      y += 170;
+    }
     
-    y += 170;
+    // ── Option: PAYPAL ─────────────────────────────────────────
+    if (pm.paypal) {
+      optionNum++;
+      ensureSpace(90);
+      setFill([245, 243, 255]); // light purple
+      pdf.rect(margin, y, contentWidth, 80, "F");
+      setColor([88, 28, 135]); // dark purple
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(10);
+      pdf.text(`OPTION ${optionNum}  —  PAYPAL  ·  Send to: ${DMEAST_PAYPAL_INFO.email}`, margin + 10, y + 14);
+      
+      setColor(colors.dark);
+      pdf.setFont("helvetica", "normal");
+      pdf.setFontSize(8.5);
+      let pyy = y + 28;
+      pdf.text(`Recipient PayPal:   ${DMEAST_PAYPAL_INFO.email}`, margin + 10, pyy); pyy += 11;
+      pdf.text(`Amount:             ${foreignAmountFmt}  (or PHP equivalent ${phpAmountFmt})`, margin + 10, pyy); pyy += 11;
+      pdf.text(`Note/Reference:     PI-${docNumber.replace(/^PI-/, "")} — please include this in PayPal message`, margin + 10, pyy); pyy += 11;
+      
+      setColor([153, 27, 27]); // red
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(7.5);
+      pdf.text("⚠ IMPORTANT: PayPal holds transactions over $500 USD for up to 21 days. Order processing", margin + 10, pyy); pyy += 9;
+      pdf.text("will be delayed accordingly. For faster delivery on large orders, use wire transfer or card.", margin + 10, pyy);
+      
+      y += 90;
+    }
     
-    // ── Option 3: PAYPAL ───────────────────────────────────────
-    ensureSpace(90);
-    setFill([245, 243, 255]); // light purple
-    pdf.rect(margin, y, contentWidth, 80, "F");
-    setColor([88, 28, 135]); // dark purple
-    pdf.setFont("helvetica", "bold");
-    pdf.setFontSize(10);
-    pdf.text("OPTION 3  —  PAYPAL  ·  Send to: " + DMEAST_PAYPAL_INFO.email, margin + 10, y + 14);
-    
-    setColor(colors.dark);
-    pdf.setFont("helvetica", "normal");
-    pdf.setFontSize(8.5);
-    let pyy = y + 28;
-    pdf.text(`Recipient PayPal:   ${DMEAST_PAYPAL_INFO.email}`, margin + 10, pyy); pyy += 11;
-    pdf.text(`Amount:             ${foreignAmountFmt}  (or PHP equivalent ${phpAmountFmt})`, margin + 10, pyy); pyy += 11;
-    pdf.text(`Note/Reference:     PI-${docNumber.replace(/^PI-/, "")} — please include this in PayPal message`, margin + 10, pyy); pyy += 11;
-    
-    // PayPal hold warning — explicitly highlighted
-    setColor([153, 27, 27]); // red
-    pdf.setFont("helvetica", "bold");
-    pdf.setFontSize(7.5);
-    pdf.text("⚠ IMPORTANT: PayPal holds transactions over $500 USD for up to 21 days. Order processing", margin + 10, pyy); pyy += 9;
-    pdf.text("will be delayed accordingly. For faster delivery on large orders, use wire transfer or card.", margin + 10, pyy);
-    
-    y += 90;
+    // ── Option: MAYA PAYMENT LINK ───────────────────────────────
+    // v16.17: Maya static link — customer enters amount themselves
+    if (pm.mayaLink) {
+      optionNum++;
+      ensureSpace(115);
+      setFill([219, 234, 254]); // light teal-blue
+      pdf.rect(margin, y, contentWidth, 105, "F");
+      setColor([5, 95, 138]); // Maya brand blue
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(10);
+      pdf.text(`OPTION ${optionNum}  —  MAYA  ·  GCash / Visa / Mastercard / QR Ph`, margin + 10, y + 14);
+      
+      setColor(colors.dark);
+      pdf.setFont("helvetica", "normal");
+      pdf.setFontSize(8.5);
+      let mpy = y + 28;
+      pdf.text(`Payment Link:  ${DMEAST_MAYA_LINK}`, margin + 10, mpy); mpy += 14;
+      
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(8);
+      pdf.text("How to pay:", margin + 10, mpy); mpy += 11;
+      pdf.setFont("helvetica", "normal");
+      const mayaSteps = [
+        `1. Open the payment link above in your browser`,
+        `2. Enter the exact PHP amount: ${phpAmountFmt}`,
+        `3. Enter reference: PI-${docNumber.replace(/^PI-/, "")}`,
+        `4. Choose payment method: Maya wallet, GCash, Visa, Mastercard, or QR Ph`,
+        `5. Complete payment and forward confirmation to info@dmeastph.com`,
+      ];
+      mayaSteps.forEach(step => {
+        const stepLines = pdf.splitTextToSize(step, contentWidth - 20);
+        stepLines.forEach(line => { pdf.text(line, margin + 10, mpy); mpy += 9; });
+      });
+      
+      y += 115;
+    }
     
     // ── Proforma Terms ─────────────────────────────────────────
     ensureSpace(110);
@@ -3194,6 +3285,13 @@ function PDFGeneratorModal({ order, onClose }){
     if (order.intlDeliveryMode === "door") return "DDP";
     return "FOB";
   });
+  // v16.17: Load payment method toggles from Firestore
+  const [paymentMethods, setPaymentMethods] = useState(DEFAULT_PAYMENT_METHODS);
+  useEffect(() => {
+    getDoc(doc(db, "settings", "paymentMethods")).then(snap => {
+      if (snap.exists()) setPaymentMethods({ ...DEFAULT_PAYMENT_METHODS, ...snap.data() });
+    }).catch(() => {});
+  }, []);
   
   // v16.13: Auto-switch to PI doc type if international order
   useEffect(() => {
@@ -3215,7 +3313,7 @@ function PDFGeneratorModal({ order, onClose }){
       const pdf = await generateDocumentPDF({ 
         order, docType, docNumber: num, validityDays,
         vatTreatment: pdfVatTreatment,
-        intlOptions: { currency: piCurrency, incoterm: piIncoterm },  // v16.13
+        intlOptions: { currency: piCurrency, incoterm: piIncoterm, paymentMethods },  // v16.13/v16.17
       });
       setGeneratedPdf(pdf);
       // Preview as data URL
@@ -5499,6 +5597,8 @@ function OrderEditorModal({ order, products: existingProducts, onClose, onSaved,
                 <label style={lbl}>Payment Status</label>
                 <select value={paymentStatusValue} onChange={e=>setPaymentStatusValue(e.target.value)} style={{...inp,cursor:"pointer"}}>
                   <option value="awaiting">Awaiting Payment</option>
+                  <option value="link_sent">💳 Maya Link Sent</option>
+                  <option value="paid">✅ Paid via Maya</option>
                   <option value="submitted">Proof Submitted</option>
                   <option value="confirmed">Confirmed (Paid)</option>
                   <option value="rejected">Rejected</option>
@@ -5554,6 +5654,12 @@ function OrderEditorModal({ order, products: existingProducts, onClose, onSaved,
                 </div>
               )}
               </>)}
+              
+              {/* ── v16.16: MAYA PAYMENT LINK ─────────────────────────────── */}
+              <MayaPaymentPanel order={{...order, email, name, total}} onPaymentLinkSent={(invoiceUrl)=>{
+                setPaymentStatusValue("link_sent");
+              }}/>
+              
             </div>
           )}
           
@@ -5583,6 +5689,368 @@ function OrderEditorModal({ order, products: existingProducts, onClose, onSaved,
   );
 }
 
+
+// ─── v16.16: MAYA PAYMENT PANEL ──────────────────────────────────────────────
+// Shown inside OrderEditorModal → Details tab
+// Calls /api/maya-invoice serverless function, then emails the link to customer
+function MayaPaymentPanel({ order, onPaymentLinkSent }) {
+  const [sending, setSending] = useState(false);
+  const [sent, setSent] = useState(false);
+  const [invoiceUrl, setInvoiceUrl] = useState(order?.mayaInvoiceUrl || null);
+  const [payStatus, setPayStatus] = useState(order?.paymentStatus || "awaiting");
+  const [errMsg, setErrMsg] = useState("");
+
+  // Sync from order prop when modal re-opens
+  useEffect(() => {
+    setInvoiceUrl(order?.mayaInvoiceUrl || null);
+    setPayStatus(order?.paymentStatus || "awaiting");
+  }, [order?.id]);
+
+  // Only show for local (non-international) orders that haven't been paid yet
+  const isIntl = !!order?.intlCountryISO || order?.paymentMethod === "International Inquiry";
+  const isPaid = payStatus === "paid";
+
+  const handleSend = async () => {
+    if (!order?.email && !confirm("No email on file for this customer. The link will be saved to the order but cannot be emailed. Continue?")) return;
+    setSending(true); setErrMsg("");
+
+    try {
+      // Step 1 — Create Maya invoice via serverless function
+      const resp = await fetch("/api/maya-invoice", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          orderId:       order.orderNumber || order.id,
+          orderRef:      order.orderNumber || order.id,
+          amountPHP:     order.total || 0,
+          customerEmail: order.email || "",
+          customerName:  order.name  || "",
+          description:   `DMEAST Order ${order.orderNumber || order.id}`,
+        }),
+      });
+
+      const data = await resp.json();
+
+      if (!data.success || !data.invoiceUrl) {
+        throw new Error(data.error || "Maya did not return a payment link. Check Vercel logs.");
+      }
+
+      const link = data.invoiceUrl;
+
+      // Step 2 — Save link + status to Firestore
+      await updateDoc(doc(db, "orders", order.id), {
+        mayaInvoiceUrl:    link,
+        mayaInvoiceId:     data.invoiceId   || null,
+        mayaInvoiceRef:    data.requestReferenceNumber || null,
+        paymentStatus:     "link_sent",
+        paymentLinkSentAt: new Date().toISOString(),
+        updatedAt:         new Date().toISOString(),
+      });
+
+      // Step 3 — Email link to customer (if email available)
+      if (order.email) {
+        try {
+          await emailjs.send(
+            EMAILJS_CONFIG.serviceId,
+            EMAILJS_CONFIG.templateId,
+            {
+              from_name: "DM EAST Team",
+              company: "DM EAST",
+              from_email: CONTACT.email,
+              phone: CONTACT.phone1,
+              product: `Payment Link — Order #${(order.orderNumber || order.id || "").slice(-6).toUpperCase()}`,
+              quantity: "—",
+              budget: formatPHP(order.total || 0),
+              timeline: "Immediate",
+              location: order.address || "—",
+              details: `Your payment link is ready:\n\n${link}\n\nAmount: ${formatPHP(order.total || 0)}\nReference: ${order.orderNumber || order.id}\n\nThis link is valid for 24 hours. You can pay via GCash, Maya, Visa, Mastercard, or QR Ph.\n\nIf you have questions, reply to this email or contact us at ${CONTACT.phone1}.`,
+              reply_to: CONTACT.email,
+              to_email: order.email,
+            },
+            EMAILJS_CONFIG.publicKey
+          );
+        } catch(emailErr) {
+          console.warn("Email send failed (link still saved):", emailErr);
+        }
+      }
+
+      setInvoiceUrl(link);
+      setPayStatus("link_sent");
+      setSent(true);
+      onPaymentLinkSent && onPaymentLinkSent(link);
+
+    } catch(err) {
+      console.error("Maya payment link error:", err);
+      setErrMsg(err.message || "Failed to create payment link.");
+    }
+
+    setSending(false);
+  };
+
+  // Don't render for international orders
+  if (isIntl) return null;
+
+  return (
+    <div style={{
+      gridColumn:"1/-1",
+      marginTop:4,
+      borderTop:`1px dashed ${ds.color.border}`,
+      paddingTop:16,
+    }}>
+      <div style={{fontSize:11,fontWeight:700,color:ds.color.textMuted,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:12}}>
+        💳 Maya Payment Link
+      </div>
+
+      {/* Already paid */}
+      {isPaid && (
+        <div style={{padding:"12px 16px",background:ds.color.successBg,border:`1px solid ${ds.color.successBorder}`,borderRadius:ds.radius.md,display:"flex",alignItems:"center",gap:10}}>
+          <span style={{fontSize:22}}>✅</span>
+          <div>
+            <div style={{fontSize:13,fontWeight:700,color:ds.color.success}}>Paid via Maya</div>
+            {order?.paidAt && <div style={{fontSize:11,color:ds.color.textMuted,marginTop:2}}>Paid on: {new Date(order.paidAt).toLocaleString("en-PH")}</div>}
+          </div>
+        </div>
+      )}
+
+      {/* Link sent, awaiting payment */}
+      {!isPaid && payStatus === "link_sent" && invoiceUrl && !sent && (
+        <div style={{padding:"12px 16px",background:"#EFF6FF",border:"1px solid #BFDBFE",borderRadius:ds.radius.md}}>
+          <div style={{fontSize:13,fontWeight:700,color:"#1D4ED8",marginBottom:6}}>💳 Payment link sent — awaiting customer payment</div>
+          <div style={{fontSize:11.5,color:ds.color.textMuted,marginBottom:8,wordBreak:"break-all"}}>{invoiceUrl}</div>
+          <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+            <a href={invoiceUrl} target="_blank" rel="noreferrer" style={{padding:"6px 12px",borderRadius:ds.radius.sm,background:"#1D4ED8",color:"#fff",fontSize:12,fontWeight:700,textDecoration:"none"}}>🔗 Open Link</a>
+            <button onClick={()=>{navigator.clipboard.writeText(invoiceUrl);}} style={{padding:"6px 12px",borderRadius:ds.radius.sm,border:"1px solid #1D4ED8",background:"#fff",color:"#1D4ED8",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:ds.font.body}}>📋 Copy</button>
+            <button onClick={handleSend} disabled={sending} style={{padding:"6px 12px",borderRadius:ds.radius.sm,border:`1px solid ${ds.color.border}`,background:"#fff",color:ds.color.textBody,fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:ds.font.body}}>🔄 Resend</button>
+          </div>
+        </div>
+      )}
+
+      {/* Success — just sent */}
+      {sent && invoiceUrl && (
+        <div style={{padding:"12px 16px",background:ds.color.successBg,border:`1px solid ${ds.color.successBorder}`,borderRadius:ds.radius.md}}>
+          <div style={{fontSize:13,fontWeight:700,color:ds.color.success,marginBottom:6}}>✅ Payment link sent{order?.email ? ` to ${order.email}` : ""}!</div>
+          <div style={{fontSize:11.5,color:ds.color.textMuted,marginBottom:8,wordBreak:"break-all"}}>{invoiceUrl}</div>
+          <div style={{display:"flex",gap:8}}>
+            <a href={invoiceUrl} target="_blank" rel="noreferrer" style={{padding:"6px 12px",borderRadius:ds.radius.sm,background:ds.color.success,color:"#fff",fontSize:12,fontWeight:700,textDecoration:"none"}}>🔗 Open Link</a>
+            <button onClick={()=>{navigator.clipboard.writeText(invoiceUrl);}} style={{padding:"6px 12px",borderRadius:ds.radius.sm,border:`1px solid ${ds.color.success}`,background:"#fff",color:ds.color.success,fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:ds.font.body}}>📋 Copy</button>
+          </div>
+        </div>
+      )}
+
+      {/* Ready to send */}
+      {!isPaid && payStatus !== "link_sent" && !sent && (
+        <div style={{padding:"14px 16px",background:ds.color.canvas,border:`1px solid ${ds.color.border}`,borderRadius:ds.radius.md}}>
+          <div style={{fontSize:12.5,color:ds.color.textBody,marginBottom:10,lineHeight:1.5}}>
+            Generate a Maya payment link for <strong>{order?.name || "this customer"}</strong> — amount: <strong style={{color:ds.color.red}}>{formatPHP(order?.total || 0)}</strong>.<br/>
+            <span style={{fontSize:11.5,color:ds.color.textMuted}}>Accepts GCash, Maya, Visa, Mastercard, QR Ph. Link emailed to customer automatically.</span>
+          </div>
+          {!order?.email && (
+            <div style={{padding:"8px 10px",background:"#FEF3C7",borderRadius:ds.radius.sm,fontSize:11.5,color:"#92400E",marginBottom:10}}>
+              ⚠️ No customer email on file — link will be saved but not emailed. Add an email in the Customer Info tab first.
+            </div>
+          )}
+          <button
+            onClick={handleSend}
+            disabled={sending || (order?.total || 0) <= 0}
+            style={{
+              padding:"10px 20px",
+              borderRadius:ds.radius.md,
+              border:"none",
+              background:sending?"#94A3B8":"#1A56DB",
+              color:"#fff",
+              fontSize:13,
+              fontWeight:700,
+              cursor:sending?"not-allowed":"pointer",
+              fontFamily:ds.font.body,
+              display:"flex",
+              alignItems:"center",
+              gap:8,
+              opacity:(order?.total || 0) <= 0 ? 0.5 : 1,
+            }}
+          >
+            {sending ? "⏳ Creating link…" : "💳 Send Maya Payment Link"}
+          </button>
+          {(order?.total || 0) <= 0 && (
+            <div style={{marginTop:8,fontSize:11.5,color:ds.color.textMuted}}>⚠️ Order total must be greater than ₱0 before sending a payment link.</div>
+          )}
+        </div>
+      )}
+
+      {errMsg && (
+        <div style={{marginTop:10,padding:"10px 14px",background:ds.color.redLight,border:`1px solid ${ds.color.redBorder}`,borderRadius:ds.radius.md,fontSize:12.5,color:ds.color.red}}>
+          ⚠️ {errMsg}
+          <div style={{fontSize:11,marginTop:4,color:ds.color.textMuted}}>Check that MAYA_SECRET_KEY is set in Vercel and the /api/maya-invoice function is deployed.</div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── v16.17: PAYMENT METHOD SETTINGS ────────────────────────────────────────
+// Firestore doc: settings/paymentMethods
+// Super Admin only — toggles which payment methods appear on Proforma Invoices
+function PaymentMethodSettings(){
+  const [methods, setMethods] = useState(DEFAULT_PAYMENT_METHODS);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [errMsg, setErrMsg] = useState("");
+
+  useEffect(() => {
+    getDoc(doc(db, "settings", "paymentMethods")).then(snap => {
+      if (snap.exists()) setMethods({ ...DEFAULT_PAYMENT_METHODS, ...snap.data() });
+      setLoading(false);
+    }).catch(e => { setErrMsg("Failed to load settings: " + e.message); setLoading(false); });
+  }, []);
+
+  const handleSave = async () => {
+    setSaving(true); setSaved(false); setErrMsg("");
+    try {
+      await setDoc(doc(db, "settings", "paymentMethods"), methods);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
+    } catch(e) {
+      setErrMsg("Failed to save: " + e.message);
+    }
+    setSaving(false);
+  };
+
+  const toggle = (key) => setMethods(prev => ({ ...prev, [key]: !prev[key] }));
+
+  const METHODS = [
+    {
+      key:   "wireTransfer",
+      label: "Bank Wire Transfer (T/T)",
+      desc:  "SWIFT wire to China Bank account 150600002424. Recommended for orders over $1,000.",
+      icon:  "🏦",
+      color: "#92400E",
+      bg:    "#FEF3C7",
+    },
+    {
+      key:   "fiuuQR",
+      label: "Fiuu QR Code — Credit/Debit Card",
+      desc:  "Visa & Mastercard via Fiuu in-store QR. Card charged in PHP.",
+      icon:  "💳",
+      color: "#075985",
+      bg:    "#E0F2FE",
+    },
+    {
+      key:   "paypal",
+      label: "PayPal",
+      desc:  "Send to info@dmeastph.com. ⚠️ PayPal holds transactions over $500 USD for 21 days.",
+      icon:  "💸",
+      color: "#581C87",
+      bg:    "#F5F3FF",
+    },
+    {
+      key:   "mayaLink",
+      label: "Maya Payment Link",
+      desc:  "Static Maya link — customer enters their own amount. Accepts Maya, GCash, Visa, Mastercard, QR Ph.",
+      icon:  "📱",
+      color: "#055F8A",
+      bg:    "#DBE4FE",
+    },
+  ];
+
+  if (loading) return (
+    <div style={{background:"#fff",border:`1px solid ${ds.color.border}`,borderRadius:ds.radius.lg,padding:"40px",textAlign:"center",color:ds.color.textMuted}}>
+      <Spinner size={28}/> <span style={{marginLeft:10}}>Loading settings…</span>
+    </div>
+  );
+
+  return (
+    <div style={{background:"#fff",border:`1px solid ${ds.color.border}`,borderRadius:ds.radius.lg,padding:"24px 28px",boxShadow:ds.shadow.xs,maxWidth:720}}>
+      <div style={{marginBottom:20}}>
+        <div style={{fontFamily:ds.font.display,fontSize:20,color:ds.color.textDark}}>⚙️ Payment Method Settings</div>
+        <div style={{fontSize:13,color:ds.color.textMuted,marginTop:4}}>
+          Control which payment methods appear on Proforma Invoices (PI). Changes take effect on the next generated PI.
+        </div>
+      </div>
+
+      <div style={{display:"flex",flexDirection:"column",gap:12,marginBottom:24}}>
+        {METHODS.map(m => (
+          <div key={m.key} style={{
+            display:"flex",
+            alignItems:"center",
+            gap:16,
+            padding:"16px 18px",
+            background: methods[m.key] ? m.bg : ds.color.canvas,
+            border:`1.5px solid ${methods[m.key] ? m.color + "60" : ds.color.border}`,
+            borderRadius:ds.radius.md,
+            transition:"all 0.15s",
+            cursor:"pointer",
+          }} onClick={() => toggle(m.key)}>
+            {/* Toggle switch */}
+            <div style={{
+              width:44, height:24, borderRadius:12, flexShrink:0,
+              background: methods[m.key] ? m.color : "#CBD5E1",
+              position:"relative", transition:"background 0.2s",
+            }}>
+              <div style={{
+                position:"absolute",
+                top:3, left: methods[m.key] ? 23 : 3,
+                width:18, height:18, borderRadius:"50%",
+                background:"#fff",
+                boxShadow:"0 1px 3px rgba(0,0,0,0.2)",
+                transition:"left 0.2s",
+              }}/>
+            </div>
+            {/* Icon + text */}
+            <div style={{flex:1}}>
+              <div style={{display:"flex",alignItems:"center",gap:8}}>
+                <span style={{fontSize:18}}>{m.icon}</span>
+                <span style={{fontSize:14,fontWeight:700,color: methods[m.key] ? m.color : ds.color.textMuted}}>
+                  {m.label}
+                </span>
+                <span style={{
+                  fontSize:10,fontWeight:700,padding:"2px 8px",borderRadius:ds.radius.pill,
+                  background: methods[m.key] ? m.color : "#94A3B8",
+                  color:"#fff",
+                }}>
+                  {methods[m.key] ? "ON" : "OFF"}
+                </span>
+              </div>
+              <div style={{fontSize:12,color:ds.color.textMuted,marginTop:4,lineHeight:1.5}}>
+                {m.desc}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Maya link display */}
+      <div style={{padding:"12px 14px",background:ds.color.canvas,borderRadius:ds.radius.md,border:`1px solid ${ds.color.border}`,marginBottom:20,fontSize:12}}>
+        <span style={{fontWeight:700,color:ds.color.textDark}}>📱 Maya Link URL: </span>
+        <span style={{color:ds.color.textMuted,wordBreak:"break-all"}}>{DMEAST_MAYA_LINK}</span>
+        <div style={{marginTop:4,fontSize:11,color:ds.color.textMuted}}>
+          This is a static link — customers enter their own payment amount. To change this link, update <code>DMEAST_MAYA_LINK</code> in the source code.
+        </div>
+      </div>
+
+      {/* Active count warning */}
+      {Object.values(methods).filter(Boolean).length === 0 && (
+        <div style={{padding:"10px 14px",background:ds.color.redLight,borderRadius:ds.radius.md,fontSize:13,color:ds.color.red,marginBottom:16}}>
+          ⚠️ At least one payment method must be active. PIs with no payment methods will not show a payment section.
+        </div>
+      )}
+
+      {errMsg && (
+        <div style={{padding:"10px 14px",background:ds.color.redLight,borderRadius:ds.radius.md,fontSize:13,color:ds.color.red,marginBottom:16}}>
+          ⚠️ {errMsg}
+        </div>
+      )}
+
+      <div style={{display:"flex",alignItems:"center",gap:12}}>
+        <Btn variant="primary" size="md" disabled={saving} onClick={handleSave}>
+          {saving ? "Saving…" : "💾 Save Settings"}
+        </Btn>
+        {saved && (
+          <span style={{fontSize:13,color:ds.color.success,fontWeight:600}}>✅ Saved! Next PI will use these settings.</span>
+        )}
+      </div>
+    </div>
+  );
+}
 
 function AdminDashboard({ user }){
   const { products: PRODUCTS, refresh: refreshProducts } = useProducts();
@@ -6014,7 +6482,7 @@ function AdminDashboard({ user }){
       setPosts(pSnap.docs.map(d=>({id:d.id,...d.data()})));
     } catch(e){ console.warn("Refresh posts failed:", e.message); }
   };
-  const allTabs=[{id:"overview",label:"Overview",icon:"📊"},{id:"orders",label:`Orders${pendingPaymentCount>0?" 🔔":""}`,icon:"📦"},{id:"receivables",label:"Receivables",icon:"💰"},{id:"expenses",label:"Expenses",icon:"🏢"},{id:"billings",label:"Billings",icon:"📝"},{id:"margin",label:"Margin",icon:"📈"},{id:"products",label:"Products",icon:"🗂️"},{id:"customers",label:"Customers",icon:"👥"},{id:"rx",label:"Rx Uploads",icon:"💊"},{id:"blog",label:"Blog",icon:"📝"}];
+  const allTabs=[{id:"overview",label:"Overview",icon:"📊"},{id:"orders",label:`Orders${pendingPaymentCount>0?" 🔔":""}`,icon:"📦"},{id:"receivables",label:"Receivables",icon:"💰"},{id:"expenses",label:"Expenses",icon:"🏢"},{id:"billings",label:"Billings",icon:"📝"},{id:"margin",label:"Margin",icon:"📈"},{id:"products",label:"Products",icon:"🗂️"},{id:"customers",label:"Customers",icon:"👥"},{id:"rx",label:"Rx Uploads",icon:"💊"},{id:"blog",label:"Blog",icon:"📝"},{id:"settings",label:"Settings",icon:"⚙️"}];
   // v15: Filter tabs based on user role
   const tabs = userPerms ? allTabs.filter(t=>userPerms.tabs.includes(t.id)) : allTabs;
 
@@ -6430,6 +6898,11 @@ function AdminDashboard({ user }){
           <div style={{background:"#fff",border:`1px solid ${ds.color.border}`,borderRadius:ds.radius.lg,padding:"24px 28px",boxShadow:ds.shadow.xs}}>
             <PostsTab posts={posts} refreshPosts={refreshPosts} userRole={userRole}/>
           </div>
+        )}
+        
+        {/* v16.17: Settings Tab — Payment Method Toggles (Super Admin only) */}
+        {tab==="settings"&&(
+          <PaymentMethodSettings/>
         )}
       </div>
       {editingProduct && <ProductEditModal product={editingProduct} onSave={saveProduct} onClose={()=>setEditingProduct(null)}/>}
