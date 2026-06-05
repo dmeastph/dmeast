@@ -4,8 +4,12 @@ export default async function handler(req, res) {
   }
 
   if (!process.env.ANTHROPIC_API_KEY) {
-    return res.status(500).json({ error: "ANTHROPIC_API_KEY not configured" });
+    return res.status(200).json({ anthropicError: true, error: { error: { message: "ANTHROPIC_API_KEY not set in Vercel env vars" } } });
   }
+
+  // Show first 8 chars of key so we can verify it matches
+  const keyPreview = process.env.ANTHROPIC_API_KEY.substring(0, 20) + "...";
+  console.log("Using API key starting with:", keyPreview);
 
   try {
     const { system, systemPrompt, userMessage, maxTokens, isPdf, pdfBase64 } = req.body;
@@ -24,55 +28,39 @@ export default async function handler(req, res) {
       messages = [{ role: "user", content: userMessage }];
     }
 
-    // Try models in order from newest to oldest until one works
-    const modelsToTry = [
-      "claude-3-5-haiku-20241022",
-      "claude-3-haiku-20240307",
-      "claude-3-sonnet-20240229",
-      "claude-3-opus-20240229",
-    ];
+    const anthropicRes = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": process.env.ANTHROPIC_API_KEY,
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify({
+        model: "claude-3-haiku-20240307",
+        max_tokens: maxTokens || 4000,
+        system: sysContent,
+        messages,
+      }),
+    });
 
-    let lastError = null;
-    for (const model of modelsToTry) {
-      const anthropicRes = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": process.env.ANTHROPIC_API_KEY,
-          "anthropic-version": "2023-06-01",
-        },
-        body: JSON.stringify({
-          model,
-          max_tokens: maxTokens || 4000,
-          system: sysContent,
-          messages,
-        }),
+    const data = await anthropicRes.json();
+    console.log("Anthropic response status:", anthropicRes.status);
+    console.log("Anthropic response:", JSON.stringify(data).substring(0, 300));
+
+    if (!anthropicRes.ok) {
+      // Return full error details to the frontend
+      const errMsg = data?.error?.message || JSON.stringify(data);
+      const errType = data?.error?.type || "unknown";
+      return res.status(200).json({ 
+        anthropicError: true, 
+        error: { error: { message: `[${errType}] ${errMsg} (key: ${keyPreview})` } }
       });
-
-      const data = await anthropicRes.json();
-
-      if (anthropicRes.ok) {
-        console.log("Used model:", model);
-        return res.status(200).json(data);
-      }
-
-      // If model not found, try next
-      const errType = data?.error?.type;
-      if (errType === "not_found_error" || errType === "invalid_request_error") {
-        lastError = data;
-        continue;
-      }
-
-      // Other error (auth, rate limit, etc) — return immediately
-      console.error("Anthropic error:", model, JSON.stringify(data));
-      return res.status(200).json({ anthropicError: true, error: data });
     }
 
-    // All models failed
-    return res.status(200).json({ anthropicError: true, error: lastError });
+    return res.status(200).json(data);
 
   } catch (err) {
     console.error("Handler error:", err.message);
-    return res.status(500).json({ error: err.message });
+    return res.status(200).json({ anthropicError: true, error: { error: { message: err.message } } });
   }
 }
