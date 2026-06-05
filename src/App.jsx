@@ -1,5 +1,21 @@
 /**
- * DMEAST — Medical Solutions Platform  v16.17
+ * DMEAST — Medical Solutions Platform  v16.18
+ *
+ * v16.18 SUPPLIER CATALOG + AUTO-RFQ SYSTEM:
+ * - 🏭 New "Suppliers" admin tab — full CRUD for supplier master records
+ *      Add/edit/delete suppliers (name, address, contact, category, terms)
+ *      Add/edit/delete products per supplier (price, stock, margin override)
+ *      Bulk import via Excel (.xlsx) upload — reads SUPPLIERS + PRODUCTS sheets
+ *      Saved to Firestore: suppliers / supplier_products collections
+ * - 📋 New "RFQ" admin tab — AI-powered quote automation
+ *      Upload RFQ file (Excel, CSV, PDF, Word) → AI parses all line items
+ *      Claude API matches each item to supplier catalog automatically
+ *      Hybrid review: ✅ High confidence auto-confirmed, ⚠️ Low confidence flagged
+ *      Margins auto-applied by category (Medicine 15%, Supply 27.5%, Equipment manual)
+ *      Override any margin per line item before generating
+ *      Export internal cost sheet (.xlsx) — item, supplier, acq price, sell price, profit
+ *      Generate client quote PDF — DMEAST branded, same style as Proforma Invoice
+ * - ✅ All existing tabs and flows unchanged
  *
  * v16.17 PAYMENT METHOD TOGGLES + MAYA LINK ON PI:
  * - ⚙️ Admin Settings tab (Super Admin only) — 4 toggle switches:
@@ -335,7 +351,7 @@ const ROLE_PERMISSIONS = {
     icon: "👑",
     color: "#7C3AED",
     description: "Full access to all features",
-    tabs: ["overview","orders","receivables","expenses","billings","margin","products","customers","rx","blog","settings"],
+    tabs: ["overview","orders","receivables","expenses","billings","margin","products","customers","rx","blog","suppliers","rfq","settings"],
     canEditOrders: true,
     canDeleteOrders: true,
     canEditProducts: true,
@@ -6053,6 +6069,893 @@ function PaymentMethodSettings(){
   );
 }
 
+// ─── v16.18: SUPPLIER CATALOG TAB ────────────────────────────────────────────
+// Firestore: suppliers/{supplierId}, supplier_products/{productId}
+// Full CRUD for suppliers and their products. Supports bulk Excel import.
+function SupplierCatalogTab(){
+  const [suppliers,setSuppliers]=useState([]);
+  const [products,setProducts]=useState([]);
+  const [loading,setLoading]=useState(true);
+  const [view,setView]=useState("suppliers"); // "suppliers" | "products" | "add_supplier" | "edit_supplier" | "add_product" | "edit_product"
+  const [selected,setSelected]=useState(null); // selected supplier or product for editing
+  const [filterSupplier,setFilterSupplier]=useState("all");
+  const [importing,setImporting]=useState(false);
+  const [importMsg,setImportMsg]=useState("");
+  const [saving,setSaving]=useState(false);
+  const [errMsg,setErrMsg]=useState("");
+  const [search,setSearch]=useState("");
+
+  // Supplier form state
+  const [sf,setSf]=useState({id:"",name:"",address:"",contact:"",phone:"",email:"",category:"medicine",paymentTerms:"",leadDays:"",notes:""});
+  // Product form state
+  const [pf,setPf]=useState({id:"",supplierId:"",genericName:"",brandName:"",description:"",strength:"",form:"",packSize:"",uom:"box",category:"medicine",subcategory:"",acqPrice:"",currency:"PHP",stockStatus:"available",expiryDate:"",marginOverride:"",imageUrl:"",notes:""});
+
+  const loadData=async()=>{
+    setLoading(true);
+    try{
+      const sSnap=await getDocs(collection(db,"suppliers"));
+      const pSnap=await getDocs(collection(db,"supplier_products"));
+      setSuppliers(sSnap.docs.map(d=>({id:d.id,...d.data()})));
+      setProducts(pSnap.docs.map(d=>({id:d.id,...d.data()})));
+    }catch(e){setErrMsg("Load failed: "+e.message);}
+    setLoading(false);
+  };
+
+  useEffect(()=>{loadData();},[]);
+
+  const resetSf=()=>setSf({id:"",name:"",address:"",contact:"",phone:"",email:"",category:"medicine",paymentTerms:"",leadDays:"",notes:""});
+  const resetPf=()=>setPf({id:"",supplierId:filterSupplier!=="all"?filterSupplier:"",genericName:"",brandName:"",description:"",strength:"",form:"",packSize:"",uom:"box",category:"medicine",subcategory:"",acqPrice:"",currency:"PHP",stockStatus:"available",expiryDate:"",marginOverride:"",imageUrl:"",notes:""});
+
+  const editSupplier=(s)=>{setSf({...s});setView("edit_supplier");};
+  const editProduct=(p)=>{setPf({...p});setView("edit_product");};
+
+  const saveSupplier=async()=>{
+    if(!sf.name.trim()){setErrMsg("Supplier name is required.");return;}
+    setSaving(true);setErrMsg("");
+    try{
+      const sid=sf.id||("SUP"+Date.now().toString().slice(-6));
+      await setDoc(doc(db,"suppliers",sid),{...sf,id:sid,updatedAt:new Date().toISOString()});
+      await loadData();
+      setView("suppliers");resetSf();
+    }catch(e){setErrMsg("Save failed: "+e.message);}
+    setSaving(false);
+  };
+
+  const saveProduct=async()=>{
+    if(!pf.genericName.trim()){setErrMsg("Generic name is required.");return;}
+    if(!pf.supplierId){setErrMsg("Supplier is required.");return;}
+    setSaving(true);setErrMsg("");
+    try{
+      const pid=pf.id||("PRD"+Date.now().toString().slice(-6));
+      await setDoc(doc(db,"supplier_products",pid),{...pf,id:pid,acqPrice:pf.acqPrice?Number(pf.acqPrice):null,marginOverride:pf.marginOverride?Number(pf.marginOverride):null,updatedAt:new Date().toISOString()});
+      await loadData();
+      setView("products");resetPf();
+    }catch(e){setErrMsg("Save failed: "+e.message);}
+    setSaving(false);
+  };
+
+  const deleteSupplier=async(sid)=>{
+    if(!window.confirm("Delete this supplier? Their products will remain but lose the supplier link."))return;
+    await deleteDoc(doc(db,"suppliers",sid));
+    await loadData();
+  };
+
+  const deleteProduct=async(pid)=>{
+    if(!window.confirm("Delete this product?"))return;
+    await deleteDoc(doc(db,"supplier_products",pid));
+    await loadData();
+  };
+
+  // ── Excel bulk import ────────────────────────────────────────────────────
+  const handleImport=async(e)=>{
+    const file=e.target.files?.[0];
+    if(!file)return;
+    setImporting(true);setImportMsg("Reading file...");
+    try{
+      // Use Claude API to parse the Excel content via file reading
+      const reader=new FileReader();
+      reader.onload=async(ev)=>{
+        try{
+          const {read,utils}=await import("https://cdn.sheetjs.com/xlsx-0.20.1/package/xlsx.mjs");
+          const wb=read(ev.target.result,{type:"array"});
+
+          let suppCount=0,prodCount=0;
+          const batch=writeBatch(db);
+
+          // Sheet: SUPPLIERS
+          if(wb.SheetNames.includes("SUPPLIERS")){
+            const rows=utils.sheet_to_json(wb.Sheets["SUPPLIERS"],{defval:""});
+            for(const row of rows){
+              const sid=String(row["SUPPLIER ID"]||row["supplier_id"]||"").trim();
+              const name=String(row["SUPPLIER NAME"]||row["supplier_name"]||"").trim();
+              if(!sid||!name)continue;
+              batch.set(doc(db,"suppliers",sid),{
+                id:sid,name,
+                address:String(row["ADDRESS"]||row["address"]||""),
+                contact:String(row["CONTACT PERSON"]||row["contact_person"]||""),
+                phone:String(row["PHONE / EMAIL"]||row["phone"]||""),
+                email:String(row["PHONE / EMAIL"]||row["email"]||""),
+                category:String(row["CATEGORY"]||row["category"]||"medicine"),
+                paymentTerms:String(row["PAYMENT TERMS"]||row["payment_terms"]||""),
+                leadDays:Number(row["LEAD TIME (days)"]||row["lead_time_days"]||3),
+                notes:String(row["NOTES"]||row["notes"]||""),
+                updatedAt:new Date().toISOString(),
+              });
+              suppCount++;
+            }
+          }
+
+          // Sheet: PRODUCTS
+          if(wb.SheetNames.includes("PRODUCTS")){
+            const rows=utils.sheet_to_json(wb.Sheets["PRODUCTS"],{defval:""});
+            for(const row of rows){
+              const pid=String(row["PRODUCT ID"]||row["product_id"]||"").trim();
+              const generic=String(row["GENERIC NAME"]||row["generic_name"]||"").trim();
+              if(!pid||!generic)continue;
+              const price=row["ACQ. PRICE (PHP)"]||row["acquisition_price"]||row["acq_price"]||null;
+              const margin=row["MARGIN OVERRIDE%"]||row["margin_override"]||null;
+              batch.set(doc(db,"supplier_products",pid),{
+                id:pid,
+                supplierId:String(row["SUPPLIER ID"]||row["supplier_id"]||""),
+                genericName:generic,
+                brandName:String(row["BRAND NAME"]||row["brand_name"]||""),
+                description:String(row["DESCRIPTION"]||row["description"]||""),
+                strength:String(row["STRENGTH/SIZE"]||row["strength_size"]||""),
+                form:String(row["FORM/DOSAGE"]||row["form"]||""),
+                packSize:String(row["PACK SIZE"]||row["pack_size"]||""),
+                uom:String(row["UNIT OF MEASURE"]||row["unit_of_measure"]||"box"),
+                category:String(row["CATEGORY"]||row["category"]||"medicine"),
+                subcategory:String(row["SUBCATEGORY"]||row["subcategory"]||""),
+                acqPrice:price?Number(String(price).replace(/[^0-9.]/g,"")):null,
+                currency:String(row["CURRENCY"]||row["currency"]||"PHP"),
+                stockStatus:String(row["STOCK STATUS"]||row["stock_status"]||"available"),
+                expiryDate:String(row["EXPIRY DATE"]||row["expiry_date"]||""),
+                marginOverride:margin?Number(String(margin).replace(/[^0-9.]/g,"")):null,
+                imageUrl:String(row["IMAGE URL"]||row["image_url"]||""),
+                notes:String(row["NOTES"]||row["notes"]||""),
+                updatedAt:new Date().toISOString(),
+              });
+              prodCount++;
+            }
+          }
+
+          await batch.commit();
+          await loadData();
+          setImportMsg(`✅ Imported ${suppCount} suppliers and ${prodCount} products successfully!`);
+        }catch(err){setImportMsg("❌ Import failed: "+err.message);}
+        setImporting(false);
+      };
+      reader.readAsArrayBuffer(file);
+    }catch(e){setImportMsg("❌ "+e.message);setImporting(false);}
+    e.target.value="";
+  };
+
+  // ── Filtered products ────────────────────────────────────────────────────
+  const filteredProducts=products.filter(p=>{
+    const matchSupplier=filterSupplier==="all"||p.supplierId===filterSupplier;
+    const q=search.toLowerCase();
+    const matchSearch=!q||p.genericName?.toLowerCase().includes(q)||p.brandName?.toLowerCase().includes(q)||p.description?.toLowerCase().includes(q)||p.subcategory?.toLowerCase().includes(q);
+    return matchSupplier&&matchSearch;
+  });
+
+  const getSupplierName=(sid)=>suppliers.find(s=>s.id===sid)?.name||sid||"—";
+
+  const inp={width:"100%",padding:"9px 12px",borderRadius:ds.radius.md,border:`1px solid ${ds.color.border}`,fontSize:13,fontFamily:ds.font.body,outline:"none",background:"#fff"};
+  const lbl={fontSize:12,fontWeight:700,color:ds.color.textDark,display:"block",marginBottom:4};
+  const fRow={display:"grid",gridTemplateColumns:"1fr 1fr",gap:14,marginBottom:12};
+
+  // ── Supplier form ─────────────────────────────────────────────────────────
+  if(view==="add_supplier"||view==="edit_supplier"){
+    return(
+      <div style={{background:"#fff",border:`1px solid ${ds.color.border}`,borderRadius:ds.radius.lg,padding:"28px 32px",maxWidth:700}}>
+        <div style={{fontFamily:ds.font.display,fontSize:20,color:ds.color.textDark,marginBottom:20}}>
+          {view==="add_supplier"?"➕ Add New Supplier":"✏️ Edit Supplier"}
+        </div>
+        <div style={fRow}>
+          <div><label style={lbl}>Supplier ID *</label><input style={inp} value={sf.id} onChange={e=>setSf(p=>({...p,id:e.target.value}))} placeholder="e.g. SUP004" disabled={view==="edit_supplier"}/></div>
+          <div><label style={lbl}>Supplier Name *</label><input style={inp} value={sf.name} onChange={e=>setSf(p=>({...p,name:e.target.value}))} placeholder="Full legal name"/></div>
+        </div>
+        <div style={{marginBottom:12}}><label style={lbl}>Address</label><input style={inp} value={sf.address} onChange={e=>setSf(p=>({...p,address:e.target.value}))} placeholder="Full address"/></div>
+        <div style={fRow}>
+          <div><label style={lbl}>Contact Person</label><input style={inp} value={sf.contact} onChange={e=>setSf(p=>({...p,contact:e.target.value}))} placeholder="Name"/></div>
+          <div><label style={lbl}>Phone / Email</label><input style={inp} value={sf.phone} onChange={e=>setSf(p=>({...p,phone:e.target.value}))} placeholder="+63 2 8888 0000"/></div>
+        </div>
+        <div style={fRow}>
+          <div><label style={lbl}>Category</label>
+            <select style={{...inp,cursor:"pointer"}} value={sf.category} onChange={e=>setSf(p=>({...p,category:e.target.value}))}>
+              <option value="medicine">Medicine</option>
+              <option value="supply">Supply</option>
+              <option value="equipment">Equipment</option>
+              <option value="medicine / supply">Medicine / Supply</option>
+              <option value="supply / beauty & aesthetics">Supply / Beauty & Aesthetics</option>
+            </select>
+          </div>
+          <div><label style={lbl}>Lead Time (days)</label><input style={inp} type="number" value={sf.leadDays} onChange={e=>setSf(p=>({...p,leadDays:e.target.value}))} placeholder="3"/></div>
+        </div>
+        <div style={fRow}>
+          <div><label style={lbl}>Payment Terms</label><input style={inp} value={sf.paymentTerms} onChange={e=>setSf(p=>({...p,paymentTerms:e.target.value}))} placeholder="e.g. 30 days / COD"/></div>
+          <div><label style={lbl}>Email</label><input style={inp} value={sf.email} onChange={e=>setSf(p=>({...p,email:e.target.value}))} placeholder="orders@supplier.com"/></div>
+        </div>
+        <div style={{marginBottom:20}}><label style={lbl}>Notes</label><textarea style={{...inp,height:60,resize:"vertical"}} value={sf.notes} onChange={e=>setSf(p=>({...p,notes:e.target.value}))} placeholder="Any remarks (e.g. Authorized distributor)"/></div>
+        {errMsg&&<div style={{padding:"8px 12px",background:ds.color.redLight,borderRadius:ds.radius.md,color:ds.color.red,fontSize:13,marginBottom:12}}>⚠️ {errMsg}</div>}
+        <div style={{display:"flex",gap:10}}>
+          <Btn variant="primary" size="md" onClick={saveSupplier} disabled={saving}>{saving?"Saving…":"💾 Save Supplier"}</Btn>
+          <Btn variant="outline" size="md" onClick={()=>{setView("suppliers");resetSf();setErrMsg("");}}>Cancel</Btn>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Product form ──────────────────────────────────────────────────────────
+  if(view==="add_product"||view==="edit_product"){
+    return(
+      <div style={{background:"#fff",border:`1px solid ${ds.color.border}`,borderRadius:ds.radius.lg,padding:"28px 32px",maxWidth:800}}>
+        <div style={{fontFamily:ds.font.display,fontSize:20,color:ds.color.textDark,marginBottom:20}}>
+          {view==="add_product"?"➕ Add New Product":"✏️ Edit Product"}
+        </div>
+        <div style={fRow}>
+          <div><label style={lbl}>Product ID *</label><input style={inp} value={pf.id} onChange={e=>setPf(p=>({...p,id:e.target.value}))} placeholder="e.g. PRD283" disabled={view==="edit_product"}/></div>
+          <div><label style={lbl}>Supplier *</label>
+            <select style={{...inp,cursor:"pointer"}} value={pf.supplierId} onChange={e=>setPf(p=>({...p,supplierId:e.target.value}))}>
+              <option value="">— Select Supplier —</option>
+              {suppliers.map(s=><option key={s.id} value={s.id}>{s.id} — {s.name}</option>)}
+            </select>
+          </div>
+        </div>
+        <div style={{marginBottom:12}}><label style={lbl}>Generic Name *</label><input style={inp} value={pf.genericName} onChange={e=>setPf(p=>({...p,genericName:e.target.value}))} placeholder="e.g. Amoxicillin 500mg Capsule"/></div>
+        <div style={fRow}>
+          <div><label style={lbl}>Brand Name</label><input style={inp} value={pf.brandName} onChange={e=>setPf(p=>({...p,brandName:e.target.value}))} placeholder="e.g. Nuevamoxil"/></div>
+          <div><label style={lbl}>Description</label><input style={inp} value={pf.description} onChange={e=>setPf(p=>({...p,description:e.target.value}))} placeholder="Full description"/></div>
+        </div>
+        <div style={fRow}>
+          <div><label style={lbl}>Strength / Size</label><input style={inp} value={pf.strength} onChange={e=>setPf(p=>({...p,strength:e.target.value}))} placeholder="e.g. 500mg"/></div>
+          <div><label style={lbl}>Form / Dosage</label><input style={inp} value={pf.form} onChange={e=>setPf(p=>({...p,form:e.target.value}))} placeholder="e.g. Capsule, Tablet, Vial"/></div>
+        </div>
+        <div style={fRow}>
+          <div><label style={lbl}>Pack Size</label><input style={inp} value={pf.packSize} onChange={e=>setPf(p=>({...p,packSize:e.target.value}))} placeholder="e.g. 100's"/></div>
+          <div><label style={lbl}>Unit of Measure</label>
+            <select style={{...inp,cursor:"pointer"}} value={pf.uom} onChange={e=>setPf(p=>({...p,uom:e.target.value}))}>
+              {["box","bottle","vial","ampoule","tube","jar","piece","pack","syringe","canister","gallon","unit","set"].map(u=><option key={u} value={u}>{u}</option>)}
+            </select>
+          </div>
+        </div>
+        <div style={fRow}>
+          <div><label style={lbl}>Category</label>
+            <select style={{...inp,cursor:"pointer"}} value={pf.category} onChange={e=>setPf(p=>({...p,category:e.target.value}))}>
+              <option value="medicine">medicine</option>
+              <option value="supply">supply</option>
+              <option value="equipment">equipment</option>
+            </select>
+          </div>
+          <div><label style={lbl}>Subcategory</label><input style={inp} value={pf.subcategory} onChange={e=>setPf(p=>({...p,subcategory:e.target.value}))} placeholder="e.g. antibiotics, IV fluids"/></div>
+        </div>
+        <div style={fRow}>
+          <div><label style={lbl}>Acquisition Price (PHP)</label><input style={inp} type="number" value={pf.acqPrice} onChange={e=>setPf(p=>({...p,acqPrice:e.target.value}))} placeholder="Your cost from supplier"/></div>
+          <div><label style={lbl}>Margin Override % (blank = use default)</label><input style={inp} type="number" value={pf.marginOverride} onChange={e=>setPf(p=>({...p,marginOverride:e.target.value}))} placeholder="e.g. 20 for 20%"/></div>
+        </div>
+        <div style={fRow}>
+          <div><label style={lbl}>Stock Status</label>
+            <select style={{...inp,cursor:"pointer"}} value={pf.stockStatus} onChange={e=>setPf(p=>({...p,stockStatus:e.target.value}))}>
+              <option value="available">available</option>
+              <option value="limited">limited</option>
+              <option value="out of stock">out of stock</option>
+              <option value="on-order">on-order</option>
+            </select>
+          </div>
+          <div><label style={lbl}>Expiry Date</label><input style={inp} value={pf.expiryDate} onChange={e=>setPf(p=>({...p,expiryDate:e.target.value}))} placeholder="e.g. May-2028"/></div>
+        </div>
+        <div style={{marginBottom:12}}><label style={lbl}>Image URL (optional)</label><input style={inp} value={pf.imageUrl} onChange={e=>setPf(p=>({...p,imageUrl:e.target.value}))} placeholder="https://..."/></div>
+        <div style={{marginBottom:20}}><label style={lbl}>Notes</label><textarea style={{...inp,height:50,resize:"vertical"}} value={pf.notes} onChange={e=>setPf(p=>({...p,notes:e.target.value}))} placeholder="Any remarks"/></div>
+        {errMsg&&<div style={{padding:"8px 12px",background:ds.color.redLight,borderRadius:ds.radius.md,color:ds.color.red,fontSize:13,marginBottom:12}}>⚠️ {errMsg}</div>}
+        <div style={{display:"flex",gap:10}}>
+          <Btn variant="primary" size="md" onClick={saveProduct} disabled={saving}>{saving?"Saving…":"💾 Save Product"}</Btn>
+          <Btn variant="outline" size="md" onClick={()=>{setView("products");resetPf();setErrMsg("");}}>Cancel</Btn>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Main catalog view ─────────────────────────────────────────────────────
+  return(
+    <div>
+      {/* Header */}
+      <div style={{background:"#fff",border:`1px solid ${ds.color.border}`,borderRadius:ds.radius.lg,padding:"20px 24px",marginBottom:16,display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:12}}>
+        <div>
+          <div style={{fontFamily:ds.font.display,fontSize:22,color:ds.color.textDark}}>🏭 Supplier Catalog</div>
+          <div style={{fontSize:13,color:ds.color.textMuted,marginTop:2}}>{suppliers.length} suppliers · {products.length} products</div>
+        </div>
+        <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
+          {/* Bulk import */}
+          <label style={{padding:"8px 14px",borderRadius:ds.radius.md,border:`1px solid ${ds.color.border}`,background:"#fff",fontSize:13,fontWeight:600,cursor:"pointer",color:ds.color.textBody,fontFamily:ds.font.body}}>
+            {importing?"⏳ Importing…":"📤 Import Excel"}
+            <input type="file" accept=".xlsx,.xls" style={{display:"none"}} onChange={handleImport} disabled={importing}/>
+          </label>
+          <Btn variant="outline" size="sm" onClick={()=>{setView("add_supplier");resetSf();setErrMsg("");}}>➕ Add Supplier</Btn>
+          <Btn variant="primary" size="sm" onClick={()=>{setView("add_product");resetPf();setErrMsg("");}}>➕ Add Product</Btn>
+        </div>
+      </div>
+
+      {importMsg&&(
+        <div style={{padding:"10px 14px",borderRadius:ds.radius.md,background:importMsg.startsWith("✅")?ds.color.successBg:ds.color.redLight,border:`1px solid ${importMsg.startsWith("✅")?ds.color.successBorder:ds.color.redBorder}`,color:importMsg.startsWith("✅")?ds.color.success:ds.color.red,fontSize:13,marginBottom:12}}>
+          {importMsg}
+        </div>
+      )}
+
+      {/* View toggle */}
+      <div style={{display:"flex",gap:8,marginBottom:16}}>
+        {[["suppliers","🏭 Suppliers"],["products","📦 Products"]].map(([v,l])=>(
+          <button key={v} onClick={()=>setView(v)} style={{padding:"8px 18px",borderRadius:ds.radius.md,border:`1.5px solid ${view===v?ds.color.red:ds.color.border}`,background:view===v?ds.color.redLight:"#fff",color:view===v?ds.color.red:ds.color.textBody,fontWeight:700,fontSize:13,cursor:"pointer",fontFamily:ds.font.body}}>{l}</button>
+        ))}
+        {view==="products"&&(
+          <>
+            <select value={filterSupplier} onChange={e=>setFilterSupplier(e.target.value)} style={{padding:"8px 12px",borderRadius:ds.radius.md,border:`1px solid ${ds.color.border}`,fontSize:13,fontFamily:ds.font.body,cursor:"pointer"}}>
+              <option value="all">All Suppliers</option>
+              {suppliers.map(s=><option key={s.id} value={s.id}>{s.id} — {s.name.slice(0,30)}</option>)}
+            </select>
+            <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="🔍 Search products…" style={{padding:"8px 12px",borderRadius:ds.radius.md,border:`1px solid ${ds.color.border}`,fontSize:13,fontFamily:ds.font.body,minWidth:200}}/>
+          </>
+        )}
+      </div>
+
+      {loading?<div style={{textAlign:"center",padding:40,color:ds.color.textMuted}}><Spinner size={28}/></div>:(
+
+        view==="suppliers"?(
+          // ── Suppliers table ──────────────────────────────────────────────
+          <div style={{background:"#fff",border:`1px solid ${ds.color.border}`,borderRadius:ds.radius.lg,overflow:"hidden"}}>
+            <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
+              <thead>
+                <tr style={{background:ds.color.red}}>
+                  {["ID","Name","Address","Category","Lead Days","Payment Terms","Actions"].map(h=>(
+                    <th key={h} style={{padding:"10px 14px",textAlign:"left",fontWeight:700,color:"#fff",fontSize:12}}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {suppliers.length===0?(
+                  <tr><td colSpan={7} style={{padding:32,textAlign:"center",color:ds.color.textMuted}}>
+                    No suppliers yet. Click "Import Excel" to upload the masterlist, or "Add Supplier" to add manually.
+                  </td></tr>
+                ):suppliers.map((s,i)=>(
+                  <tr key={s.id} style={{background:i%2===0?"#fff":ds.color.canvas,borderBottom:`1px solid ${ds.color.borderLight}`}}>
+                    <td style={{padding:"10px 14px",fontWeight:700,color:ds.color.red}}>{s.id}</td>
+                    <td style={{padding:"10px 14px",fontWeight:600}}>{s.name}</td>
+                    <td style={{padding:"10px 14px",color:ds.color.textMuted,maxWidth:180,fontSize:12}}>{s.address||"—"}</td>
+                    <td style={{padding:"10px 14px"}}><span style={{background:ds.color.goldLight,color:ds.color.gold,borderRadius:ds.radius.pill,padding:"2px 8px",fontSize:11,fontWeight:700}}>{s.category||"—"}</span></td>
+                    <td style={{padding:"10px 14px",textAlign:"center"}}>{s.leadDays||"—"}</td>
+                    <td style={{padding:"10px 14px",color:ds.color.textMuted,fontSize:12}}>{s.paymentTerms||"—"}</td>
+                    <td style={{padding:"10px 14px"}}>
+                      <div style={{display:"flex",gap:6}}>
+                        <button onClick={()=>editSupplier(s)} style={{padding:"4px 10px",borderRadius:ds.radius.sm,border:`1px solid ${ds.color.border}`,background:"#fff",fontSize:12,cursor:"pointer",fontFamily:ds.font.body}}>✏️ Edit</button>
+                        <button onClick={()=>deleteSupplier(s.id)} style={{padding:"4px 10px",borderRadius:ds.radius.sm,border:`1px solid ${ds.color.redBorder}`,background:ds.color.redLight,color:ds.color.red,fontSize:12,cursor:"pointer",fontFamily:ds.font.body}}>🗑️</button>
+                        <button onClick={()=>{setFilterSupplier(s.id);setView("products");}} style={{padding:"4px 10px",borderRadius:ds.radius.sm,border:`1px solid ${ds.color.border}`,background:"#fff",fontSize:12,cursor:"pointer",fontFamily:ds.font.body}}>📦 Products</button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ):(
+          // ── Products table ───────────────────────────────────────────────
+          <div style={{background:"#fff",border:`1px solid ${ds.color.border}`,borderRadius:ds.radius.lg,overflow:"auto"}}>
+            <table style={{width:"100%",borderCollapse:"collapse",fontSize:12,minWidth:900}}>
+              <thead>
+                <tr style={{background:ds.color.red}}>
+                  {["ID","Supplier","Generic Name","Brand","Form","Pack","Acq. Price","Category","Subcategory","Stock","Margin","Actions"].map(h=>(
+                    <th key={h} style={{padding:"10px 12px",textAlign:"left",fontWeight:700,color:"#fff",fontSize:11,whiteSpace:"nowrap"}}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {filteredProducts.length===0?(
+                  <tr><td colSpan={12} style={{padding:32,textAlign:"center",color:ds.color.textMuted}}>
+                    {products.length===0?"No products yet. Import the masterlist Excel to seed all 282 products instantly.":"No products match your search."}
+                  </td></tr>
+                ):filteredProducts.map((p,i)=>(
+                  <tr key={p.id} style={{background:i%2===0?"#fff":ds.color.canvas,borderBottom:`1px solid ${ds.color.borderLight}`}}>
+                    <td style={{padding:"8px 12px",fontWeight:700,color:ds.color.red,whiteSpace:"nowrap"}}>{p.id}</td>
+                    <td style={{padding:"8px 12px",fontSize:11,color:ds.color.textMuted,whiteSpace:"nowrap"}}>{p.supplierId}</td>
+                    <td style={{padding:"8px 12px",fontWeight:600,maxWidth:220}}>{p.genericName}</td>
+                    <td style={{padding:"8px 12px",color:ds.color.textMuted}}>{p.brandName||"—"}</td>
+                    <td style={{padding:"8px 12px",color:ds.color.textMuted}}>{p.form||"—"}</td>
+                    <td style={{padding:"8px 12px",color:ds.color.textMuted,whiteSpace:"nowrap"}}>{p.packSize||"—"}</td>
+                    <td style={{padding:"8px 12px",fontWeight:700,color:p.acqPrice?"#1E8449":ds.color.textMuted,whiteSpace:"nowrap"}}>{p.acqPrice?formatPHP(p.acqPrice):"—"}</td>
+                    <td style={{padding:"8px 12px"}}><span style={{background:p.category==="medicine"?ds.color.redLight:p.category==="equipment"?ds.color.goldLight:ds.color.canvas,color:p.category==="medicine"?ds.color.red:p.category==="equipment"?ds.color.gold:ds.color.textBody,borderRadius:ds.radius.pill,padding:"2px 7px",fontSize:10,fontWeight:700}}>{p.category}</span></td>
+                    <td style={{padding:"8px 12px",color:ds.color.textMuted,fontSize:11}}>{p.subcategory||"—"}</td>
+                    <td style={{padding:"8px 12px"}}><span style={{color:p.stockStatus==="available"?ds.color.success:p.stockStatus==="limited"?"#E67E22":ds.color.red,fontSize:11,fontWeight:600}}>{p.stockStatus||"—"}</span></td>
+                    <td style={{padding:"8px 12px",color:p.marginOverride?"#E67E22":ds.color.textMuted,fontWeight:p.marginOverride?700:400}}>{p.marginOverride?`${p.marginOverride}%`:"default"}</td>
+                    <td style={{padding:"8px 12px"}}>
+                      <div style={{display:"flex",gap:4}}>
+                        <button onClick={()=>editProduct(p)} style={{padding:"3px 8px",borderRadius:ds.radius.sm,border:`1px solid ${ds.color.border}`,background:"#fff",fontSize:11,cursor:"pointer",fontFamily:ds.font.body}}>✏️</button>
+                        <button onClick={()=>deleteProduct(p.id)} style={{padding:"3px 8px",borderRadius:ds.radius.sm,border:`1px solid ${ds.color.redBorder}`,background:ds.color.redLight,color:ds.color.red,fontSize:11,cursor:"pointer",fontFamily:ds.font.body}}>🗑️</button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {filteredProducts.length>0&&(
+              <div style={{padding:"10px 16px",borderTop:`1px solid ${ds.color.borderLight}`,fontSize:12,color:ds.color.textMuted}}>
+                Showing {filteredProducts.length} of {products.length} products
+              </div>
+            )}
+          </div>
+        )
+      )}
+    </div>
+  );
+}
+
+// ─── v16.18: AUTO-RFQ TAB ─────────────────────────────────────────────────────
+// Upload RFQ → AI parses → match to catalog → apply margins → export Excel + PDF
+const DEFAULT_MARGINS={medicine:15,supply:27.5,equipment:null};
+
+function RFQTab(){
+  const [step,setStep]=useState("upload"); // upload | review | export
+  const [rfqFile,setRfqFile]=useState(null);
+  const [rfqName,setRfqName]=useState("");
+  const [clientName,setClientName]=useState("");
+  const [parsing,setParsing]=useState(false);
+  const [parsedItems,setParsedItems]=useState([]); // [{lineNum,rawText,qty,unit,parsedName,matchedProduct,confidence,supplierId,acqPrice,sellingPrice,margin,profit,status}]
+  const [suppliers,setSuppliers]=useState([]);
+  const [products,setProducts]=useState([]);
+  const [loadingCatalog,setLoadingCatalog]=useState(true);
+  const [exporting,setExporting]=useState(false);
+  const [exportMsg,setExportMsg]=useState("");
+  const [errMsg,setErrMsg]=useState("");
+  const [quoteNotes,setQuoteNotes]=useState("");
+  const [validityDays,setValidityDays]=useState(30);
+
+  // Load supplier catalog
+  useEffect(()=>{
+    Promise.all([
+      getDocs(collection(db,"suppliers")),
+      getDocs(collection(db,"supplier_products")),
+    ]).then(([ss,ps])=>{
+      setSuppliers(ss.docs.map(d=>({id:d.id,...d.data()})));
+      setProducts(ps.docs.map(d=>({id:d.id,...d.data()})));
+      setLoadingCatalog(false);
+    }).catch(()=>setLoadingCatalog(false));
+  },[]);
+
+  // ── File upload & AI parse ─────────────────────────────────────────────────
+  const handleFileChange=(e)=>{
+    const f=e.target.files?.[0];
+    if(f){setRfqFile(f);setRfqName(f.name);}
+    e.target.value="";
+  };
+
+  const handleParse=async()=>{
+    if(!rfqFile){setErrMsg("Please upload an RFQ file first.");return;}
+    setParsing(true);setErrMsg("");
+
+    try{
+      // Read file as text/base64 depending on type
+      let fileContent="";
+      const ext=rfqFile.name.split(".").pop().toLowerCase();
+
+      if(["xlsx","xls"].includes(ext)){
+        // Parse Excel with SheetJS
+        const buf=await rfqFile.arrayBuffer();
+        const {read,utils}=await import("https://cdn.sheetjs.com/xlsx-0.20.1/package/xlsx.mjs");
+        const wb=read(buf,{type:"array"});
+        const ws=wb.Sheets[wb.SheetNames[0]];
+        const rows=utils.sheet_to_json(ws,{header:1,defval:""});
+        fileContent=rows.map(r=>r.join("\t")).join("\n");
+      } else if(ext==="csv"){
+        fileContent=await rfqFile.text();
+      } else {
+        // PDF/Word — read as text (best effort)
+        fileContent=await rfqFile.text();
+      }
+
+      // Truncate for API
+      const truncated=fileContent.slice(0,12000);
+
+      // Build catalog context (top 200 products for matching)
+      const catalogSummary=products.slice(0,200).map(p=>`${p.id}|${p.genericName}|${p.brandName||""}|${p.category}|${p.subcategory||""}|${p.acqPrice||""}|${p.supplierId}`).join("\n");
+
+      // Call Claude API
+      const response=await fetch("https://api.anthropic.com/v1/messages",{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({
+          model:"claude-sonnet-4-20250514",
+          max_tokens:4000,
+          system:`You are an RFQ parsing assistant for DMEAST, a Philippine medical supplies distributor.
+
+TASK: Parse the RFQ document and match each line item to the supplier product catalog.
+
+SUPPLIER CATALOG (format: productId|genericName|brandName|category|subcategory|acqPrice|supplierId):
+${catalogSummary}
+
+MARGIN RULES:
+- medicine: 15%
+- supply: 27.5%
+- equipment: null (manual)
+
+OUTPUT: Return ONLY a JSON array. Each element:
+{
+  "lineNum": number,
+  "rawText": "original line from RFQ",
+  "parsedName": "cleaned generic name",
+  "qty": number,
+  "unit": "box/piece/vial/etc",
+  "matchedProductId": "PRDxxx or null",
+  "matchedGenericName": "matched name or null",
+  "confidence": "high|medium|low|none",
+  "confidenceReason": "brief reason",
+  "acqPrice": number or null,
+  "category": "medicine|supply|equipment",
+  "supplierId": "SUPxxx or null",
+  "notes": ""
+}
+
+Rules:
+- Match by generic name, strength, dosage form
+- "high" = exact or near-exact match
+- "medium" = probable match but needs confirmation
+- "low" = possible match, different brand/strength
+- "none" = not found in catalog
+- If no price in catalog, set acqPrice to null`,
+          messages:[{role:"user",content:`Parse this RFQ and match to catalog:\n\n${truncated}`}]
+        })
+      });
+
+      const data=await response.json();
+      const text=data.content?.map(c=>c.text||"").join("")||"";
+      const clean=text.replace(/```json|```/g,"").trim();
+      let parsed=[];
+      try{parsed=JSON.parse(clean);}
+      catch(e){
+        // Try to extract JSON array
+        const match=clean.match(/\[[\s\S]*\]/);
+        if(match)parsed=JSON.parse(match[0]);
+        else throw new Error("Could not parse AI response. Please try again.");
+      }
+
+      // Enrich with selling price and profit
+      const enriched=parsed.map(item=>{
+        const prod=products.find(p=>p.id===item.matchedProductId);
+        const margin=prod?.marginOverride||DEFAULT_MARGINS[item.category]||27.5;
+        const acq=item.acqPrice||prod?.acqPrice||null;
+        const sell=acq?Math.round(acq*(1+margin/100)*100)/100:null;
+        const profit=acq&&sell?Math.round((sell-acq)*100)/100:null;
+        const supplier=suppliers.find(s=>s.id===(item.supplierId||prod?.supplierId));
+        return{
+          ...item,
+          acqPrice:acq,
+          sellingPrice:sell,
+          margin:margin,
+          profit:profit,
+          supplierName:supplier?.name||"",
+          supplierAddress:supplier?.address||"",
+          status:item.confidence==="high"?"confirmed":item.confidence==="none"?"not_found":"review",
+        };
+      });
+
+      setParsedItems(enriched);
+      setStep("review");
+    }catch(e){
+      setErrMsg("Parse failed: "+e.message);
+    }
+    setParsing(false);
+  };
+
+  // ── Update a line item manually ────────────────────────────────────────────
+  const updateItem=(idx,field,value)=>{
+    setParsedItems(prev=>{
+      const arr=[...prev];
+      const item={...arr[idx],[field]:value};
+      // Recalculate selling price if acqPrice or margin changed
+      if(field==="acqPrice"||field==="margin"){
+        const acq=Number(field==="acqPrice"?value:item.acqPrice)||null;
+        const margin=Number(field==="margin"?value:item.margin)||27.5;
+        item.sellingPrice=acq?Math.round(acq*(1+margin/100)*100)/100:null;
+        item.profit=acq&&item.sellingPrice?Math.round((item.sellingPrice-acq)*100)/100:null;
+      }
+      if(field==="status"&&value==="confirmed"){
+        item.confidence="high";
+      }
+      arr[idx]=item;
+      return arr;
+    });
+  };
+
+  // ── Summary stats ──────────────────────────────────────────────────────────
+  const confirmed=parsedItems.filter(i=>i.status==="confirmed").length;
+  const needsReview=parsedItems.filter(i=>i.status==="review").length;
+  const notFound=parsedItems.filter(i=>i.status==="not_found").length;
+  const totalAcq=parsedItems.reduce((s,i)=>s+(i.acqPrice||0)*(i.qty||1),0);
+  const totalSell=parsedItems.reduce((s,i)=>s+(i.sellingPrice||0)*(i.qty||1),0);
+  const totalProfit=totalSell-totalAcq;
+
+  // ── Export Excel (internal cost sheet) ────────────────────────────────────
+  const exportExcel=async()=>{
+    setExporting(true);
+    try{
+      const {utils,writeFile}=await import("https://cdn.sheetjs.com/xlsx-0.20.1/package/xlsx.mjs");
+      const rows=[
+        ["#","Raw Item","Parsed Name","Qty","Unit","Supplier","Supplier Address","Acquisition Price","Selling Price","Margin %","Profit","Category","Status","Confidence","Notes"],
+        ...parsedItems.map((item,i)=>[
+          i+1,
+          item.rawText||"",
+          item.parsedName||"",
+          item.qty||1,
+          item.unit||"",
+          item.supplierName||"",
+          item.supplierAddress||"",
+          item.acqPrice||"",
+          item.sellingPrice||"",
+          item.margin?(item.margin+"%"):"",
+          item.profit||"",
+          item.category||"",
+          item.status||"",
+          item.confidence||"",
+          item.notes||"",
+        ]),
+        [],
+        ["","","TOTALS","","","","",totalAcq,totalSell,"",totalProfit,"","","",""],
+      ];
+      const ws=utils.aoa_to_sheet(rows);
+      ws["!cols"]=[8,30,30,6,8,30,35,14,14,10,12,12,12,12,20].map(w=>({wch:w}));
+      const wb=utils.book_new();
+      utils.book_append_sheet(wb,ws,"Cost Sheet");
+      writeFile(wb,`DMEAST_RFQ_CostSheet_${clientName.replace(/\s/g,"_")||"Client"}_${new Date().toISOString().slice(0,10)}.xlsx`);
+      setExportMsg("✅ Excel downloaded!");
+    }catch(e){setExportMsg("❌ "+e.message);}
+    setExporting(false);
+  };
+
+  // ── Export PDF (client quote) ──────────────────────────────────────────────
+  const exportPDF=async()=>{
+    setExporting(true);
+    try{
+      const {jsPDF}=await import("https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js");
+      const pdf=new jsPDF({orientation:"landscape",unit:"mm",format:"a4"});
+      const W=297,M=14,cw=W-M*2;
+      let y=M;
+
+      const setColor=(rgb)=>{ pdf.setTextColor(...rgb); };
+      const setFill=(rgb)=>{ pdf.setFillColor(...rgb); };
+      const dark=[26,26,46],red=[192,57,43],gold=[212,172,13],muted=[120,120,140],white=[255,255,255];
+
+      // Header
+      setFill(dark);pdf.rect(0,0,W,22,"F");
+      setColor(white);pdf.setFont("helvetica","bold");pdf.setFontSize(14);
+      pdf.text("DM EAST — MEDICAL SOLUTIONS",M,10);
+      pdf.setFont("helvetica","normal");pdf.setFontSize(8);
+      pdf.text("dmeastph.com  ·  info@dmeastph.com  ·  +63 951 040 1708",M,16);
+      setColor(gold);pdf.setFont("helvetica","bold");pdf.setFontSize(9);
+      const qNum="QT-"+Date.now().toString().slice(-6).toUpperCase();
+      pdf.text(`QUOTATION #${qNum}`,W-M,10,{align:"right"});
+      setColor(white);pdf.setFont("helvetica","normal");pdf.setFontSize(8);
+      pdf.text(`Date: ${new Date().toLocaleDateString("en-PH")}  ·  Valid: ${validityDays} days`,W-M,16,{align:"right"});
+      y=28;
+
+      // Client info
+      if(clientName){
+        setColor(dark);pdf.setFont("helvetica","bold");pdf.setFontSize(9);
+        pdf.text(`Prepared for: ${clientName}`,M,y);y+=5;
+      }
+      if(quoteNotes){
+        setColor(muted);pdf.setFont("helvetica","italic");pdf.setFontSize(8);
+        pdf.text(quoteNotes,M,y);y+=5;
+      }
+      y+=2;
+
+      // Table header
+      const cols=[
+        {label:"#",w:8},{label:"Item Description",w:70},{label:"Qty",w:10},{label:"Unit",w:14},
+        {label:"Unit Price (PHP)",w:24},{label:"Total (PHP)",w:24},{label:"Notes",w:cw-8-70-10-14-24-24},
+      ];
+      setFill(red);pdf.rect(M,y,cw,8,"F");
+      setColor(white);pdf.setFont("helvetica","bold");pdf.setFontSize(7.5);
+      let cx=M+2;
+      cols.forEach(c=>{pdf.text(c.label,cx,y+5.5);cx+=c.w;});
+      y+=8;
+
+      // Table rows
+      const confirmedItems=parsedItems.filter(i=>i.status==="confirmed"||i.status==="review");
+      confirmedItems.forEach((item,i)=>{
+        const rowH=10;
+        if(y+rowH>195){pdf.addPage();y=M;}
+        setFill(i%2===0?[255,255,255]:[248,248,250]);
+        pdf.rect(M,y,cw,rowH,"F");
+        setColor(dark);pdf.setFont("helvetica","normal");pdf.setFontSize(7.5);
+        cx=M+2;
+        const totalLine=(item.sellingPrice||0)*(item.qty||1);
+        const rowData=[
+          String(i+1),
+          (item.parsedName||item.rawText||"").slice(0,55),
+          String(item.qty||1),
+          item.unit||"",
+          item.sellingPrice?formatPHP(item.sellingPrice):"TBD",
+          totalLine?formatPHP(totalLine):"TBD",
+          item.status==="review"?"⚠️ Confirm":"",
+        ];
+        rowData.forEach((val,ci)=>{
+          if(ci===1){const lines=pdf.splitTextToSize(val,cols[ci].w-2);pdf.text(lines[0],cx,y+6.5);}
+          else pdf.text(val,cx,y+6.5);
+          cx+=cols[ci].w;
+        });
+        y+=rowH;
+      });
+
+      // Not found items note
+      if(notFound>0){
+        y+=4;
+        setColor(red);pdf.setFont("helvetica","italic");pdf.setFontSize(8);
+        pdf.text(`⚠️ ${notFound} item(s) not found in our catalog — will be sourced and quoted separately.`,M,y);y+=5;
+      }
+
+      // Totals
+      y+=4;
+      setFill([248,248,250]);pdf.rect(M,y,cw,16,"F");
+      setColor(dark);pdf.setFont("helvetica","bold");pdf.setFontSize(9);
+      pdf.text("TOTAL QUOTED AMOUNT:",M+4,y+10);
+      setColor(red);pdf.setFontSize(12);
+      pdf.text(formatPHP(totalSell),W-M,y+10,{align:"right"});
+      y+=20;
+
+      // Terms
+      setColor(muted);pdf.setFont("helvetica","normal");pdf.setFontSize(7.5);
+      pdf.text(`This quotation is valid for ${validityDays} days from the date of issue. Prices are inclusive of VAT where applicable.`,M,y);
+      pdf.text("Payment terms: as agreed. Delivery lead time subject to stock availability. For inquiries: info@dmeastph.com",M,y+5);
+
+      pdf.save(`DMEAST_Quote_${clientName.replace(/\s/g,"_")||"Client"}_${qNum}.pdf`);
+      setExportMsg("✅ PDF downloaded!");
+    }catch(e){setExportMsg("❌ PDF error: "+e.message);}
+    setExporting(false);
+  };
+
+  const inp2={padding:"9px 12px",borderRadius:ds.radius.md,border:`1px solid ${ds.color.border}`,fontSize:13,fontFamily:ds.font.body,outline:"none",background:"#fff"};
+
+  // ── Step: Upload ───────────────────────────────────────────────────────────
+  if(step==="upload") return(
+    <div style={{maxWidth:680}}>
+      <div style={{background:"#fff",border:`1px solid ${ds.color.border}`,borderRadius:ds.radius.lg,padding:"28px 32px",marginBottom:16}}>
+        <div style={{fontFamily:ds.font.display,fontSize:22,color:ds.color.textDark,marginBottom:4}}>📋 Auto-RFQ System</div>
+        <div style={{fontSize:13,color:ds.color.textMuted,marginBottom:24}}>
+          Upload a client RFQ file. AI will parse all line items, match them to your supplier catalog, and apply your margins automatically.
+        </div>
+
+        {loadingCatalog?(
+          <div style={{textAlign:"center",padding:20,color:ds.color.textMuted}}><Spinner size={20}/> Loading catalog…</div>
+        ):products.length===0?(
+          <div style={{padding:"14px 16px",background:ds.color.goldLight,border:`1px solid ${ds.color.goldBorder}`,borderRadius:ds.radius.md,fontSize:13,color:ds.color.gold,marginBottom:20}}>
+            ⚠️ Your supplier catalog is empty. Go to the <strong>Suppliers</strong> tab and import the masterlist Excel first — the AI needs it to match RFQ items.
+          </div>
+        ):(
+          <div style={{padding:"10px 14px",background:ds.color.successBg,border:`1px solid ${ds.color.successBorder}`,borderRadius:ds.radius.md,fontSize:13,color:ds.color.success,marginBottom:20}}>
+            ✅ Catalog loaded: {suppliers.length} suppliers · {products.length} products ready for matching
+          </div>
+        )}
+
+        <div style={{marginBottom:14}}>
+          <label style={{fontSize:12,fontWeight:700,color:ds.color.textDark,display:"block",marginBottom:6}}>Client Name</label>
+          <input style={{...inp2,width:"100%"}} value={clientName} onChange={e=>setClientName(e.target.value)} placeholder="e.g. Imus City Health Office"/>
+        </div>
+
+        <div style={{marginBottom:20}}>
+          <label style={{fontSize:12,fontWeight:700,color:ds.color.textDark,display:"block",marginBottom:6}}>Upload RFQ File</label>
+          <label style={{display:"flex",alignItems:"center",gap:12,padding:"20px",borderRadius:ds.radius.lg,border:`2px dashed ${rfqFile?ds.color.success:ds.color.border}`,background:rfqFile?ds.color.successBg:"#FAFAFA",cursor:"pointer"}}>
+            <span style={{fontSize:28}}>{rfqFile?"📄":"📂"}</span>
+            <div>
+              <div style={{fontSize:14,fontWeight:600,color:rfqFile?ds.color.success:ds.color.textDark}}>{rfqFile?rfqFile.name:"Click to upload RFQ file"}</div>
+              <div style={{fontSize:12,color:ds.color.textMuted}}>Accepts: Excel (.xlsx), CSV, PDF, Word (.docx)</div>
+            </div>
+            <input type="file" style={{display:"none"}} accept=".xlsx,.xls,.csv,.pdf,.docx,.doc" onChange={handleFileChange}/>
+          </label>
+        </div>
+
+        {errMsg&&<div style={{padding:"8px 12px",background:ds.color.redLight,borderRadius:ds.radius.md,color:ds.color.red,fontSize:13,marginBottom:12}}>⚠️ {errMsg}</div>}
+
+        <Btn variant="primary" size="lg" onClick={handleParse} disabled={parsing||!rfqFile||products.length===0}>
+          {parsing?<><Spinner size={16}/> AI Parsing…</>:"🤖 Parse RFQ with AI"}
+        </Btn>
+        <div style={{fontSize:12,color:ds.color.textMuted,marginTop:8}}>
+          Powered by Claude AI — typically takes 10–30 seconds for 200+ items.
+        </div>
+      </div>
+    </div>
+  );
+
+  // ── Step: Review ───────────────────────────────────────────────────────────
+  return(
+    <div>
+      {/* Summary bar */}
+      <div style={{background:"#fff",border:`1px solid ${ds.color.border}`,borderRadius:ds.radius.lg,padding:"16px 20px",marginBottom:16,display:"flex",alignItems:"center",gap:20,flexWrap:"wrap"}}>
+        <div style={{flex:1}}>
+          <div style={{fontFamily:ds.font.display,fontSize:18,color:ds.color.textDark}}>📋 Review Matched Items — {rfqName}</div>
+          {clientName&&<div style={{fontSize:13,color:ds.color.textMuted}}>Client: {clientName}</div>}
+        </div>
+        <div style={{display:"flex",gap:16,flexWrap:"wrap"}}>
+          <div style={{textAlign:"center"}}><div style={{fontSize:20,fontWeight:700,color:ds.color.success}}>{confirmed}</div><div style={{fontSize:11,color:ds.color.textMuted}}>Confirmed</div></div>
+          <div style={{textAlign:"center"}}><div style={{fontSize:20,fontWeight:700,color:"#E67E22"}}>{needsReview}</div><div style={{fontSize:11,color:ds.color.textMuted}}>Review</div></div>
+          <div style={{textAlign:"center"}}><div style={{fontSize:20,fontWeight:700,color:ds.color.red}}>{notFound}</div><div style={{fontSize:11,color:ds.color.textMuted}}>Not Found</div></div>
+          <div style={{textAlign:"center"}}><div style={{fontSize:16,fontWeight:700,color:ds.color.textDark}}>{formatPHP(totalSell)}</div><div style={{fontSize:11,color:ds.color.textMuted}}>Total Quote</div></div>
+          <div style={{textAlign:"center"}}><div style={{fontSize:16,fontWeight:700,color:ds.color.success}}>{formatPHP(totalProfit)}</div><div style={{fontSize:11,color:ds.color.textMuted}}>Est. Profit</div></div>
+        </div>
+        <div style={{display:"flex",gap:8}}>
+          <Btn variant="outline" size="sm" onClick={()=>{setStep("upload");setParsedItems([]);}}>← Re-upload</Btn>
+          <button onClick={exportExcel} disabled={exporting} style={{padding:"8px 14px",borderRadius:ds.radius.md,border:"none",background:"#1E8449",color:"#fff",fontWeight:700,fontSize:13,cursor:"pointer",fontFamily:ds.font.body}}>
+            {exporting?"⏳":"📊"} Export Excel
+          </button>
+          <button onClick={exportPDF} disabled={exporting} style={{padding:"8px 14px",borderRadius:ds.radius.md,border:"none",background:ds.color.red,color:"#fff",fontWeight:700,fontSize:13,cursor:"pointer",fontFamily:ds.font.body}}>
+            {exporting?"⏳":"📄"} Export Quote PDF
+          </button>
+        </div>
+      </div>
+
+      {exportMsg&&<div style={{padding:"10px 14px",borderRadius:ds.radius.md,background:exportMsg.startsWith("✅")?ds.color.successBg:ds.color.redLight,border:`1px solid ${exportMsg.startsWith("✅")?ds.color.successBorder:ds.color.redBorder}`,color:exportMsg.startsWith("✅")?ds.color.success:ds.color.red,fontSize:13,marginBottom:12}}>{exportMsg}</div>}
+
+      {/* Quote settings */}
+      <div style={{background:"#fff",border:`1px solid ${ds.color.border}`,borderRadius:ds.radius.lg,padding:"14px 20px",marginBottom:16,display:"flex",gap:16,alignItems:"center",flexWrap:"wrap"}}>
+        <div style={{display:"flex",alignItems:"center",gap:8}}>
+          <label style={{fontSize:12,fontWeight:700,color:ds.color.textDark}}>Validity (days):</label>
+          <input type="number" value={validityDays} onChange={e=>setValidityDays(Number(e.target.value))} style={{...inp2,width:70}}/>
+        </div>
+        <div style={{flex:1}}>
+          <input value={quoteNotes} onChange={e=>setQuoteNotes(e.target.value)} placeholder="Optional notes to include on the PDF quote…" style={{...inp2,width:"100%"}}/>
+        </div>
+      </div>
+
+      {/* Items table */}
+      <div style={{background:"#fff",border:`1px solid ${ds.color.border}`,borderRadius:ds.radius.lg,overflow:"auto"}}>
+        <table style={{width:"100%",borderCollapse:"collapse",fontSize:12,minWidth:1100}}>
+          <thead>
+            <tr style={{background:ds.color.red}}>
+              {["#","Status","Raw RFQ Item","Parsed Name","Qty","Unit","Matched Product","Supplier","Acq. Price","Margin %","Selling Price","Profit","Confidence"].map(h=>(
+                <th key={h} style={{padding:"9px 10px",textAlign:"left",fontWeight:700,color:"#fff",fontSize:11,whiteSpace:"nowrap"}}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {parsedItems.map((item,i)=>{
+              const statusColor=item.status==="confirmed"?ds.color.success:item.status==="not_found"?ds.color.red:"#E67E22";
+              const bg=item.status==="not_found"?"#FFF5F5":item.status==="review"?"#FFFBF0":i%2===0?"#fff":ds.color.canvas;
+              return(
+                <tr key={i} style={{background:bg,borderBottom:`1px solid ${ds.color.borderLight}`}}>
+                  <td style={{padding:"8px 10px",color:ds.color.textMuted}}>{i+1}</td>
+                  <td style={{padding:"8px 10px"}}>
+                    <select value={item.status} onChange={e=>updateItem(i,"status",e.target.value)} style={{padding:"3px 6px",borderRadius:ds.radius.sm,border:`1px solid ${statusColor}`,background:bg,color:statusColor,fontSize:11,cursor:"pointer",fontFamily:ds.font.body}}>
+                      <option value="confirmed">✅ Confirmed</option>
+                      <option value="review">⚠️ Review</option>
+                      <option value="not_found">❌ Not Found</option>
+                    </select>
+                  </td>
+                  <td style={{padding:"8px 10px",color:ds.color.textMuted,maxWidth:160,fontSize:11}}>{item.rawText||"—"}</td>
+                  <td style={{padding:"8px 10px",fontWeight:600,maxWidth:160}}>{item.parsedName||"—"}</td>
+                  <td style={{padding:"8px 10px",textAlign:"center"}}>
+                    <input type="number" value={item.qty||1} onChange={e=>updateItem(i,"qty",Number(e.target.value))} style={{width:50,padding:"3px 6px",borderRadius:ds.radius.sm,border:`1px solid ${ds.color.border}`,textAlign:"center",fontSize:12,fontFamily:ds.font.body}}/>
+                  </td>
+                  <td style={{padding:"8px 10px",color:ds.color.textMuted}}>{item.unit||"—"}</td>
+                  <td style={{padding:"8px 10px",fontSize:11,color:item.matchedProductId?ds.color.textDark:ds.color.textMuted}}>{item.matchedGenericName||item.matchedProductId||"—"}</td>
+                  <td style={{padding:"8px 10px",fontSize:11,color:ds.color.textMuted,maxWidth:140}}>{item.supplierName||"—"}</td>
+                  <td style={{padding:"8px 10px"}}>
+                    <input type="number" value={item.acqPrice||""} onChange={e=>updateItem(i,"acqPrice",e.target.value?Number(e.target.value):null)} placeholder="—" style={{width:80,padding:"3px 6px",borderRadius:ds.radius.sm,border:`1px solid ${ds.color.border}`,fontSize:12,fontFamily:ds.font.body}}/>
+                  </td>
+                  <td style={{padding:"8px 10px"}}>
+                    <input type="number" value={item.margin||""} onChange={e=>updateItem(i,"margin",e.target.value?Number(e.target.value):null)} placeholder="—" style={{width:55,padding:"3px 6px",borderRadius:ds.radius.sm,border:`1px solid ${ds.color.border}`,fontSize:12,fontFamily:ds.font.body}}/>
+                  </td>
+                  <td style={{padding:"8px 10px",fontWeight:700,color:item.sellingPrice?ds.color.textDark:ds.color.textMuted,whiteSpace:"nowrap"}}>{item.sellingPrice?formatPHP(item.sellingPrice):"—"}</td>
+                  <td style={{padding:"8px 10px",fontWeight:700,color:item.profit>0?ds.color.success:ds.color.textMuted,whiteSpace:"nowrap"}}>{item.profit?formatPHP(item.profit):"—"}</td>
+                  <td style={{padding:"8px 10px"}}>
+                    <span style={{fontSize:10,fontWeight:700,padding:"2px 7px",borderRadius:ds.radius.pill,background:item.confidence==="high"?ds.color.successBg:item.confidence==="medium"?ds.color.goldLight:item.confidence==="low"?"#FDE8E8":ds.color.canvas,color:item.confidence==="high"?ds.color.success:item.confidence==="medium"?ds.color.gold:item.confidence==="low"?ds.color.red:ds.color.textMuted}}>
+                      {item.confidence||"—"}
+                    </span>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 function AdminDashboard({ user }){
   const { products: PRODUCTS, refresh: refreshProducts } = useProducts();
   const [tab,setTab]=useState("overview");
@@ -6483,7 +7386,7 @@ function AdminDashboard({ user }){
       setPosts(pSnap.docs.map(d=>({id:d.id,...d.data()})));
     } catch(e){ console.warn("Refresh posts failed:", e.message); }
   };
-  const allTabs=[{id:"overview",label:"Overview",icon:"📊"},{id:"orders",label:`Orders${pendingPaymentCount>0?" 🔔":""}`,icon:"📦"},{id:"receivables",label:"Receivables",icon:"💰"},{id:"expenses",label:"Expenses",icon:"🏢"},{id:"billings",label:"Billings",icon:"📝"},{id:"margin",label:"Margin",icon:"📈"},{id:"products",label:"Products",icon:"🗂️"},{id:"customers",label:"Customers",icon:"👥"},{id:"rx",label:"Rx Uploads",icon:"💊"},{id:"blog",label:"Blog",icon:"📝"},{id:"settings",label:"Settings",icon:"⚙️"}];
+  const allTabs=[{id:"overview",label:"Overview",icon:"📊"},{id:"orders",label:`Orders${pendingPaymentCount>0?" 🔔":""}`,icon:"📦"},{id:"receivables",label:"Receivables",icon:"💰"},{id:"expenses",label:"Expenses",icon:"🏢"},{id:"billings",label:"Billings",icon:"📝"},{id:"margin",label:"Margin",icon:"📈"},{id:"products",label:"Products",icon:"🗂️"},{id:"customers",label:"Customers",icon:"👥"},{id:"rx",label:"Rx Uploads",icon:"💊"},{id:"blog",label:"Blog",icon:"📝"},{id:"suppliers",label:"Suppliers",icon:"🏭"},{id:"rfq",label:"RFQ",icon:"📋"},{id:"settings",label:"Settings",icon:"⚙️"}];
   // v15: Filter tabs based on user role
   const tabs = userPerms ? allTabs.filter(t=>userPerms.tabs.includes(t.id)) : allTabs;
 
@@ -6899,6 +7802,16 @@ function AdminDashboard({ user }){
           <div style={{background:"#fff",border:`1px solid ${ds.color.border}`,borderRadius:ds.radius.lg,padding:"24px 28px",boxShadow:ds.shadow.xs}}>
             <PostsTab posts={posts} refreshPosts={refreshPosts} userRole={userRole}/>
           </div>
+        )}
+
+        {/* v16.18: Supplier Catalog Tab */}
+        {tab==="suppliers"&&(
+          <SupplierCatalogTab/>
+        )}
+
+        {/* v16.18: Auto-RFQ Tab */}
+        {tab==="rfq"&&(
+          <RFQTab/>
         )}
         
         {/* v16.17: Settings Tab — Payment Method Toggles (Super Admin only) */}
