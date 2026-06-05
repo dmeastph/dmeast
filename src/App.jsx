@@ -2496,7 +2496,7 @@ const DEFAULT_PAYMENT_METHODS = {
 //   base64 -i fiuu-qr.png | pbcopy   (macOS)
 //   certutil -encode fiuu-qr.png tmp.txt && type tmp.txt   (Windows)
 // Then paste the data URL ("data:image/png;base64,iVBORw0KG...") between the quotes below.
-const FIUU_QR_IMAGE_DATA = "/fiuu-qr.png"; // Moved to public/ for Vercel build performance // v16.15: Real Fiuu QR embedded
+const FIUU_QR_IMAGE_DATA = "/fiuu-qr.png"; // v16.15: Real Fiuu QR embedded
 
 // v16.14: Fiuu card payment info
 const DMEAST_FIUU_INFO = {
@@ -6530,79 +6530,38 @@ function RFQTab(){
     setParsing(true);setErrMsg("");
 
     try{
-      // Read file as text/base64 depending on type
-      let fileContent="";
+      // Read file depending on type
       const ext=rfqFile.name.split(".").pop().toLowerCase();
+      const catalogSummary=products.slice(0,200).map(p=>`${p.id}|${p.genericName}|${p.brandName||""}|${p.category}|${p.subcategory||""}|${p.acqPrice||""}|${p.supplierId}`).join("\n");
+      const systemPrompt=`You are an RFQ parsing assistant for DMEAST, a Philippine medical supplies distributor.\n\nTASK: Parse the RFQ document and match each line item to the supplier product catalog.\n\nSUPPLIER CATALOG (format: productId|genericName|brandName|category|subcategory|acqPrice|supplierId):\n${catalogSummary}\n\nMARGIN RULES:\n- medicine: 15%\n- supply: 27.5%\n- equipment: null (manual)\n\nOUTPUT: Return ONLY a JSON array. Each element:\n{\n  "lineNum": number,\n  "rawText": "original line from RFQ",\n  "parsedName": "cleaned generic name",\n  "qty": number,\n  "unit": "box/piece/vial/etc",\n  "matchedProductId": "PRDxxx or null",\n  "matchedGenericName": "matched name or null",\n  "confidence": "high|medium|low|none",\n  "confidenceReason": "brief reason",\n  "acqPrice": number or null,\n  "category": "medicine|supply|equipment",\n  "supplierId": "SUPxxx or null",\n  "notes": ""\n}\n\nRules:\n- Match by generic name, strength, dosage form\n- high = exact or near-exact match\n- medium = probable match\n- low = possible match\n- none = not found in catalog\n- If no price in catalog, set acqPrice to null`;
 
-      if(["xlsx","xls"].includes(ext)){
-        // Parse Excel with SheetJS
+      let requestBody;
+      if(ext==="pdf"){
         const buf=await rfqFile.arrayBuffer();
-        const {read,utils}=await import("https://cdn.sheetjs.com/xlsx-0.20.1/package/xlsx.mjs");
-        const wb=read(buf,{type:"array"});
-        const ws=wb.Sheets[wb.SheetNames[0]];
-        const rows=utils.sheet_to_json(ws,{header:1,defval:""});
-        fileContent=rows.map(r=>r.join("\t")).join("\n");
-      } else if(ext==="csv"){
-        fileContent=await rfqFile.text();
+        const bytes=new Uint8Array(buf);
+        let binary=""; for(let i=0;i<bytes.byteLength;i++) binary+=String.fromCharCode(bytes[i]);
+        requestBody={maxTokens:4000,system:systemPrompt,isPdf:true,pdfBase64:btoa(binary),userMessage:"Parse this RFQ PDF and match all line items to the catalog."};
       } else {
-        // PDF/Word — read as text (best effort)
-        fileContent=await rfqFile.text();
+        let fc="";
+        if(["xlsx","xls"].includes(ext)){
+          const buf=await rfqFile.arrayBuffer();
+          const {read,utils}=await import("https://cdn.sheetjs.com/xlsx-0.20.1/package/xlsx.mjs");
+          const wb=read(buf,{type:"array"}); const ws=wb.Sheets[wb.SheetNames[0]];
+          fc=utils.sheet_to_json(ws,{header:1,defval:""}).map(r=>r.join("\t")).join("\n");
+        } else { fc=await rfqFile.text(); }
+        requestBody={maxTokens:4000,system:systemPrompt,isPdf:false,userMessage:`Parse this RFQ and match to catalog:\n\n${fc.slice(0,12000)}`};
       }
 
-      // Truncate for API
-      const truncated=fileContent.slice(0,12000);
-
-      // Build catalog context (top 200 products for matching)
-      const catalogSummary=products.slice(0,200).map(p=>`${p.id}|${p.genericName}|${p.brandName||""}|${p.category}|${p.subcategory||""}|${p.acqPrice||""}|${p.supplierId}`).join("\n");
-
-      // Call Claude API via Vercel serverless proxy (keeps API key server-side)
-      const response=await fetch("/api/claude-rfq",{
-        method:"POST",
-        headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({
-          maxTokens:4000,
-          system:`You are an RFQ parsing assistant for DMEAST, a Philippine medical supplies distributor.
-
-TASK: Parse the RFQ document and match each line item to the supplier product catalog.
-
-SUPPLIER CATALOG (format: productId|genericName|brandName|category|subcategory|acqPrice|supplierId):
-${catalogSummary}
-
-MARGIN RULES:
-- medicine: 15%
-- supply: 27.5%
-- equipment: null (manual)
-
-OUTPUT: Return ONLY a JSON array. Each element:
-{
-  "lineNum": number,
-  "rawText": "original line from RFQ",
-  "parsedName": "cleaned generic name",
-  "qty": number,
-  "unit": "box/piece/vial/etc",
-  "matchedProductId": "PRDxxx or null",
-  "matchedGenericName": "matched name or null",
-  "confidence": "high|medium|low|none",
-  "confidenceReason": "brief reason",
-  "acqPrice": number or null,
-  "category": "medicine|supply|equipment",
-  "supplierId": "SUPxxx or null",
-  "notes": ""
-}
-
-Rules:
-- Match by generic name, strength, dosage form
-- "high" = exact or near-exact match
-- "medium" = probable match but needs confirmation
-- "low" = possible match, different brand/strength
-- "none" = not found in catalog
-- If no price in catalog, set acqPrice to null`,
-          userMessage:`Parse this RFQ and match to catalog:\n\n${truncated}`
-        })
-      });
-
+      const response=await fetch("/api/claude-rfq",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(requestBody)});
       const data=await response.json();
-      const text=data.content?.map(c=>c.text||"").join("")||"";
+
+      // Show helpful error if API key not configured
+      if(data.anthropicError||data.error){
+        const msg=data.error?.error?.message||data.error||"API error";
+        throw new Error(typeof msg==="string"?msg:JSON.stringify(msg));
+      }
+
+            const text=data.content?.map(c=>c.text||"").join("")||"";
       const clean=text.replace(/```json|```/g,"").trim();
       let parsed=[];
       try{parsed=JSON.parse(clean);}
