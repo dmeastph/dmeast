@@ -6532,15 +6532,15 @@ function RFQTab(){
     try{
       // Read file depending on type
       const ext=rfqFile.name.split(".").pop().toLowerCase();
-      const catalogSummary=products.slice(0,200).map(p=>`${p.id}|${p.genericName}|${p.brandName||""}|${p.category}|${p.subcategory||""}|${p.acqPrice||""}|${p.supplierId}`).join("\n");
-      const systemPrompt=`You are an RFQ parsing assistant for DMEAST, a Philippine medical supplies distributor.\n\nTASK: Parse the RFQ document and match each line item to the supplier product catalog.\n\nSUPPLIER CATALOG (format: productId|genericName|brandName|category|subcategory|acqPrice|supplierId):\n${catalogSummary}\n\nMARGIN RULES:\n- medicine: 15%\n- supply: 27.5%\n- equipment: null (manual)\n\nOUTPUT: Return ONLY a JSON array. Each element:\n{\n  "lineNum": number,\n  "rawText": "original line from RFQ",\n  "parsedName": "cleaned generic name",\n  "qty": number,\n  "unit": "box/piece/vial/etc",\n  "matchedProductId": "PRDxxx or null",\n  "matchedGenericName": "matched name or null",\n  "confidence": "high|medium|low|none",\n  "confidenceReason": "brief reason",\n  "acqPrice": number or null,\n  "category": "medicine|supply|equipment",\n  "supplierId": "SUPxxx or null",\n  "notes": ""\n}\n\nRules:\n- Match by generic name, strength, dosage form\n- high = exact or near-exact match\n- medium = probable match\n- low = possible match\n- none = not found in catalog\n- If no price in catalog, set acqPrice to null`;
+      const catalogSummary=products.slice(0,200).map(p=>`${p.id}|${p.genericName}|${p.brandName||""}|${p.category}|${p.acqPrice||""}|${p.supplierId}`).join("\n");
+      const systemPrompt=`You are an RFQ parser for DMEAST, a Philippine medical distributor. Match each RFQ line item to the catalog.\n\nCATALOG (id|generic|brand|category|acqPrice|supplierId):\n${catalogSummary}\n\nMARGINS: medicine 15%, supply 27.5%, equipment manual.\n\nOUTPUT RULE: Respond with ONLY a raw JSON array. NO markdown fences, NO text before/after. Start with [ end with ]. Use SHORT field values. Each element:\n{"lineNum":n,"parsedName":"name","qty":n,"unit":"u","matchedProductId":"PRDxxx|null","confidence":"high|medium|low|none","acqPrice":n|null,"category":"medicine|supply|equipment","supplierId":"SUPxxx|null"}\n\nMatch by generic name, strength, form. Be concise to fit all items.`;
 
       let requestBody;
       if(ext==="pdf"){
         const buf=await rfqFile.arrayBuffer();
         const bytes=new Uint8Array(buf);
-        let binary=""; for(let i=0;i<bytes.byteLength;i++) binary+=String.fromCharCode(bytes[i]);
-        requestBody={maxTokens:4000,system:systemPrompt,isPdf:true,pdfBase64:btoa(binary),userMessage:"Parse this RFQ PDF and match all line items to the catalog."};
+        let bin=""; for(let i=0;i<bytes.byteLength;i++) bin+=String.fromCharCode(bytes[i]);
+        requestBody={maxTokens:16000,system:systemPrompt,isPdf:true,pdfBase64:btoa(bin),userMessage:"Parse this RFQ PDF. Match every line to the catalog. Respond ONLY with the raw JSON array."};
       } else {
         let fc="";
         if(["xlsx","xls"].includes(ext)){
@@ -6549,27 +6549,32 @@ function RFQTab(){
           const wb=read(buf,{type:"array"}); const ws=wb.Sheets[wb.SheetNames[0]];
           fc=utils.sheet_to_json(ws,{header:1,defval:""}).map(r=>r.join("\t")).join("\n");
         } else { fc=await rfqFile.text(); }
-        requestBody={maxTokens:4000,system:systemPrompt,isPdf:false,userMessage:`Parse this RFQ and match to catalog:\n\n${fc.slice(0,12000)}`};
+        requestBody={maxTokens:16000,system:systemPrompt,isPdf:false,userMessage:`Parse this RFQ. Respond ONLY with the raw JSON array:\n\n${fc.slice(0,12000)}`};
       }
 
       const response=await fetch("/api/claude-rfq",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(requestBody)});
       const data=await response.json();
 
-      // Show helpful error if API key not configured
-      if(data.anthropicError||data.error){
-        const msg=data.error?.error?.message||data.error||"API error";
-        throw new Error(typeof msg==="string"?msg:JSON.stringify(msg));
+      if(data.anthropicError||(!data.content&&data.error)){
+        const m=data.error?.error?.message||data.error||"API error";
+        throw new Error(typeof m==="string"?m:JSON.stringify(m));
       }
 
-            const text=data.content?.map(c=>c.text||"").join("")||"";
-      const clean=text.replace(/```json|```/g,"").trim();
       let parsed=[];
-      try{parsed=JSON.parse(clean);}
-      catch(e){
-        // Try to extract JSON array
-        const match=clean.match(/\[[\s\S]*\]/);
-        if(match)parsed=JSON.parse(match[0]);
-        else throw new Error("Could not parse AI response. Please try again.");
+      if(data.parsedItems&&Array.isArray(data.parsedItems)){
+        parsed=data.parsedItems;
+        if(data.wasTruncated) console.warn("RFQ response was truncated; recovered "+parsed.length+" items.");
+      } else {
+        const text=data.rawText||data.content?.map(c=>c.text||"").join("")||"";
+        try{
+          let clean=text.replace(/```json/gi,"").replace(/```/g,"").trim();
+          const fb=clean.indexOf("["), lb=clean.lastIndexOf("]");
+          if(fb>=0&&lb>fb) clean=clean.slice(fb,lb+1); else if(fb>=0) clean=clean.slice(fb);
+          try{ parsed=JSON.parse(clean); }
+          catch(_){ const lo=clean.lastIndexOf("}"); if(lo>0&&fb>=0) parsed=JSON.parse(clean.slice(0,lo+1)+"]"); else throw new Error("x"); }
+        }catch(e){
+          throw new Error("Could not parse AI response. "+(data.parseError||""));
+        }
       }
 
       // Enrich with selling price and profit
