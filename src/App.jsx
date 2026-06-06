@@ -2574,7 +2574,7 @@ function computeVATBreakdown(totalAmount, vatTreatment = "vat_inclusive") {
 }
 
 // v15: Main PDF generator - creates all 4 document types
-async function generateDocumentPDF({ order, docType, docNumber, validityDays = 30, vatTreatment, intlOptions = {} }) {
+async function generateDocumentPDF({ order, docType, docNumber, validityDays = 30, vatTreatment, intlOptions = {}, rfqExtraTerms = null }) {
   // v16.13: For proforma invoice (international), intlOptions contains:
   //   { currency: "USD", incoterm: "FOB", customRate: null|number }
   const isPI = docType === "proformaInvoice";
@@ -2883,7 +2883,7 @@ async function generateDocumentPDF({ order, docType, docNumber, validityDays = 3
     setColor(colors.muted);
     pdf.setFont("helvetica", "italic");
     pdf.setFontSize(8);
-    pdf.text(`Indicative PHP reference: ${formatPHP(vat.total)}  ·  @ rate ~${fxRate.toFixed(2)} PHP/${piCurrency} + 1% buffer`, totalsX, y);
+    pdf.text(`Indicative PHP reference: ${("PHP " + formatPHPNum(vat.total))}  ·  @ rate ~${fxRate.toFixed(2)} PHP/${piCurrency} + 1% buffer`, totalsX, y);
     y += 14;
   } else {
     setFill(colors.red);
@@ -2892,7 +2892,7 @@ async function generateDocumentPDF({ order, docType, docNumber, validityDays = 3
     pdf.setFont("helvetica", "bold");
     pdf.setFontSize(11);
     pdf.text("TOTAL AMOUNT DUE:", totalsX, y + 11);
-    pdf.text(formatPHP(vat.total), margin + contentWidth - 10, y + 11, { align: "right" });
+    pdf.text("PHP " + formatPHPNum(vat.total), margin + contentWidth - 10, y + 11, { align: "right" });
     y += 30;
   }
   
@@ -2908,14 +2908,25 @@ async function generateDocumentPDF({ order, docType, docNumber, validityDays = 3
     y += 12;
     pdf.setFont("helvetica", "normal");
     setColor(colors.muted);
-    const terms = [
+    const vatLine = (vatTreatment === "vat_exempt" || vatTreatment === "zero_rated")
+      ? "2. Prices are quoted in Philippine Peso (PHP), EXCLUSIVE of 12% VAT."
+      : "2. Prices are quoted in Philippine Peso (PHP), VAT inclusive.";
+    let terms = [
       `1. This quotation is valid for ${validityDays} days from the date issued.`,
-      "2. Prices are quoted in Philippine Peso (PHP), VAT inclusive.",
+      vatLine,
       "3. Payment terms: " + (order.paymentMethod || (order.paymentTerms ? findTerms(order.paymentTerms)?.label : "As agreed")),
-      "4. Delivery timeline subject to product availability and confirmation.",
-      "5. This quotation is subject to acceptance via signed PO or written confirmation.",
+      "4. Prices and stock availability are subject to change without prior notice.",
+      "5. Delivery timeline subject to product availability and confirmation.",
+      "6. This quotation is subject to acceptance via signed PO or written confirmation.",
     ];
-    terms.forEach(t => { pdf.text(t, margin, y); y += 10; });
+    // Append any RFQ-specific extra terms (renumbered)
+    if (rfqExtraTerms && rfqExtraTerms.length) {
+      rfqExtraTerms.forEach((t) => { terms.push((terms.length + 1) + ". " + t); });
+    }
+    terms.forEach(t => {
+      const wrapped = pdf.splitTextToSize(t, contentWidth);
+      wrapped.forEach(line => { pdf.text(line, margin, y); y += 10; });
+    });
   } else if (docType === "deliveryReceipt") {
     pdf.setFont("helvetica", "bold");
     setColor(colors.dark);
@@ -2972,7 +2983,7 @@ async function generateDocumentPDF({ order, docType, docNumber, validityDays = 3
     
     // Compute the PHP amount + indicative info upfront (used in all payment blocks)
     const phpAmount = vat.total;
-    const phpAmountFmt = formatPHP(phpAmount);
+    const phpAmountFmt = ("PHP " + formatPHPNum(phpAmount));
     const foreignAmountFmt = formatPI(phpAmount);
     
     // ── Choose Payment Method Header ────────────────────────────
@@ -6669,105 +6680,52 @@ function RFQTab(){
     setExporting(false);
   };
 
-  // ── Export PDF (client quote) ──────────────────────────────────────────────
+  // ── Export PDF (client quote) — reuses the branded generateDocumentPDF ──────
   const exportPDF=async()=>{
     setExporting(true);
     try{
-      const jsPDF=await loadJsPDF();
-      const pdf=new jsPDF({orientation:"landscape",unit:"mm",format:"a4"});
-      const W=297,M=14,cw=W-M*2;
-      let y=M;
+      // Convert matched RFQ items into the order shape generateDocumentPDF expects
+      const quoteItems=parsedItems
+        .filter(i=>i.status==="confirmed"||i.status==="review")
+        .map(i=>({
+          name:(i.parsedName||i.rawText||"Item")+(i.status==="review"?" (to confirm)":""),
+          qty:i.qty||1,
+          price:i.sellingPrice||0,
+        }));
 
-      const setColor=(rgb)=>{ pdf.setTextColor(...rgb); };
-      const setFill=(rgb)=>{ pdf.setFillColor(...rgb); };
-      const dark=[26,26,46],red=[192,57,43],gold=[212,172,13],muted=[120,120,140],white=[255,255,255];
+      const quoteTotal=quoteItems.reduce((s,it)=>s+(it.price||0)*(it.qty||0),0);
 
-      // Header
-      setFill(dark);pdf.rect(0,0,W,22,"F");
-      setColor(white);pdf.setFont("helvetica","bold");pdf.setFontSize(14);
-      pdf.text("DM EAST — MEDICAL SOLUTIONS",M,10);
-      pdf.setFont("helvetica","normal");pdf.setFontSize(8);
-      pdf.text("dmeastph.com  ·  info@dmeastph.com  ·  +63 951 040 1708",M,16);
-      setColor(gold);pdf.setFont("helvetica","bold");pdf.setFontSize(9);
-      const qNum="QT-"+Date.now().toString().slice(-6).toUpperCase();
-      pdf.text(`QUOTATION #${qNum}`,W-M,10,{align:"right"});
-      setColor(white);pdf.setFont("helvetica","normal");pdf.setFontSize(8);
-      pdf.text(`Date: ${new Date().toLocaleDateString("en-PH")}  ·  Valid: ${validityDays} days`,W-M,16,{align:"right"});
-      y=28;
+      const orderObj={
+        name:clientName||"Valued Client",
+        address:"—",
+        items:quoteItems,
+        total:quoteTotal,
+        paymentMethod:"As agreed",
+        // VAT EXCLUSIVE — RFQ supplier prices are net; quote is exclusive of VAT
+        vatTreatment:"vat_exempt",
+      };
 
-      // Client info
-      if(clientName){
-        setColor(dark);pdf.setFont("helvetica","bold");pdf.setFontSize(9);
-        pdf.text(`Prepared for: ${clientName}`,M,y);y+=5;
-      }
-      if(quoteNotes){
-        setColor(muted);pdf.setFont("helvetica","italic");pdf.setFontSize(8);
-        pdf.text(quoteNotes,M,y);y+=5;
-      }
-      y+=2;
+      const qNum="QT-"+new Date().getFullYear()+"-"+Date.now().toString().slice(-4);
 
-      // Table header
-      const cols=[
-        {label:"#",w:8},{label:"Item Description",w:70},{label:"Qty",w:10},{label:"Unit",w:14},
-        {label:"Unit Price (PHP)",w:24},{label:"Total (PHP)",w:24},{label:"Notes",w:cw-8-70-10-14-24-24},
-      ];
-      setFill(red);pdf.rect(M,y,cw,8,"F");
-      setColor(white);pdf.setFont("helvetica","bold");pdf.setFontSize(7.5);
-      let cx=M+2;
-      cols.forEach(c=>{pdf.text(c.label,cx,y+5.5);cx+=c.w;});
-      y+=8;
-
-      // Table rows
-      const confirmedItems=parsedItems.filter(i=>i.status==="confirmed"||i.status==="review");
-      confirmedItems.forEach((item,i)=>{
-        const rowH=10;
-        if(y+rowH>195){pdf.addPage();y=M;}
-        setFill(i%2===0?[255,255,255]:[248,248,250]);
-        pdf.rect(M,y,cw,rowH,"F");
-        setColor(dark);pdf.setFont("helvetica","normal");pdf.setFontSize(7.5);
-        cx=M+2;
-        const totalLine=(item.sellingPrice||0)*(item.qty||1);
-        const rowData=[
-          String(i+1),
-          (item.parsedName||item.rawText||"").slice(0,55),
-          String(item.qty||1),
-          item.unit||"",
-          item.sellingPrice?formatPHP(item.sellingPrice):"TBD",
-          totalLine?formatPHP(totalLine):"TBD",
-          item.status==="review"?"⚠️ Confirm":"",
-        ];
-        rowData.forEach((val,ci)=>{
-          if(ci===1){const lines=pdf.splitTextToSize(val,cols[ci].w-2);pdf.text(lines[0],cx,y+6.5);}
-          else pdf.text(val,cx,y+6.5);
-          cx+=cols[ci].w;
-        });
-        y+=rowH;
+      // Build the standard branded quotation PDF
+      const pdf=await generateDocumentPDF({
+        order:orderObj,
+        docType:"quotation",
+        docNumber:qNum,
+        validityDays:Number(validityDays)||30,
+        vatTreatment:"vat_exempt",
+        rfqExtraTerms:[
+          "Prices quoted are EXCLUSIVE of 12% VAT, which will be added upon official invoicing.",
+          "Prices and stock availability are subject to change without prior notice.",
+          "Items marked \"(to confirm)\" are pending final supplier confirmation.",
+          notFound>0?(notFound+" item(s) not found in our current catalog will be sourced and quoted separately."):null,
+          quoteNotes?("Note: "+quoteNotes):null,
+        ].filter(Boolean),
       });
 
-      // Not found items note
-      if(notFound>0){
-        y+=4;
-        setColor(red);pdf.setFont("helvetica","italic");pdf.setFontSize(8);
-        pdf.text(`⚠️ ${notFound} item(s) not found in our catalog — will be sourced and quoted separately.`,M,y);y+=5;
-      }
-
-      // Totals
-      y+=4;
-      setFill([248,248,250]);pdf.rect(M,y,cw,16,"F");
-      setColor(dark);pdf.setFont("helvetica","bold");pdf.setFontSize(9);
-      pdf.text("TOTAL QUOTED AMOUNT:",M+4,y+10);
-      setColor(red);pdf.setFontSize(12);
-      pdf.text(formatPHP(totalSell),W-M,y+10,{align:"right"});
-      y+=20;
-
-      // Terms
-      setColor(muted);pdf.setFont("helvetica","normal");pdf.setFontSize(7.5);
-      pdf.text(`This quotation is valid for ${validityDays} days from the date of issue. Prices are inclusive of VAT where applicable.`,M,y);
-      pdf.text("Payment terms: as agreed. Delivery lead time subject to stock availability. For inquiries: info@dmeastph.com",M,y+5);
-
-      pdf.save(`DMEAST_Quote_${clientName.replace(/\s/g,"_")||"Client"}_${qNum}.pdf`);
-      setExportMsg("✅ PDF downloaded!");
-    }catch(e){setExportMsg("❌ PDF error: "+e.message);}
+      pdf.save(`DMEAST_Quote_${(clientName||"Client").replace(/\s/g,"_")}_${qNum}.pdf`);
+      setExportMsg("PDF downloaded!");
+    }catch(e){setExportMsg("PDF error: "+e.message);}
     setExporting(false);
   };
 
