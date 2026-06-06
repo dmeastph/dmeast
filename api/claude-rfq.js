@@ -46,11 +46,45 @@ export default async function handler(req, res) {
       return res.status(200).json({ anthropicError: true, error: { error: { message: msg } } });
     }
 
-    // Log the stop_reason so we can detect truncation
-    console.log("stop_reason:", data.stop_reason, "| output length:", 
-      (data.content?.map(c => c.text || "").join("") || "").length);
+    const rawText = data.content?.map(c => c.text || "").join("") || "";
+    console.log("stop_reason:", data.stop_reason);
+    console.log("RAW RESPONSE (first 1000 chars):", rawText.substring(0, 1000));
 
-    return res.status(200).json(data);
+    // Parse JSON server-side so the frontend gets clean data
+    let parsed = null;
+    let parseError = null;
+    try {
+      let clean = rawText.replace(/```json/gi, "").replace(/```/g, "").trim();
+      // Find the array boundaries
+      const firstBracket = clean.indexOf("[");
+      const lastBracket = clean.lastIndexOf("]");
+      if (firstBracket >= 0 && lastBracket > firstBracket) {
+        clean = clean.slice(firstBracket, lastBracket + 1);
+      }
+      try {
+        parsed = JSON.parse(clean);
+      } catch (_) {
+        // Salvage: cut at last complete object
+        const lastObj = clean.lastIndexOf("}");
+        if (lastObj > 0 && firstBracket >= 0) {
+          const salvaged = clean.slice(0, lastObj + 1) + "]";
+          parsed = JSON.parse(salvaged);
+        } else {
+          throw new Error("no recoverable array");
+        }
+      }
+    } catch (e) {
+      parseError = e.message;
+      console.error("Server-side parse failed:", e.message);
+    }
+
+    // Return both the parsed data AND the raw text so frontend can use either
+    return res.status(200).json({
+      ...data,
+      parsedItems: parsed,
+      parseError: parseError,
+      rawText: rawText,
+    });
 
   } catch (err) {
     return res.status(200).json({ anthropicError: true, error: { error: { message: err.message } } });
