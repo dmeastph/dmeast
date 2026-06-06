@@ -2720,7 +2720,7 @@ async function generateDocumentPDF({ order, docType, docNumber, validityDays = 3
   pdf.setFont("helvetica", "normal");
   pdf.setFontSize(9);
   pdf.text(order.phone || "—", leftCol + 60, y);
-  pdf.text(`#${order.id.slice(-6).toUpperCase()}`, rightCol + 60, y);
+  pdf.text(order.id ? `#${order.id.slice(-6).toUpperCase()}` : (order.docRef || "—"), rightCol + 60, y);
   y += 14;
   
   if (order.email) {
@@ -6695,17 +6695,20 @@ function RFQTab(){
 
       const quoteTotal=quoteItems.reduce((s,it)=>s+(it.price||0)*(it.qty||0),0);
 
+      const qNum="QT-"+new Date().getFullYear()+"-"+Date.now().toString().slice(-4);
+
       const orderObj={
+        id:null,
+        docRef:qNum,
         name:clientName||"Valued Client",
         address:"—",
+        phone:"—",
         items:quoteItems,
         total:quoteTotal,
         paymentMethod:"As agreed",
         // VAT EXCLUSIVE — RFQ supplier prices are net; quote is exclusive of VAT
         vatTreatment:"vat_exempt",
       };
-
-      const qNum="QT-"+new Date().getFullYear()+"-"+Date.now().toString().slice(-4);
 
       // Build the standard branded quotation PDF
       const pdf=await generateDocumentPDF({
