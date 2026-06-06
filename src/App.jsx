@@ -6563,7 +6563,6 @@ function RFQTab(){
       let parsed=[];
       if(data.parsedItems&&Array.isArray(data.parsedItems)){
         parsed=data.parsedItems;
-        if(data.wasTruncated) console.warn("RFQ response was truncated; recovered "+parsed.length+" items.");
       } else {
         const text=data.rawText||data.content?.map(c=>c.text||"").join("")||"";
         try{
@@ -6674,7 +6673,7 @@ function RFQTab(){
   const exportPDF=async()=>{
     setExporting(true);
     try{
-      const {jsPDF}=await import("https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js");
+      const jsPDF=await loadJsPDF();
       const pdf=new jsPDF({orientation:"landscape",unit:"mm",format:"a4"});
       const W=297,M=14,cw=W-M*2;
       let y=M;
