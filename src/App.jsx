@@ -2737,77 +2737,123 @@ async function generateDocumentPDF({ order, docType, docNumber, validityDays = 3
   
   y += 8;
   
-  // ── ITEMS TABLE ────────────────────────────────────────────
-  setFill(colors.canvas);
-  pdf.rect(margin, y, contentWidth, 22, "F");
-  setDraw(colors.light);
-  pdf.rect(margin, y, contentWidth, 22, "S");
-  
-  setColor(colors.dark);
-  pdf.setFont("helvetica", "bold");
-  pdf.setFontSize(8);
-  pdf.text("QTY",         margin + 10,                  y + 14);
-  pdf.text("UNIT",        margin + 50,                  y + 14);
-  pdf.text("DESCRIPTION", margin + 90,                  y + 14);
-  pdf.text("UNIT PRICE",  margin + contentWidth - 130,  y + 14, { align: "left" });
-  pdf.text("AMOUNT",      margin + contentWidth - 50,   y + 14, { align: "left" });
-  y += 22;
-  
-  // Items rows
-  pdf.setFont("helvetica", "normal");
-  pdf.setFontSize(9);
-  setColor(colors.dark);
-  
-  let rowsDrawn = 0;
+  // ── ITEMS TABLE (pagination-aware) ─────────────────────────
   const rowHeight = 18;
-  const minRows = 8; // ensure consistent layout
-  
-  (order.items || []).forEach(item => {
-    pdf.line(margin, y, margin + contentWidth, y);
-    pdf.text(String(item.qty || 1),    margin + 10, y + 12);
-    pdf.text("pc",                      margin + 50, y + 12);
-    
-    const descLines = pdf.splitTextToSize(item.name || "—", 240);
-    pdf.text(descLines[0],              margin + 90, y + 12);
-    
-    pdf.text(formatPHPNum(item.price || 0),  margin + contentWidth - 130, y + 12);
-    pdf.text(formatPHPNum((item.price||0) * (item.qty||0)), margin + contentWidth - 50, y + 12);
-    y += rowHeight;
-    rowsDrawn++;
-  });
-  
-  // Other charges as additional rows
-  (order.otherCharges || []).forEach(charge => {
-    pdf.line(margin, y, margin + contentWidth, y);
-    pdf.text("1",              margin + 10, y + 12);
-    pdf.text("svc",             margin + 50, y + 12);
-    setColor(colors.muted);
-    pdf.text(charge.description || "Other charge", margin + 90, y + 12);
+  const tableLeft = margin;
+  const tableRight = margin + contentWidth;
+  const colX = {
+    qty: margin + 10,
+    unit: margin + 50,
+    desc: margin + 90,
+    price: margin + contentWidth - 130,
+    amount: margin + contentWidth - 50,
+  };
+  const vLineX = [margin + 40, margin + 80, margin + contentWidth - 140, margin + contentWidth - 60];
+
+  // Draws the column header bar; returns new y
+  const drawTableHeader = (yy) => {
+    setFill(colors.canvas);
+    pdf.rect(tableLeft, yy, contentWidth, 22, "F");
+    setDraw(colors.light);
+    pdf.rect(tableLeft, yy, contentWidth, 22, "S");
     setColor(colors.dark);
-    pdf.text(formatPHPNum(charge.amount || 0),  margin + contentWidth - 130, y + 12);
-    pdf.text(formatPHPNum(charge.amount || 0),  margin + contentWidth - 50,  y + 12);
-    y += rowHeight;
-    rowsDrawn++;
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(8);
+    pdf.text("QTY", colX.qty, yy + 14);
+    pdf.text("UNIT", colX.unit, yy + 14);
+    pdf.text("DESCRIPTION", colX.desc, yy + 14);
+    pdf.text("UNIT PRICE", colX.price, yy + 14, { align: "left" });
+    pdf.text("AMOUNT", colX.amount, yy + 14, { align: "left" });
+    return yy + 22;
+  };
+
+  // Build a unified list of rows (items + other charges)
+  const tableRows = [];
+  (order.items || []).forEach(item => {
+    tableRows.push({
+      qty: String(item.qty || 1),
+      unit: item.unit || "pc",
+      desc: item.name || "—",
+      price: item.price || 0,
+      amount: (item.price || 0) * (item.qty || 0),
+      muted: false,
+    });
   });
-  
-  // Pad with empty rows so layout looks consistent
-  while (rowsDrawn < minRows) {
-    pdf.line(margin, y, margin + contentWidth, y);
+  (order.otherCharges || []).forEach(charge => {
+    tableRows.push({
+      qty: "1",
+      unit: "svc",
+      desc: charge.description || "Other charge",
+      price: charge.amount || 0,
+      amount: charge.amount || 0,
+      muted: true,
+    });
+  });
+
+  // Pagination constants
+  const bottomLimit = pageHeight - 70; // leave room for footer
+  let headerY = y;              // y where current page's table header sits
+  let rowsOnPage = 0;
+  y = drawTableHeader(y);
+
+  // Draw vertical lines for the current page's table region
+  const drawVerticalLines = (topY, bottomY) => {
+    setDraw(colors.light);
+    pdf.setLineWidth(0.5);
+    vLineX.forEach(x => pdf.line(x, topY, x, bottomY));
+    pdf.line(tableLeft, topY, tableLeft, bottomY);
+    pdf.line(tableRight, topY, tableRight, bottomY);
+  };
+
+  tableRows.forEach((row) => {
+    // Need a new page?
+    if (y + rowHeight > bottomLimit) {
+      // close current page's table borders
+      pdf.line(tableLeft, y, tableRight, y);
+      drawVerticalLines(headerY, y);
+      pdf.addPage();
+      y = margin;
+      headerY = y;
+      rowsOnPage = 0;
+      y = drawTableHeader(y);
+    }
+    setDraw(colors.light);
+    pdf.line(tableLeft, y, tableRight, y);
+    setColor(row.muted ? colors.muted : colors.dark);
+    pdf.setFont("helvetica", "normal");
+    pdf.setFontSize(9);
+    pdf.text(row.qty, colX.qty, y + 12);
+    pdf.text(row.unit, colX.unit, y + 12);
+    const descLines = pdf.splitTextToSize(row.desc, 240);
+    pdf.text(descLines[0], colX.desc, y + 12);
+    setColor(colors.dark);
+    pdf.text(formatPHPNum(row.price), colX.price, y + 12);
+    pdf.text(formatPHPNum(row.amount), colX.amount, y + 12);
     y += rowHeight;
-    rowsDrawn++;
+    rowsOnPage++;
+  });
+
+  // Pad to a minimum of rows ONLY if everything fit on one page (cosmetic)
+  if (tableRows.length <= 8) {
+    while (rowsOnPage < 8 && y + rowHeight <= bottomLimit) {
+      pdf.line(tableLeft, y, tableRight, y);
+      y += rowHeight;
+      rowsOnPage++;
+    }
   }
-  pdf.line(margin, y, margin + contentWidth, y);
-  
-  // Vertical lines for the table
-  pdf.line(margin + 40, y - rowHeight*rowsDrawn - 22, margin + 40, y);
-  pdf.line(margin + 80, y - rowHeight*rowsDrawn - 22, margin + 80, y);
-  pdf.line(margin + contentWidth - 140, y - rowHeight*rowsDrawn - 22, margin + contentWidth - 140, y);
-  pdf.line(margin + contentWidth - 60, y - rowHeight*rowsDrawn - 22, margin + contentWidth - 60, y);
-  pdf.line(margin, y - rowHeight*rowsDrawn - 22, margin, y);
-  pdf.line(margin + contentWidth, y - rowHeight*rowsDrawn - 22, margin + contentWidth, y);
-  
+
+  // Close the final page's table
+  pdf.line(tableLeft, y, tableRight, y);
+  drawVerticalLines(headerY, y);
+
   y += 14;
-  
+
+  // If not enough room for the totals + terms, start a fresh page
+  if (y + 140 > pageHeight - 40) {
+    pdf.addPage();
+    y = margin;
+  }
+
   // ── VAT BREAKDOWN (v15.4: supports VAT Inclusive / Exempt / Zero-Rated) ────
   // Use order's vatTreatment, or fall back to passed parameter, or default to vat_inclusive
   const effectiveVAT = vatTreatment || order.vatTreatment || "vat_inclusive";
@@ -3219,6 +3265,11 @@ async function generateDocumentPDF({ order, docType, docNumber, validityDays = 3
   }
   
   // ── FOOTER ─────────────────────────────────────────────────
+  // If the content has run down near/into the footer zone, push footer to a new page
+  if (y > pageHeight - 80) {
+    pdf.addPage();
+    y = margin;
+  }
   const footerY = pageHeight - 60;
   setDraw(colors.light);
   pdf.line(margin, footerY, pageWidth - margin, footerY);
