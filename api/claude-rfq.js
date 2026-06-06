@@ -17,7 +17,7 @@ export default async function handler(req, res) {
         role: "user",
         content: [
           { type: "document", source: { type: "base64", media_type: "application/pdf", data: pdfBase64 } },
-          { type: "text", text: userMessaage },
+          { type: "text", text: userMessage },
         ],
       }];
     } else {
