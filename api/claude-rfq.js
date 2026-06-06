@@ -24,46 +24,33 @@ export default async function handler(req, res) {
       messages = [{ role: "user", content: userMessage }];
     }
 
-    const models = [
-      "claude-haiku-4-5-20251001",
-      "claude-haiku-4-5",
-      "claude-sonnet-4-5",
-      "claude-3-5-haiku-20241022",
-      "claude-3-5-sonnet-20241022",
-    ];
+    const r = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": process.env.ANTHROPIC_API_KEY,
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify({
+        model: "claude-haiku-4-5-20251001",
+        max_tokens: maxTokens || 8000,
+        system: sysContent,
+        messages,
+      }),
+    });
 
-    for (const model of models) {
-      const r = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": process.env.ANTHROPIC_API_KEY,
-          "anthropic-version": "2023-06-01",
-        },
-        body: JSON.stringify({ model, max_tokens: maxTokens || 4000, system: sysContent, messages }),
-      });
+    const data = await r.json();
 
-      const data = await r.json();
-      console.log(`Model ${model}: status ${r.status}, type: ${data?.error?.type || "ok"}`);
-
-      if (r.ok) {
-        console.log("SUCCESS with model:", model);
-        // Log first 500 chars of response for debugging
-        const rawText = data.content?.map(c => c.text || "").join("") || "";
-        console.log("Response preview:", rawText.substring(0, 500));
-        return res.status(200).json(data);
-      }
-
-      if (data?.error?.type === "not_found_error") continue;
-
+    if (!r.ok) {
       const msg = `[${data?.error?.type}] ${data?.error?.message}`;
       return res.status(200).json({ anthropicError: true, error: { error: { message: msg } } });
     }
 
-    return res.status(200).json({
-      anthropicError: true,
-      error: { error: { message: "No working model found. Check Vercel logs." } }
-    });
+    // Log the stop_reason so we can detect truncation
+    console.log("stop_reason:", data.stop_reason, "| output length:", 
+      (data.content?.map(c => c.text || "").join("") || "").length);
+
+    return res.status(200).json(data);
 
   } catch (err) {
     return res.status(200).json({ anthropicError: true, error: { error: { message: err.message } } });
