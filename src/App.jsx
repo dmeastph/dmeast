@@ -2750,7 +2750,6 @@ async function generateDocumentPDF({ order, docType, docNumber, validityDays = 3
   };
   const vLineX = [margin + 40, margin + 80, margin + contentWidth - 140, margin + contentWidth - 60];
 
-  // Draws the column header bar; returns new y
   const drawTableHeader = (yy) => {
     setFill(colors.canvas);
     pdf.rect(tableLeft, yy, contentWidth, 22, "F");
@@ -2767,7 +2766,6 @@ async function generateDocumentPDF({ order, docType, docNumber, validityDays = 3
     return yy + 22;
   };
 
-  // Build a unified list of rows (items + other charges)
   const tableRows = [];
   (order.items || []).forEach(item => {
     tableRows.push({
@@ -2790,13 +2788,11 @@ async function generateDocumentPDF({ order, docType, docNumber, validityDays = 3
     });
   });
 
-  // Pagination constants
-  const bottomLimit = pageHeight - 70; // leave room for footer
-  let headerY = y;              // y where current page's table header sits
+  const bottomLimit = pageHeight - 70;
+  let headerY = y;
   let rowsOnPage = 0;
   y = drawTableHeader(y);
 
-  // Draw vertical lines for the current page's table region
   const drawVerticalLines = (topY, bottomY) => {
     setDraw(colors.light);
     pdf.setLineWidth(0.5);
@@ -2806,9 +2802,7 @@ async function generateDocumentPDF({ order, docType, docNumber, validityDays = 3
   };
 
   tableRows.forEach((row) => {
-    // Need a new page?
     if (y + rowHeight > bottomLimit) {
-      // close current page's table borders
       pdf.line(tableLeft, y, tableRight, y);
       drawVerticalLines(headerY, y);
       pdf.addPage();
@@ -2833,7 +2827,6 @@ async function generateDocumentPDF({ order, docType, docNumber, validityDays = 3
     rowsOnPage++;
   });
 
-  // Pad to a minimum of rows ONLY if everything fit on one page (cosmetic)
   if (tableRows.length <= 8) {
     while (rowsOnPage < 8 && y + rowHeight <= bottomLimit) {
       pdf.line(tableLeft, y, tableRight, y);
@@ -2842,13 +2835,11 @@ async function generateDocumentPDF({ order, docType, docNumber, validityDays = 3
     }
   }
 
-  // Close the final page's table
   pdf.line(tableLeft, y, tableRight, y);
   drawVerticalLines(headerY, y);
 
   y += 14;
 
-  // If not enough room for the totals + terms, start a fresh page
   if (y + 140 > pageHeight - 40) {
     pdf.addPage();
     y = margin;
@@ -2938,7 +2929,7 @@ async function generateDocumentPDF({ order, docType, docNumber, validityDays = 3
     pdf.setFont("helvetica", "bold");
     pdf.setFontSize(11);
     pdf.text("TOTAL AMOUNT DUE:", totalsX, y + 11);
-    pdf.text("PHP " + formatPHPNum(vat.total), margin + contentWidth - 10, y + 11, { align: "right" });
+    pdf.text(("PHP " + formatPHPNum(vat.total)), margin + contentWidth - 10, y + 11, { align: "right" });
     y += 30;
   }
   
@@ -2965,7 +2956,6 @@ async function generateDocumentPDF({ order, docType, docNumber, validityDays = 3
       "5. Delivery timeline subject to product availability and confirmation.",
       "6. This quotation is subject to acceptance via signed PO or written confirmation.",
     ];
-    // Append any RFQ-specific extra terms (renumbered)
     if (rfqExtraTerms && rfqExtraTerms.length) {
       rfqExtraTerms.forEach((t) => { terms.push((terms.length + 1) + ". " + t); });
     }
@@ -3265,7 +3255,6 @@ async function generateDocumentPDF({ order, docType, docNumber, validityDays = 3
   }
   
   // ── FOOTER ─────────────────────────────────────────────────
-  // If the content has run down near/into the footer zone, push footer to a new page
   if (y > pageHeight - 80) {
     pdf.addPage();
     y = margin;
@@ -6556,6 +6545,11 @@ function RFQTab(){
   const [step,setStep]=useState("upload"); // upload | review | export
   const [rfqFile,setRfqFile]=useState(null);
   const [rfqName,setRfqName]=useState("");
+  // Multi-image upload: when user picks images, they go here instead of rfqFile
+  // Each entry: {name, dataUrl (for thumbnail preview), base64 (for API), mediaType, sizeKb}
+  const [rfqImages,setRfqImages]=useState([]);
+  const [compressing,setCompressing]=useState(false);
+  const MAX_IMAGES=10;
   const [clientName,setClientName]=useState("");
   const [parsing,setParsing]=useState(false);
   const [parsedItems,setParsedItems]=useState([]); // [{lineNum,rawText,qty,unit,parsedName,matchedProduct,confidence,supplierId,acqPrice,sellingPrice,margin,profit,status}]
@@ -6581,28 +6575,116 @@ function RFQTab(){
   },[]);
 
   // ── File upload & AI parse ─────────────────────────────────────────────────
-  const handleFileChange=(e)=>{
-    const f=e.target.files?.[0];
-    if(f){setRfqFile(f);setRfqName(f.name);}
+  // Resize + compress an image file to keep it well under API limits.
+  // Returns {name, dataUrl, base64, mediaType, sizeKb}
+  const compressImage=(file,maxDim=1500,quality=0.85)=>new Promise((resolve,reject)=>{
+    const reader=new FileReader();
+    reader.onerror=()=>reject(new Error("Could not read "+file.name));
+    reader.onload=()=>{
+      const img=new Image();
+      img.onerror=()=>reject(new Error("Could not load "+file.name));
+      img.onload=()=>{
+        let {width:w,height:h}=img;
+        if(w>maxDim||h>maxDim){
+          const scale=maxDim/Math.max(w,h);
+          w=Math.round(w*scale); h=Math.round(h*scale);
+        }
+        const canvas=document.createElement("canvas");
+        canvas.width=w; canvas.height=h;
+        const ctx=canvas.getContext("2d");
+        ctx.fillStyle="#fff"; ctx.fillRect(0,0,w,h); // white background for transparent PNGs
+        ctx.drawImage(img,0,0,w,h);
+        const dataUrl=canvas.toDataURL("image/jpeg",quality);
+        const base64=dataUrl.split(",")[1];
+        const sizeKb=Math.round((base64.length*3/4)/1024);
+        resolve({name:file.name,dataUrl,base64,mediaType:"image/jpeg",sizeKb});
+      };
+      img.src=reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+
+  const handleFileChange=async(e)=>{
+    const files=Array.from(e.target.files||[]);
     e.target.value="";
+    if(!files.length) return;
+
+    const IMG_EXTS=["png","jpg","jpeg","webp"];
+    const isImageFile=(f)=>IMG_EXTS.includes((f.name.split(".").pop()||"").toLowerCase());
+    const allImages=files.every(isImageFile);
+    const anyImage=files.some(isImageFile);
+
+    if(anyImage && !allImages){
+      setErrMsg("Please upload either a single document (PDF/Excel/Word) OR image files — not mixed.");
+      return;
+    }
+
+    if(allImages){
+      // Multi-image flow
+      const room=MAX_IMAGES-rfqImages.length;
+      if(files.length>room){
+        setErrMsg(`You can upload up to ${MAX_IMAGES} images per RFQ. Removed extras.`);
+      }
+      const toProcess=files.slice(0,room);
+      if(!toProcess.length) return;
+      setCompressing(true); setErrMsg("");
+      try{
+        const compressed=[];
+        for(const f of toProcess){ compressed.push(await compressImage(f)); }
+        setRfqImages(prev=>[...prev,...compressed]);
+        setRfqFile(null); setRfqName("");
+      }catch(err){
+        setErrMsg("Image processing failed: "+err.message);
+      }
+      setCompressing(false);
+      return;
+    }
+
+    // Single document flow
+    if(files.length>1){
+      setErrMsg("Only one document file at a time. For multi-page, combine into a PDF or upload as images.");
+      return;
+    }
+    const f=files[0];
+    setRfqFile(f); setRfqName(f.name);
+    setRfqImages([]); // clear any image queue
   };
 
+  const removeImage=(idx)=>setRfqImages(prev=>prev.filter((_,i)=>i!==idx));
+  const clearAllImages=()=>setRfqImages([]);
+
   const handleParse=async()=>{
-    if(!rfqFile){setErrMsg("Please upload an RFQ file first.");return;}
+    if(!rfqFile&&rfqImages.length===0){setErrMsg("Please upload an RFQ file or images first.");return;}
     setParsing(true);setErrMsg("");
 
     try{
-      // Read file depending on type
-      const ext=rfqFile.name.split(".").pop().toLowerCase();
+      // Build request based on what was uploaded: multi-images, PDF, or text-extractable doc
+      const hasImages=rfqImages && rfqImages.length>0;
+      const ext=rfqFile?rfqFile.name.split(".").pop().toLowerCase():"";
+
       const catalogSummary=products.slice(0,200).map(p=>`${p.id}|${p.genericName}|${p.brandName||""}|${p.category}|${p.acqPrice||""}|${p.supplierId}`).join("\n");
-      const systemPrompt=`You are an RFQ parser for DMEAST, a Philippine medical distributor. Match each RFQ line item to the catalog.\n\nCATALOG (id|generic|brand|category|acqPrice|supplierId):\n${catalogSummary}\n\nMARGINS: medicine 15%, supply 27.5%, equipment manual.\n\nOUTPUT RULE: Respond with ONLY a raw JSON array. NO markdown fences, NO text before/after. Start with [ end with ]. Use SHORT field values. Each element:\n{"lineNum":n,"parsedName":"name","qty":n,"unit":"u","matchedProductId":"PRDxxx|null","confidence":"high|medium|low|none","acqPrice":n|null,"category":"medicine|supply|equipment","supplierId":"SUPxxx|null"}\n\nMatch by generic name, strength, form. Be concise to fit all items.`;
+      const systemPrompt=`You are an RFQ parser for DMEAST, a Philippine medical distributor. Match each RFQ line item to the catalog.\n\nCATALOG (id|generic|brand|category|acqPrice|supplierId):\n${catalogSummary}\n\nMARGINS: medicine 15%, supply 27.5%, equipment manual.\n\nOUTPUT RULE: Respond with ONLY a raw JSON array. NO markdown fences, NO text before/after. Start with [ end with ]. If the file/images contain no readable RFQ line items, respond with []. Use SHORT field values. Each element:\n{"lineNum":n,"parsedName":"name","qty":n,"unit":"u","matchedProductId":"PRDxxx|null","confidence":"high|medium|low|none","acqPrice":n|null,"category":"medicine|supply|equipment","supplierId":"SUPxxx|null"}\n\nMatch by generic name, strength, form. Be concise to fit all items.`;
+
+      const toB64=async(file)=>{
+        const buf=await file.arrayBuffer();
+        const bytes=new Uint8Array(buf);
+        let bin=""; const chunk=8192;
+        for(let i=0;i<bytes.byteLength;i+=chunk){ bin+=String.fromCharCode.apply(null,bytes.subarray(i,i+chunk)); }
+        return btoa(bin);
+      };
 
       let requestBody;
-      if(ext==="pdf"){
-        const buf=await rfqFile.arrayBuffer();
-        const bytes=new Uint8Array(buf);
-        let bin=""; for(let i=0;i<bytes.byteLength;i++) bin+=String.fromCharCode(bytes[i]);
-        requestBody={maxTokens:16000,system:systemPrompt,isPdf:true,pdfBase64:btoa(bin),userMessage:"Parse this RFQ PDF. Match every line to the catalog. Respond ONLY with the raw JSON array."};
+      if(hasImages){
+        // Multi-image: send array of {base64, mediaType} in upload order = page order
+        requestBody={
+          maxTokens:16000,
+          system:systemPrompt,
+          isImages:true,
+          images:rfqImages.map(im=>({base64:im.base64,mediaType:im.mediaType})),
+          userMessage:`These are ${rfqImages.length} page(s) of one RFQ, in order. Parse every line item visible across all pages into a single combined JSON array. Respond ONLY with the raw JSON array.`,
+        };
+      } else if(ext==="pdf"){
+        requestBody={maxTokens:16000,system:systemPrompt,isPdf:true,pdfBase64:await toB64(rfqFile),userMessage:"Parse this RFQ PDF. Match every line to the catalog. Respond ONLY with the raw JSON array."};
       } else {
         let fc="";
         if(["xlsx","xls"].includes(ext)){
@@ -6634,9 +6716,16 @@ function RFQTab(){
           try{ parsed=JSON.parse(clean); }
           catch(_){ const lo=clean.lastIndexOf("}"); if(lo>0&&fb>=0) parsed=JSON.parse(clean.slice(0,lo+1)+"]"); else throw new Error("x"); }
         }catch(e){
-          throw new Error("Could not parse AI response. "+(data.parseError||""));
+          throw new Error("Could not read this file. Please ensure it's a clear image, PDF, or Excel/Word document with visible RFQ line items.");
         }
       }
+
+      if(!parsed.length){
+        throw new Error("No RFQ line items found. Please check that the document contains a list of medicines/supplies with quantities.");
+      }
+
+      // For images, set rfqName from first image so the Review header has something to show
+      if(hasImages && !rfqName){ setRfqName(rfqImages.length>1?`${rfqImages.length} images`:rfqImages[0].name); }
 
       // Enrich with selling price and profit
       const enriched=parsed.map(item=>{
@@ -6735,7 +6824,6 @@ function RFQTab(){
   const exportPDF=async()=>{
     setExporting(true);
     try{
-      // Convert matched RFQ items into the order shape generateDocumentPDF expects
       const quoteItems=parsedItems
         .filter(i=>i.status==="confirmed"||i.status==="review")
         .map(i=>({
@@ -6745,23 +6833,17 @@ function RFQTab(){
         }));
 
       const quoteTotal=quoteItems.reduce((s,it)=>s+(it.price||0)*(it.qty||0),0);
-
       const qNum="QT-"+new Date().getFullYear()+"-"+Date.now().toString().slice(-4);
 
       const orderObj={
-        id:null,
-        docRef:qNum,
+        id:null, docRef:qNum,
         name:clientName||"Valued Client",
-        address:"—",
-        phone:"—",
-        items:quoteItems,
-        total:quoteTotal,
+        address:"—", phone:"—",
+        items:quoteItems, total:quoteTotal,
         paymentMethod:"As agreed",
-        // VAT EXCLUSIVE — RFQ supplier prices are net; quote is exclusive of VAT
         vatTreatment:"vat_exempt",
       };
 
-      // Build the standard branded quotation PDF
       const pdf=await generateDocumentPDF({
         order:orderObj,
         docType:"quotation",
@@ -6813,23 +6895,50 @@ function RFQTab(){
 
         <div style={{marginBottom:20}}>
           <label style={{fontSize:12,fontWeight:700,color:ds.color.textDark,display:"block",marginBottom:6}}>Upload RFQ File</label>
-          <label style={{display:"flex",alignItems:"center",gap:12,padding:"20px",borderRadius:ds.radius.lg,border:`2px dashed ${rfqFile?ds.color.success:ds.color.border}`,background:rfqFile?ds.color.successBg:"#FAFAFA",cursor:"pointer"}}>
-            <span style={{fontSize:28}}>{rfqFile?"📄":"📂"}</span>
-            <div>
-              <div style={{fontSize:14,fontWeight:600,color:rfqFile?ds.color.success:ds.color.textDark}}>{rfqFile?rfqFile.name:"Click to upload RFQ file"}</div>
-              <div style={{fontSize:12,color:ds.color.textMuted}}>Accepts: Excel (.xlsx), CSV, PDF, Word (.docx)</div>
+          <label style={{display:"flex",alignItems:"center",gap:12,padding:"20px",borderRadius:ds.radius.lg,border:`2px dashed ${(rfqFile||rfqImages.length)?ds.color.success:ds.color.border}`,background:(rfqFile||rfqImages.length)?ds.color.successBg:"#FAFAFA",cursor:compressing?"wait":"pointer"}}>
+            <span style={{fontSize:28}}>{rfqFile?"📄":(rfqImages.length?"🖼️":"📂")}</span>
+            <div style={{flex:1}}>
+              <div style={{fontSize:14,fontWeight:600,color:(rfqFile||rfqImages.length)?ds.color.success:ds.color.textDark}}>
+                {compressing?"Compressing images…":
+                 rfqFile?rfqFile.name:
+                 rfqImages.length?`${rfqImages.length} image(s) ready — click to add more`:
+                 "Click to upload RFQ file"}
+              </div>
+              <div style={{fontSize:12,color:ds.color.textMuted}}>Accepts: Excel, CSV, PDF, Word, or up to {MAX_IMAGES} images (PNG/JPG). Images auto-compress.</div>
             </div>
-            <input type="file" style={{display:"none"}} accept=".xlsx,.xls,.csv,.pdf,.docx,.doc" onChange={handleFileChange}/>
+            <input type="file" multiple style={{display:"none"}} accept=".xlsx,.xls,.csv,.pdf,.docx,.doc,.png,.jpg,.jpeg,.webp" onChange={handleFileChange} disabled={compressing}/>
           </label>
+
+          {/* Image thumbnails when multi-image upload */}
+          {rfqImages.length>0 && (
+            <div style={{marginTop:10,padding:"10px 12px",border:`1px solid ${ds.color.border}`,borderRadius:ds.radius.md,background:"#fff"}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+                <div style={{fontSize:12,fontWeight:600,color:ds.color.textDark}}>
+                  Pages ({rfqImages.length}/{MAX_IMAGES}) — order matters
+                </div>
+                <button type="button" onClick={clearAllImages} style={{background:"none",border:"none",color:ds.color.textMuted,fontSize:11,cursor:"pointer",textDecoration:"underline"}}>Clear all</button>
+              </div>
+              <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                {rfqImages.map((im,i)=>(
+                  <div key={i} style={{position:"relative",width:72,border:`1px solid ${ds.color.border}`,borderRadius:6,overflow:"hidden",background:"#f5f5f5"}}>
+                    <img src={im.dataUrl} alt={`page ${i+1}`} style={{width:"100%",height:72,objectFit:"cover",display:"block"}}/>
+                    <div style={{position:"absolute",top:2,left:2,background:"rgba(0,0,0,0.7)",color:"#fff",fontSize:10,fontWeight:700,padding:"1px 5px",borderRadius:3}}>{i+1}</div>
+                    <button type="button" onClick={()=>removeImage(i)} aria-label="remove" style={{position:"absolute",top:2,right:2,background:"rgba(192,57,43,0.9)",color:"#fff",border:"none",width:18,height:18,borderRadius:"50%",cursor:"pointer",fontSize:11,lineHeight:"16px",padding:0}}>×</button>
+                    <div style={{fontSize:10,color:ds.color.textMuted,padding:"3px 4px",textAlign:"center"}}>{im.sizeKb} KB</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         {errMsg&&<div style={{padding:"8px 12px",background:ds.color.redLight,borderRadius:ds.radius.md,color:ds.color.red,fontSize:13,marginBottom:12}}>⚠️ {errMsg}</div>}
 
-        <Btn variant="primary" size="lg" onClick={handleParse} disabled={parsing||!rfqFile||products.length===0}>
+        <Btn variant="primary" size="lg" onClick={handleParse} disabled={parsing||compressing||(!rfqFile&&rfqImages.length===0)||products.length===0}>
           {parsing?<><Spinner size={16}/> AI Parsing…</>:"🤖 Parse RFQ with AI"}
         </Btn>
         <div style={{fontSize:12,color:ds.color.textMuted,marginTop:8}}>
-          Powered by Claude AI — typically takes 10–30 seconds for 200+ items.
+          Powered by Claude AI — 10–30s for single docs; longer for multi-page image uploads.
         </div>
       </div>
     </div>

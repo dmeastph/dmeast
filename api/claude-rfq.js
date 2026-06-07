@@ -8,7 +8,12 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { system, systemPrompt, userMessage, maxTokens, isPdf, pdfBase64 } = req.body;
+    const {
+      system, systemPrompt, userMessage, maxTokens,
+      isPdf, pdfBase64,
+      isImage, imageBase64, imageMediaType,  // single image (legacy)
+      isImages, images,                       // multi-image: [{base64, mediaType}, ...]
+    } = req.body;
     const sysContent = system || systemPrompt;
 
     let messages;
@@ -17,6 +22,22 @@ export default async function handler(req, res) {
         role: "user",
         content: [
           { type: "document", source: { type: "base64", media_type: "application/pdf", data: pdfBase64 } },
+          { type: "text", text: userMessage },
+        ],
+      }];
+    } else if (isImages && Array.isArray(images) && images.length > 0) {
+      // Multi-image: send each as its own image block, then the text instruction last
+      const content = images.map((im, i) => ({
+        type: "image",
+        source: { type: "base64", media_type: im.mediaType || "image/jpeg", data: im.base64 },
+      }));
+      content.push({ type: "text", text: userMessage });
+      messages = [{ role: "user", content }];
+    } else if (isImage && imageBase64) {
+      messages = [{
+        role: "user",
+        content: [
+          { type: "image", source: { type: "base64", media_type: imageMediaType || "image/png", data: imageBase64 } },
           { type: "text", text: userMessage },
         ],
       }];
@@ -47,9 +68,8 @@ export default async function handler(req, res) {
     }
 
     const rawText = data.content?.map(c => c.text || "").join("") || "";
-    console.log("stop_reason:", data.stop_reason, "| length:", rawText.length);
+    console.log("stop_reason:", data.stop_reason, "| length:", rawText.length, "| images:", images?.length || 0);
 
-    // Robust server-side parse with truncation salvage
     let parsed = null;
     let parseError = null;
     try {
@@ -64,7 +84,6 @@ export default async function handler(req, res) {
       try {
         parsed = JSON.parse(clean);
       } catch (_) {
-        // Salvage: find last complete object and close the array
         const lastObj = clean.lastIndexOf("}");
         if (lastObj > 0 && fb >= 0) {
           parsed = JSON.parse(clean.slice(0, lastObj + 1) + "]");
