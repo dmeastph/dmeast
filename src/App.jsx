@@ -2923,13 +2923,19 @@ async function generateDocumentPDF({ order, docType, docNumber, validityDays = 3
     pdf.text(`Indicative PHP reference: ${("PHP " + formatPHPNum(vat.total))}  ·  @ rate ~${fxRate.toFixed(2)} PHP/${piCurrency} + 1% buffer`, totalsX, y);
     y += 14;
   } else {
+    // Widen the red bar so big peso amounts don't collide with the label
+    const barX = totalsX - 10;
+    const barW = (margin + contentWidth) - barX;
     setFill(colors.red);
-    pdf.rect(totalsX - 10, y - 4, 220, 22, "F");
+    pdf.rect(barX, y - 4, barW, 22, "F");
     pdf.setTextColor(255, 255, 255);
     pdf.setFont("helvetica", "bold");
     pdf.setFontSize(11);
     pdf.text("TOTAL AMOUNT DUE:", totalsX, y + 11);
-    pdf.text(("PHP " + formatPHPNum(vat.total)), margin + contentWidth - 10, y + 11, { align: "right" });
+    // Right-align the amount within the bar with smaller font for very long numbers
+    const totalStr = "PHP " + formatPHPNum(vat.total);
+    pdf.setFontSize(totalStr.length > 16 ? 10 : 11);
+    pdf.text(totalStr, margin + contentWidth - 10, y + 11, { align: "right" });
     y += 30;
   }
   
@@ -6541,12 +6547,31 @@ function SupplierCatalogTab(){
 // Upload RFQ → AI parses → match to catalog → apply margins → export Excel + PDF
 const DEFAULT_MARGINS={medicine:15,supply:27.5,equipment:null};
 
+// v16.18: Pack size helpers for RFQ unit conversion
+// Catalog stores packSize as a string like "100's", "30's", "60mL", "1's".
+// Only count-based packs (with 's suffix or just a plain integer) can be split into per-piece pricing.
+function parsePackCount(packStr) {
+  if (!packStr) return null;
+  const s = String(packStr).trim().toLowerCase();
+  // Volume/weight units mean the price IS already per unit-of-sale (bottle, vial, IV bag)
+  if (/m?l$|gm?$|kg$|mcg$/i.test(s)) return null;
+  // Match "100's", "30 s", "100s", or just "100"
+  const m = s.match(/^(\d+)\s*'?s?$/);
+  return m ? Number(m[1]) : null;
+}
+
+// Detects whether the RFQ's requested unit is a piece-unit (tablet, pc, capsule, etc.)
+// vs a pack-unit (box, pack, bottle). Only piece-units trigger per-piece price math.
+function isPieceUnit(unit) {
+  if (!unit) return false;
+  const u = String(unit).toLowerCase().trim();
+  return /tablet|tab\b|capsule|cap\b|piece|^pc$|pcs|dose|sachet|amp|ampule|^each$|unit/.test(u);
+}
+
 function RFQTab(){
   const [step,setStep]=useState("upload"); // upload | review | export
   const [rfqFile,setRfqFile]=useState(null);
   const [rfqName,setRfqName]=useState("");
-  // Multi-image upload: when user picks images, they go here instead of rfqFile
-  // Each entry: {name, dataUrl (for thumbnail preview), base64 (for API), mediaType, sizeKb}
   const [rfqImages,setRfqImages]=useState([]);
   const [compressing,setCompressing]=useState(false);
   const MAX_IMAGES=10;
@@ -6561,6 +6586,8 @@ function RFQTab(){
   const [errMsg,setErrMsg]=useState("");
   const [quoteNotes,setQuoteNotes]=useState("");
   const [validityDays,setValidityDays]=useState(30);
+  // v16.18: Sticky header toggle for long RFQ tables
+  const [stickyHeader,setStickyHeader]=useState(false);
 
   // Load supplier catalog
   useEffect(()=>{
@@ -6575,8 +6602,6 @@ function RFQTab(){
   },[]);
 
   // ── File upload & AI parse ─────────────────────────────────────────────────
-  // Resize + compress an image file to keep it well under API limits.
-  // Returns {name, dataUrl, base64, mediaType, sizeKb}
   const compressImage=(file,maxDim=1500,quality=0.85)=>new Promise((resolve,reject)=>{
     const reader=new FileReader();
     reader.onerror=()=>reject(new Error("Could not read "+file.name));
@@ -6592,7 +6617,7 @@ function RFQTab(){
         const canvas=document.createElement("canvas");
         canvas.width=w; canvas.height=h;
         const ctx=canvas.getContext("2d");
-        ctx.fillStyle="#fff"; ctx.fillRect(0,0,w,h); // white background for transparent PNGs
+        ctx.fillStyle="#fff"; ctx.fillRect(0,0,w,h);
         ctx.drawImage(img,0,0,w,h);
         const dataUrl=canvas.toDataURL("image/jpeg",quality);
         const base64=dataUrl.split(",")[1];
@@ -6608,19 +6633,15 @@ function RFQTab(){
     const files=Array.from(e.target.files||[]);
     e.target.value="";
     if(!files.length) return;
-
     const IMG_EXTS=["png","jpg","jpeg","webp"];
     const isImageFile=(f)=>IMG_EXTS.includes((f.name.split(".").pop()||"").toLowerCase());
     const allImages=files.every(isImageFile);
     const anyImage=files.some(isImageFile);
-
     if(anyImage && !allImages){
       setErrMsg("Please upload either a single document (PDF/Excel/Word) OR image files — not mixed.");
       return;
     }
-
     if(allImages){
-      // Multi-image flow
       const room=MAX_IMAGES-rfqImages.length;
       if(files.length>room){
         setErrMsg(`You can upload up to ${MAX_IMAGES} images per RFQ. Removed extras.`);
@@ -6639,15 +6660,13 @@ function RFQTab(){
       setCompressing(false);
       return;
     }
-
-    // Single document flow
     if(files.length>1){
       setErrMsg("Only one document file at a time. For multi-page, combine into a PDF or upload as images.");
       return;
     }
     const f=files[0];
     setRfqFile(f); setRfqName(f.name);
-    setRfqImages([]); // clear any image queue
+    setRfqImages([]);
   };
 
   const removeImage=(idx)=>setRfqImages(prev=>prev.filter((_,i)=>i!==idx));
@@ -6658,12 +6677,11 @@ function RFQTab(){
     setParsing(true);setErrMsg("");
 
     try{
-      // Build request based on what was uploaded: multi-images, PDF, or text-extractable doc
       const hasImages=rfqImages && rfqImages.length>0;
       const ext=rfqFile?rfqFile.name.split(".").pop().toLowerCase():"";
 
-      const catalogSummary=products.slice(0,200).map(p=>`${p.id}|${p.genericName}|${p.brandName||""}|${p.category}|${p.acqPrice||""}|${p.supplierId}`).join("\n");
-      const systemPrompt=`You are an RFQ parser for DMEAST, a Philippine medical distributor. Match each RFQ line item to the catalog.\n\nCATALOG (id|generic|brand|category|acqPrice|supplierId):\n${catalogSummary}\n\nMARGINS: medicine 15%, supply 27.5%, equipment manual.\n\nOUTPUT RULE: Respond with ONLY a raw JSON array. NO markdown fences, NO text before/after. Start with [ end with ]. If the file/images contain no readable RFQ line items, respond with []. Use SHORT field values. Each element:\n{"lineNum":n,"parsedName":"name","qty":n,"unit":"u","matchedProductId":"PRDxxx|null","confidence":"high|medium|low|none","acqPrice":n|null,"category":"medicine|supply|equipment","supplierId":"SUPxxx|null"}\n\nMatch by generic name, strength, form. Be concise to fit all items.`;
+      const catalogSummary=products.slice(0,200).map(p=>`${p.id}|${p.genericName}|${p.brandName||""}|${p.category}|pack:${p.packSize||"1"}|${p.acqPrice||""}|${p.supplierId}`).join("\n");
+      const systemPrompt=`You are an RFQ parser for DMEAST, a Philippine medical distributor. Match each RFQ line item to the catalog.\n\nCATALOG (id|generic|brand|category|pack:size|acqPrice|supplierId):\n${catalogSummary}\n\nMARGINS: medicine 15%, supply 27.5%, equipment manual.\n\nIMPORTANT: Return the RFQ-requested unit as written (e.g. "tablet", "pc", "vial", "box"). Do NOT convert units — the system handles pack-size math.\n\nOUTPUT RULE: Respond with ONLY a raw JSON array. NO markdown fences, NO text before/after. Start with [ end with ]. If file has no readable RFQ line items, respond with []. Each element:\n{"lineNum":n,"parsedName":"name","qty":n,"unit":"u","matchedProductId":"PRDxxx|null","confidence":"high|medium|low|none","acqPrice":n|null,"category":"medicine|supply|equipment","supplierId":"SUPxxx|null","notes":"reason if review/none"}\n\nFor confidence=review or none, put a short reason in notes (e.g. "qty unit mismatch", "no exact strength match", "not in catalog"). Match by generic name, strength, form.`;
 
       const toB64=async(file)=>{
         const buf=await file.arrayBuffer();
@@ -6675,13 +6693,10 @@ function RFQTab(){
 
       let requestBody;
       if(hasImages){
-        // Multi-image: send array of {base64, mediaType} in upload order = page order
         requestBody={
-          maxTokens:16000,
-          system:systemPrompt,
-          isImages:true,
+          maxTokens:16000, system:systemPrompt, isImages:true,
           images:rfqImages.map(im=>({base64:im.base64,mediaType:im.mediaType})),
-          userMessage:`These are ${rfqImages.length} page(s) of one RFQ, in order. Parse every line item visible across all pages into a single combined JSON array. Respond ONLY with the raw JSON array.`,
+          userMessage:`These are ${rfqImages.length} page(s) of one RFQ, in order. Parse every visible line item into a single combined JSON array. Respond ONLY with the raw JSON array.`,
         };
       } else if(ext==="pdf"){
         requestBody={maxTokens:16000,system:systemPrompt,isPdf:true,pdfBase64:await toB64(rfqFile),userMessage:"Parse this RFQ PDF. Match every line to the catalog. Respond ONLY with the raw JSON array."};
@@ -6724,25 +6739,46 @@ function RFQTab(){
         throw new Error("No RFQ line items found. Please check that the document contains a list of medicines/supplies with quantities.");
       }
 
-      // For images, set rfqName from first image so the Review header has something to show
       if(hasImages && !rfqName){ setRfqName(rfqImages.length>1?`${rfqImages.length} images`:rfqImages[0].name); }
 
-      // Enrich with selling price and profit
+      // Enrich with selling price, profit, AND pack-size conversion
       const enriched=parsed.map(item=>{
         const prod=products.find(p=>p.id===item.matchedProductId);
         const margin=prod?.marginOverride||DEFAULT_MARGINS[item.category]||27.5;
-        const acq=item.acqPrice||prod?.acqPrice||null;
-        const sell=acq?Math.round(acq*(1+margin/100)*100)/100:null;
-        const profit=acq&&sell?Math.round((sell-acq)*100)/100:null;
+        const packAcq=item.acqPrice||prod?.acqPrice||null; // Acq price PER PACK from catalog
+        const packCount=prod?parsePackCount(prod.packSize):null;
+        const reqUnit=item.unit||"";
+        const requestsPieces=isPieceUnit(reqUnit);
+
+        // Determine per-unit acquisition price:
+        // - If catalog pack has multiple pieces (packCount > 1) AND RFQ asks per piece → divide
+        // - Otherwise the catalog price IS the per-unit price (per box, per bottle, per vial)
+        let perUnitAcq=packAcq;
+        let conversionNote="";
+        if(packAcq && packCount && packCount>1 && requestsPieces){
+          perUnitAcq=Math.round((packAcq/packCount)*10000)/10000; // keep 4 decimals for accuracy
+          conversionNote=`Pack of ${packCount} @ PHP ${packAcq} → PHP ${perUnitAcq.toFixed(2)} per ${reqUnit||"pc"}`;
+        }
+
+        const sell=perUnitAcq?Math.round(perUnitAcq*(1+margin/100)*100)/100:null;
+        const profit=perUnitAcq&&sell?Math.round((sell-perUnitAcq)*100)/100:null;
         const supplier=suppliers.find(s=>s.id===(item.supplierId||prod?.supplierId));
+
+        // Build AI-supplied + conversion notes
+        const notes=[item.notes,conversionNote].filter(Boolean).join(" • ");
+
         return{
           ...item,
-          acqPrice:acq,
+          packAcqPrice:packAcq,    // original per-pack price (for reference)
+          packCount:packCount,      // number of pieces per pack from catalog
+          packSize:prod?.packSize||null,
+          acqPrice:perUnitAcq,      // per-unit acq used for math
           sellingPrice:sell,
           margin:margin,
           profit:profit,
           supplierName:supplier?.name||"",
           supplierAddress:supplier?.address||"",
+          notes:notes,
           status:item.confidence==="high"?"confirmed":item.confidence==="none"?"not_found":"review",
         };
       });
@@ -6789,13 +6825,16 @@ function RFQTab(){
     try{
       const {utils,writeFile}=await import("https://cdn.sheetjs.com/xlsx-0.20.1/package/xlsx.mjs");
       const rows=[
-        ["#","Raw Item","Parsed Name","Qty","Unit","Supplier","Supplier Address","Acquisition Price","Selling Price","Margin %","Profit","Category","Status","Confidence","Notes"],
+        ["#","Raw Item","Parsed Name","Qty","Unit","Catalog Pack","Pack Acq Price","Per-Unit Acq","Supplier","Supplier Address","Acquisition Price","Selling Price","Margin %","Profit","Category","Status","Confidence","Notes"],
         ...parsedItems.map((item,i)=>[
           i+1,
           item.rawText||"",
           item.parsedName||"",
           item.qty||1,
           item.unit||"",
+          item.packSize||"",
+          item.packAcqPrice||"",
+          item.packCount&&item.packAcqPrice?(item.packAcqPrice/item.packCount).toFixed(4):"",
           item.supplierName||"",
           item.supplierAddress||"",
           item.acqPrice||"",
@@ -6829,6 +6868,7 @@ function RFQTab(){
         .map(i=>({
           name:(i.parsedName||i.rawText||"Item")+(i.status==="review"?" (to confirm)":""),
           qty:i.qty||1,
+          unit:i.unit||"pc",
           price:i.sellingPrice||0,
         }));
 
@@ -6908,14 +6948,10 @@ function RFQTab(){
             </div>
             <input type="file" multiple style={{display:"none"}} accept=".xlsx,.xls,.csv,.pdf,.docx,.doc,.png,.jpg,.jpeg,.webp" onChange={handleFileChange} disabled={compressing}/>
           </label>
-
-          {/* Image thumbnails when multi-image upload */}
           {rfqImages.length>0 && (
             <div style={{marginTop:10,padding:"10px 12px",border:`1px solid ${ds.color.border}`,borderRadius:ds.radius.md,background:"#fff"}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
-                <div style={{fontSize:12,fontWeight:600,color:ds.color.textDark}}>
-                  Pages ({rfqImages.length}/{MAX_IMAGES}) — order matters
-                </div>
+                <div style={{fontSize:12,fontWeight:600,color:ds.color.textDark}}>Pages ({rfqImages.length}/{MAX_IMAGES}) — order matters</div>
                 <button type="button" onClick={clearAllImages} style={{background:"none",border:"none",color:ds.color.textMuted,fontSize:11,cursor:"pointer",textDecoration:"underline"}}>Clear all</button>
               </div>
               <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
@@ -6938,7 +6974,7 @@ function RFQTab(){
           {parsing?<><Spinner size={16}/> AI Parsing…</>:"🤖 Parse RFQ with AI"}
         </Btn>
         <div style={{fontSize:12,color:ds.color.textMuted,marginTop:8}}>
-          Powered by Claude AI — 10–30s for single docs; longer for multi-page image uploads.
+          Powered by Claude AI — typically takes 10–30 seconds for 200+ items.
         </div>
       </div>
     </div>
@@ -6979,18 +7015,22 @@ function RFQTab(){
           <label style={{fontSize:12,fontWeight:700,color:ds.color.textDark}}>Validity (days):</label>
           <input type="number" value={validityDays} onChange={e=>setValidityDays(Number(e.target.value))} style={{...inp2,width:70}}/>
         </div>
+        <label style={{display:"flex",alignItems:"center",gap:6,cursor:"pointer",userSelect:"none"}}>
+          <input type="checkbox" checked={stickyHeader} onChange={e=>setStickyHeader(e.target.checked)} style={{cursor:"pointer"}}/>
+          <span style={{fontSize:12,fontWeight:600,color:ds.color.textDark}}>📌 Freeze header</span>
+        </label>
         <div style={{flex:1}}>
           <input value={quoteNotes} onChange={e=>setQuoteNotes(e.target.value)} placeholder="Optional notes to include on the PDF quote…" style={{...inp2,width:"100%"}}/>
         </div>
       </div>
 
-      {/* Items table */}
-      <div style={{background:"#fff",border:`1px solid ${ds.color.border}`,borderRadius:ds.radius.lg,overflow:"auto"}}>
-        <table style={{width:"100%",borderCollapse:"collapse",fontSize:12,minWidth:1100}}>
-          <thead>
+      {/* Items table — sticky header toggle and per-piece pack math */}
+      <div style={{background:"#fff",border:`1px solid ${ds.color.border}`,borderRadius:ds.radius.lg,overflow:stickyHeader?"visible":"auto"}}>
+        <table style={{width:"100%",borderCollapse:"collapse",fontSize:12,minWidth:1200}}>
+          <thead style={stickyHeader?{position:"sticky",top:0,zIndex:10}:undefined}>
             <tr style={{background:ds.color.red}}>
-              {["#","Status","Raw RFQ Item","Parsed Name","Qty","Unit","Matched Product","Supplier","Acq. Price","Margin %","Selling Price","Profit","Confidence"].map(h=>(
-                <th key={h} style={{padding:"9px 10px",textAlign:"left",fontWeight:700,color:"#fff",fontSize:11,whiteSpace:"nowrap"}}>{h}</th>
+              {["#","Status","Raw RFQ Item","Parsed Name","Qty","Unit","Matched Product","Pack","Supplier","Acq. Price","Margin %","Selling Price","Profit","Confidence","Notes"].map(h=>(
+                <th key={h} style={{padding:"9px 10px",textAlign:"left",fontWeight:700,color:"#fff",fontSize:11,whiteSpace:"nowrap",background:ds.color.red,...(stickyHeader?{position:"sticky",top:0}:{})}}>{h}</th>
               ))}
             </tr>
           </thead>
@@ -7015,6 +7055,7 @@ function RFQTab(){
                   </td>
                   <td style={{padding:"8px 10px",color:ds.color.textMuted}}>{item.unit||"—"}</td>
                   <td style={{padding:"8px 10px",fontSize:11,color:item.matchedProductId?ds.color.textDark:ds.color.textMuted}}>{item.matchedGenericName||item.matchedProductId||"—"}</td>
+                  <td style={{padding:"8px 10px",fontSize:11,color:ds.color.textMuted,whiteSpace:"nowrap"}}>{item.packSize||"—"}</td>
                   <td style={{padding:"8px 10px",fontSize:11,color:ds.color.textMuted,maxWidth:140}}>{item.supplierName||"—"}</td>
                   <td style={{padding:"8px 10px"}}>
                     <input type="number" value={item.acqPrice||""} onChange={e=>updateItem(i,"acqPrice",e.target.value?Number(e.target.value):null)} placeholder="—" style={{width:80,padding:"3px 6px",borderRadius:ds.radius.sm,border:`1px solid ${ds.color.border}`,fontSize:12,fontFamily:ds.font.body}}/>
@@ -7028,6 +7069,9 @@ function RFQTab(){
                     <span style={{fontSize:10,fontWeight:700,padding:"2px 7px",borderRadius:ds.radius.pill,background:item.confidence==="high"?ds.color.successBg:item.confidence==="medium"?ds.color.goldLight:item.confidence==="low"?"#FDE8E8":ds.color.canvas,color:item.confidence==="high"?ds.color.success:item.confidence==="medium"?ds.color.gold:item.confidence==="low"?ds.color.red:ds.color.textMuted}}>
                       {item.confidence||"—"}
                     </span>
+                  </td>
+                  <td style={{padding:"8px 10px",fontSize:11,color:ds.color.textMuted,minWidth:180}}>
+                    <input type="text" value={item.notes||""} onChange={e=>updateItem(i,"notes",e.target.value)} placeholder="—" style={{width:"100%",padding:"3px 6px",borderRadius:ds.radius.sm,border:`1px solid ${ds.color.border}`,fontSize:11,fontFamily:ds.font.body}}/>
                   </td>
                 </tr>
               );
