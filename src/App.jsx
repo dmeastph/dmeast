@@ -2646,20 +2646,13 @@ async function generateDocumentPDF({ order, docType, docNumber, validityDays = 3
   pdf.line(margin, y, pageWidth - margin, y);
   y += 14;
   
-  // Company info (full width line below logo)
-  setColor(colors.dark);
-  pdf.setFont("helvetica", "bold");
-  pdf.setFontSize(9);
-  pdf.text(DMEAST_BUSINESS_INFO.legalName, margin, y);
-  y += 12;
-  
+  // Company info — address + VAT TIN only (legal name + proprietor are in the brand logo already)
   setColor(colors.muted);
   pdf.setFont("helvetica", "normal");
   pdf.setFontSize(8);
   const addrLines = pdf.splitTextToSize(DMEAST_BUSINESS_INFO.registeredAddress, contentWidth);
   addrLines.forEach(line => { pdf.text(line, margin, y); y += 10; });
   
-  pdf.text(`${DMEAST_BUSINESS_INFO.proprietor} - Prop.`, margin, y); y += 10;
   pdf.text(`VAT Reg. TIN: ${DMEAST_BUSINESS_INFO.vatRegTIN}`, margin, y); y += 10;
   
   // Horizontal line
@@ -6891,10 +6884,9 @@ function RFQTab(){
         validityDays:Number(validityDays)||30,
         vatTreatment:"vat_exempt",
         rfqExtraTerms:[
-          "Prices quoted are EXCLUSIVE of 12% VAT, which will be added upon official invoicing.",
-          "Prices and stock availability are subject to change without prior notice.",
-          "Items marked \"(to confirm)\" are pending final supplier confirmation.",
-          notFound>0?(notFound+" item(s) not found in our current catalog will be sourced and quoted separately."):null,
+          // Base terms already include: validity, VAT-exclusive notice, payment terms,
+          // prices/stock subject to change, delivery timeline, PO acceptance.
+          // Only add user-supplied notes here so we don't duplicate.
           quoteNotes?("Note: "+quoteNotes):null,
         ].filter(Boolean),
       });
@@ -7025,12 +7017,12 @@ function RFQTab(){
       </div>
 
       {/* Items table — sticky header toggle and per-piece pack math */}
-      <div style={{background:"#fff",border:`1px solid ${ds.color.border}`,borderRadius:ds.radius.lg,overflow:stickyHeader?"visible":"auto"}}>
+      <div style={{background:"#fff",border:`1px solid ${ds.color.border}`,borderRadius:ds.radius.lg,overflow:stickyHeader?"visible":"auto",position:"relative"}}>
         <table style={{width:"100%",borderCollapse:"collapse",fontSize:12,minWidth:1200}}>
-          <thead style={stickyHeader?{position:"sticky",top:0,zIndex:10}:undefined}>
+          <thead>
             <tr style={{background:ds.color.red}}>
               {["#","Status","Raw RFQ Item","Parsed Name","Qty","Unit","Matched Product","Pack","Supplier","Acq. Price","Margin %","Selling Price","Profit","Confidence","Notes"].map(h=>(
-                <th key={h} style={{padding:"9px 10px",textAlign:"left",fontWeight:700,color:"#fff",fontSize:11,whiteSpace:"nowrap",background:ds.color.red,...(stickyHeader?{position:"sticky",top:0}:{})}}>{h}</th>
+                <th key={h} style={{padding:"9px 10px",textAlign:"left",fontWeight:700,color:"#fff",fontSize:11,whiteSpace:"nowrap",background:ds.color.red,boxShadow:stickyHeader?"0 2px 4px rgba(0,0,0,0.1)":"none",...(stickyHeader?{position:"sticky",top:67,zIndex:50}:{})}}>{h}</th>
               ))}
             </tr>
           </thead>
