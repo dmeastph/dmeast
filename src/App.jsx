@@ -666,17 +666,17 @@ const GLOBAL_CSS = `
 const SEO_META = {
   home: {
     title: "DM EAST · Quality Medical Solutions Delivered Nationwide | Pharmaceuticals, Equipment, Supplies",
-    description: "DMEAST is your trusted source for pharmaceuticals, medical equipment, and healthcare essentials in the Philippines. BIR-registered. Delivered nationwide. Trusted by 50+ healthcare institutions, hospitals, LGUs, and clinics.",
-    keywords: "medical supplies Philippines, pharmaceuticals Manila, medical equipment supplier, healthcare distributor Philippines, hospital supplies, LGU medical supplier, BIR registered medical trader, DMEAST",
+    description: "DMEAST is your trusted source for medical equipment, devices, and healthcare supplies in the Philippines. BIR-registered. Delivered nationwide. Trusted by 50+ healthcare institutions, hospitals, LGUs, and clinics.",
+    keywords: "medical supplies Philippines, medical equipment supplier, healthcare distributor Philippines, hospital supplies, LGU medical supplier, BIR registered medical trader, DMEAST",
   },
   products: {
     title: "Shop Medical Supplies & Pharmaceuticals · Free Delivery NCR | DM EAST",
-    description: "Browse 500+ healthcare products: pharmaceuticals, medical equipment, supplies, and more. PHP prices, BIR-compliant invoicing, nationwide delivery from Metro Manila to provinces.",
-    keywords: "buy medical supplies online Philippines, pharmaceutical online store, medical equipment shop, Philippine healthcare ecommerce",
+    description: "Browse healthcare products: medical equipment, diagnostic devices, supplies, and more. PHP prices, BIR-compliant invoicing, nationwide delivery from Metro Manila to provinces.",
+    keywords: "buy medical supplies online Philippines, medical equipment shop, Philippine healthcare ecommerce",
   },
   about: {
     title: "About DM EAST · Medical Trading Company in Manila Since 2020",
-    description: "DM EAST (Decon Medical Equipment and Supplies Trading) — Philippine-based medical trading company established 2020. Sourcing pharmaceuticals, medical equipment, and supplies from authorized FDA-licensed suppliers.",
+    description: "DM EAST (Decon Medical Equipment and Supplies Trading) — Philippine-based medical trading company established 2020. Sourcing medical equipment, devices, and supplies from authorized FDA-licensed suppliers.",
     keywords: "about DMEAST, medical trading company Philippines, Decon Medical Equipment, Manila medical supplier",
   },
   institutional: {
@@ -686,8 +686,8 @@ const SEO_META = {
   },
   quote: {
     title: "Request a Quote · Bulk & Specialized Medical Orders | DM EAST",
-    description: "Need bulk pharmaceuticals, specialized medical equipment, or institutional supplies? Request a formal quotation. We respond within 24-48 hours with PHP-priced quotation and BIR-compliant terms.",
-    keywords: "medical supplies quote Philippines, bulk pharmaceutical pricing, hospital equipment quotation",
+    description: "Need specialized medical equipment, devices, or institutional supplies? Request a formal quotation. We respond within 24-48 hours with PHP-priced quotation and BIR-compliant terms.",
+    keywords: "medical supplies quote Philippines, hospital equipment quotation",
   },
   track: {
     title: "Track Your Order | DM EAST",
@@ -834,6 +834,14 @@ const CATEGORIES = [
   {id:"specialized",label:"Specialized Systems",   color:"#004D40",accent:"#00897B",icon:"⚙️", institutional:true},
   {id:"vehicles",   label:"Medical Vehicles",      color:"#BF360C",accent:"#F4511E",icon:"🚑", institutional:true},
 ];
+
+// v16.19: PayRex compliance — temporary public-side hide of pharmaceuticals.
+// Public visitors won't see pharma category, products, or copy mentioning them.
+// Admin dashboard, supplier catalog, RFQ system, and Firestore data remain 100% intact.
+// FLIP TO false WHEN PAYREX APPROVES THE MERCHANT ACCOUNT.
+const HIDE_PHARMA_PUBLIC = true;
+const PUBLIC_CATEGORIES = HIDE_PHARMA_PUBLIC ? CATEGORIES.filter(c=>c.id!=="pharma") : CATEGORIES;
+const filterPharmaPublic = (arr) => HIDE_PHARMA_PUBLIC ? arr.filter(p=>p.category!=="pharma") : arr;
 
 // v16.7: Catalog seed data — 130 products (23 medicines + 107 equipment)
 const CATALOG_SEED_PRODUCTS = [
@@ -1008,7 +1016,7 @@ async function bulkImportCatalog(onProgress) {
 
 const CLIENT_TYPES = [
   {icon:"🏥",label:"Clinics & Medical Practices", desc:"Private clinics, dental offices, specialty practices, and medical centers across the Philippines."},
-  {icon:"💊",label:"Pharmacies & Drugstores",     desc:"Licensed pharmacies, drugstore chains, and pharmaceutical distributors."},
+  {icon:"🏥",label:"Clinics & Healthcare Facilities", desc:"Independent clinics, primary care centers, and healthcare facilities of all sizes."},
   {icon:"🏢",label:"Businesses & BPOs",           desc:"Companies maintaining workplace health programs, first-aid supplies, and employee wellness."},
   {icon:"🏠",label:"Individuals & Families",      desc:"Home healthcare, personal wellness, and everyday health essentials delivered nationwide."},
   {icon:"🏛️",label:"Institutions & Government",  desc:"Hospitals, LGUs, RHUs, and government health programs. Institutional orders available upon request."},
@@ -1018,7 +1026,7 @@ const CLIENT_TYPES = [
 const COMPANY_MILESTONES = [
   {year:"2020",title:"Founded",                  desc:"DMEAST established in Sta. Cruz, Manila as a registered medical trading company."},
   {year:"2021",title:"LGU Programs",             desc:"First local government unit partnership for ambulances and mobile clinic vehicles."},
-  {year:"2022",title:"Pharmaceutical Expansion", desc:"Expanded pharmaceutical supply line, adding a wider range of branded and generic medicines."},
+  {year:"2022",title:"Catalog Expansion",         desc:"Expanded healthcare product range, adding a wider selection of medical devices, diagnostic equipment, and supplies."},
   {year:"2023",title:"Beauty & Wellness Launch", desc:"Launched the Beauty & Wellness product line, serving aesthetic clinics and practitioners nationwide."},
   {year:"2025",title:"500+ Clients",             desc:"Reached 500+ clients served across clinics, pharmacies, businesses, and institutions nationwide."},
   {year:"2026",title:"Online Store Launch",      desc:"Launched dmeastph.com — making it easier to shop, order, and request quotes online."},
@@ -1037,7 +1045,7 @@ const INSTITUTIONAL_SERVICES = [
   {title:"ICU & Emergency Equipment",   body:"Ventilators, defibrillators, patient monitors, and full ICU/ER equipment packages.",icon:"🚨"},
   {title:"Laboratory Setup",            body:"Complete lab equipping — analyzers, centrifuges, sterilizers, and cold storage systems.",icon:"🔬"},
   {title:"Medical Vehicles",            body:"Ambulances, ambu-trikes, and mobile clinics for healthcare programs and emergency response.",icon:"🚑"},
-  {title:"Bulk & Specialized Supply",   body:"Large-volume pharmaceuticals, vaccines, hyperbaric chambers, and specialized systems upon request.",icon:"⚙️"},
+  {title:"Bulk & Specialized Supply",   body:"Large-volume medical supplies, hyperbaric chambers, and specialized equipment systems upon request.",icon:"⚙️"},
 ];
 
 const SHIPPING_METHODS = [
@@ -1116,7 +1124,7 @@ const DEFAULT_PRODUCTS = [
   // VEHICLES
   {id:"veh-01",category:"vehicles",name:"Type II Ambulance",desc:"DOH-compliant Type II ambulance van, fully equipped for emergency response.",price:null,cta:"sales",imageSrc:null,featured:true,tag:"Specialized Vehicles"},
   {id:"veh-02",category:"vehicles",name:"Ambu-Trike",desc:"Three-wheel ambulance trike for barangay-level emergency response.",price:null,cta:"sales",imageSrc:null,featured:true,tag:"Specialized Vehicles"},
-  {id:"veh-03",category:"vehicles",name:"Mobile Clinic Vehicle",desc:"Fully equipped mobile clinic with examination area and pharmaceutical storage.",price:null,cta:"sales",imageSrc:null,featured:false,tag:"Specialized Vehicles"},
+  {id:"veh-03",category:"vehicles",name:"Mobile Clinic Vehicle",desc:"Fully equipped mobile clinic with examination area and supply storage.",price:null,cta:"sales",imageSrc:null,featured:false,tag:"Specialized Vehicles"},
   {id:"veh-04",category:"vehicles",name:"Super Mobile Clinic",desc:"Large-scale mobile clinic for multi-specialty outreach and disaster response.",price:null,cta:"sales",imageSrc:null,featured:false,tag:"Specialized Vehicles"},
   {id:"veh-05",category:"vehicles",name:"Fire-Trike",desc:"Compact fire-response trike for barangay brigades.",price:null,cta:"sales",imageSrc:null,featured:false,tag:"Specialized Vehicles"},
   // BEAUTY
@@ -1434,7 +1442,7 @@ function CategoryCard({cat,onClick}){
       <div style={{padding:"20px 22px 22px"}}>
         <div style={{fontSize:22,marginBottom:8}}>{cat.icon}</div>
         <div style={{fontSize:13.5,fontWeight:600,color:ds.color.textDark,marginBottom:5}}>{cat.label}</div>
-        <div style={{fontSize:12,color:ds.color.textMuted}}>{PRODUCTS.filter(p=>p.category===cat.id).length} products available</div>
+        <div style={{fontSize:12,color:ds.color.textMuted}}>{filterPharmaPublic(PRODUCTS).filter(p=>p.category===cat.id).length} products available</div>
         <div style={{marginTop:12,fontSize:12,fontWeight:700,color:cat.accent}}>Explore →</div>
       </div>
     </button>
@@ -2136,7 +2144,7 @@ function CustomerPortal({user,setPage,addToCart,wishlist,toggleWishlist}){
               </div>
             ):(
               <div className="dm-grid-4">
-                {PRODUCTS.filter(p=>wishlist.includes(p.id)).map(p=>(
+                {filterPharmaPublic(PRODUCTS).filter(p=>wishlist.includes(p.id)).map(p=>(
                   <ProductCard key={p.id} product={p} addToCart={addToCart} setPage={setPage} wishlist={wishlist} toggleWishlist={toggleWishlist}/>
                 ))}
               </div>
@@ -8104,7 +8112,7 @@ function HeroSectionV16({setPage}){
               onMouseLeave={e=>{e.currentTarget.style.borderColor=ds.color.border;e.currentTarget.style.boxShadow=ds.shadow.xs;}}
               >
                 <span style={{position:"absolute",left:18,top:"50%",transform:"translateY(-50%)",fontSize:18}}>🔍</span>
-                Search medicines, equipment, or browse our catalog…
+                Search products, equipment, or browse our catalog…
                 <span style={{position:"absolute",right:14,top:"50%",transform:"translateY(-50%)",background:ds.color.red,color:"#fff",borderRadius:ds.radius.md,padding:"6px 14px",fontSize:12,fontWeight:700}}>Browse →</span>
               </button>
             </div>
@@ -8202,14 +8210,14 @@ function StatsTrustBand(){
 
 // v16.0: Category grid (icon-based, mobile-friendly)
 function CategoryGridV16({setPage,setActiveCategory}){
-  const allCats = CATEGORIES.filter(c => !c.institutional);
+  const allCats = PUBLIC_CATEGORIES.filter(c => !c.institutional);
   return (
     <section style={{background:ds.color.canvas,padding:"64px 28px"}}>
       <div style={{maxWidth:1280,margin:"0 auto"}}>
         <div style={{textAlign:"center",marginBottom:36}}>
           <div style={{fontSize:11,fontWeight:700,color:ds.color.gold,letterSpacing:"0.14em",textTransform:"uppercase",marginBottom:10}}>Browse by Category</div>
           <h2 style={{fontFamily:ds.font.display,fontSize:"clamp(1.6rem,3vw,2.2rem)",color:ds.color.textDark,fontWeight:400,marginBottom:8}}>What are you looking for today?</h2>
-          <p style={{fontSize:14,color:ds.color.textMuted,maxWidth:560,margin:"0 auto"}}>Find pharmaceuticals, medical supplies, and healthcare essentials — all in one place.</p>
+          <p style={{fontSize:14,color:ds.color.textMuted,maxWidth:560,margin:"0 auto"}}>Find medical equipment, devices, and healthcare essentials — all in one place.</p>
         </div>
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:14}}>
           {allCats.map((cat,i)=>{
@@ -8256,11 +8264,11 @@ function CategoryGridV16({setPage,setActiveCategory}){
 // v16.0: Trending products section (horizontal scroll on mobile)
 function TrendingProductsV16({setPage, addToCart}){
   const { products: PRODUCTS } = useProducts();
-  const trending = PRODUCTS.filter(p =>
+  const trending = filterPharmaPublic(PRODUCTS).filter(p =>
     p.featured && p.cta === "buy" && !p.requiresPrescription &&
     !CATEGORIES.find(c=>c.id===p.category)?.institutional
   ).slice(0,8);
-  const fallback = trending.length >= 4 ? trending : PRODUCTS.filter(p => p.cta === "buy").slice(0,8);
+  const fallback = trending.length >= 4 ? trending : filterPharmaPublic(PRODUCTS).filter(p => p.cta === "buy").slice(0,8);
   const display = fallback.length >= 4 ? fallback : trending;
 
   return (
@@ -8288,7 +8296,7 @@ function TrendingProductsV16({setPage, addToCart}){
 // v16.0: Promo deal cards (color-blocked feature products)
 function PromoCardsV16({setPage}){
   const { products: PRODUCTS } = useProducts();
-  const promos = PRODUCTS.filter(p => p.featured && p.cta === "buy" && !p.requiresPrescription).slice(0,3);
+  const promos = filterPharmaPublic(PRODUCTS).filter(p => p.featured && p.cta === "buy" && !p.requiresPrescription).slice(0,3);
   
   if (promos.length < 2) return null;
   
@@ -8415,7 +8423,7 @@ function InstitutionalCTABannerV16({setPage}){
               </h2>
               <p style={{fontSize:14.5,color:"rgba(255,255,255,0.75)",lineHeight:1.7,marginBottom:0,maxWidth:560}}>
                 Get bulk pricing, dedicated account support, and BIR-compliant documentation 
-                for institutional purchases. Equipment, supplies, and pharmaceuticals — sourced and delivered.
+                for institutional purchases. Equipment, devices, and supplies — sourced and delivered.
               </p>
             </div>
             <div style={{textAlign:"right"}}>
@@ -8459,7 +8467,7 @@ function TestimonialsV16(){
     { 
       name:"Dr. Paolo Tan", 
       role:"Medical Director", 
-      quote:"From pharmaceuticals to lab equipment — DMEAST is our go-to for institutional needs. Quality is consistent.",
+      quote:"From diagnostic devices to lab equipment — DMEAST is our go-to for institutional needs. Quality is consistent.",
       rating: 5,
       avatar: "👨‍⚕️"
     },
@@ -8511,10 +8519,10 @@ function FAQAccordionV16(){
   const faqs = [
     { q:"How long does delivery take?", a:"Metro Manila orders ship within 1-2 business days. Provincial orders typically arrive within 3-7 business days, depending on location. Bulk institutional orders may take longer based on item availability." },
     { q:"Do you accept LGU Purchase Orders (POs)?", a:"Yes! We process orders for LGUs, hospitals, government health centers, and other institutional buyers. Contact us with your PO requirements and we'll prepare a formal quotation." },
-    { q:"Are your products FDA-registered?", a:"Yes. All pharmaceutical products are sourced from FDA-licensed distributors and manufacturers. Medical equipment meets BFAD/FDA standards. Documentation available upon request." },
+    { q:"Are your products FDA-registered?", a:"Yes. All medical equipment and devices are sourced from FDA-licensed distributors and manufacturers, meeting BFAD/FDA standards. Documentation available upon request." },
     { q:"Do you provide official BIR receipts?", a:"Absolutely. DMEAST is a BIR-registered VAT entity (TIN: 417-877-476-00000). We issue proper Sales Invoices and Official Receipts for all transactions, tax-ready for your records." },
     { q:"What payment methods do you accept?", a:"GCash, Maya, bank transfer (BDO, BPI, Metrobank), and credit terms for verified institutional clients (Net 15/30/60). We're working on integrating online card payments." },
-    { q:"Can I return or exchange products?", a:"Returns are accepted for damaged or incorrect items within 7 days of delivery. Pharmaceutical products in original sealed packaging. Contact us within 24 hours of receipt to start a return." },
+    { q:"Can I return or exchange products?", a:"Returns are accepted for damaged or incorrect items within 7 days of delivery, in original sealed packaging. Contact us within 24 hours of receipt to start a return." },
   ];
   
   const [openIdx, setOpenIdx] = useState(0);
@@ -8595,7 +8603,7 @@ function HeroSection({setPage}){
             <h1 className="dm-fade-up dm-fade-up-2" style={{fontFamily:ds.font.display,fontSize:"clamp(2.4rem,4.5vw,3.6rem)",fontWeight:400,lineHeight:1.12,marginBottom:24}}>
               <span style={{color:ds.color.red}}>Supplies & Healthcare</span><br/><span style={{color:ds.color.textDark}}>Products Online.</span>
             </h1>
-            <p className="dm-fade-up dm-fade-up-3" style={{fontSize:16,color:ds.color.textMuted,lineHeight:1.8,maxWidth:500,marginBottom:36}}>Shop healthcare products, pharmaceuticals, diagnostic devices, and beauty & wellness essentials — trusted by clinics, businesses, and individuals across the Philippines.</p>
+            <p className="dm-fade-up dm-fade-up-3" style={{fontSize:16,color:ds.color.textMuted,lineHeight:1.8,maxWidth:500,marginBottom:36}}>Shop healthcare products, diagnostic devices, and beauty & wellness essentials — trusted by clinics, businesses, and individuals across the Philippines.</p>
             <div className="dm-fade-up dm-fade-up-4" style={{display:"flex",gap:12,flexWrap:"wrap",marginBottom:44}}>
               <Btn variant="primary" size="lg" onClick={()=>setPage("products")}>Shop Now</Btn>
               <Btn variant="secondary" size="lg" onClick={()=>setPage("institutional")}>Institutional Orders</Btn>
@@ -8628,11 +8636,11 @@ function HeroSection({setPage}){
 }
 
 function CategoriesSection({setPage,setActiveCategory}){
-  const shopCats = CATEGORIES.filter(c => !c.institutional);
+  const shopCats = PUBLIC_CATEGORIES.filter(c => !c.institutional);
   return(
     <section style={{background:ds.color.canvas,padding:"80px 28px"}}>
       <div style={{maxWidth:1280,margin:"0 auto"}}>
-        <SectionHeader eyebrow="Shop by Category" title="Find What You Need" subtitle="Browse healthcare products, pharmaceuticals, diagnostic devices, and beauty & wellness essentials — all available for direct online purchase." center/>
+        <SectionHeader eyebrow="Shop by Category" title="Find What You Need" subtitle="Browse healthcare products, diagnostic devices, and beauty & wellness essentials — all available for direct online purchase." center/>
         <div className="dm-grid-4" style={{marginBottom:36}}>
           {shopCats.map(cat=><CategoryCard key={cat.id} cat={cat} onClick={()=>{setActiveCategory(cat.id);setPage("products");}}/>)}
         </div>
@@ -8790,7 +8798,7 @@ function HomePage({setPage,setActiveCategory,addToCart,setActivePost}){
 function AboutPage(){
   return(
     <div style={{paddingTop:67}}>
-      <PageHero eyebrow="About Us" title="Affordable Healthcare Products, Delivered Nationwide" subtitle="Since 2020, DMEAST has been a trusted source of medical supplies, pharmaceuticals, diagnostic devices, and healthcare essentials for clinics, businesses, and individuals across the Philippines."/>
+      <PageHero eyebrow="About Us" title="Affordable Healthcare Products, Delivered Nationwide" subtitle="Since 2020, DMEAST has been a trusted source of medical supplies, diagnostic devices, and healthcare essentials for clinics, businesses, and individuals across the Philippines."/>
       <div style={{maxWidth:1160,margin:"0 auto",padding:"72px 28px"}}>
         <div className="dm-grid-2" style={{gap:64,marginBottom:72}}>
           <div>
@@ -8830,15 +8838,15 @@ function ProductsPage({setPage,addToCart,setActiveCategory,activeCategory,wishli
   const [sortBy,setSortBy]=useState("default"); // default | price-asc | price-desc | name
   useEffect(()=>{if(activeCategory)setCat(activeCategory);},[activeCategory]);
 
-  const shopCats = CATEGORIES.filter(c=>!c.institutional);
-  const institutionalCats = CATEGORIES.filter(c=>c.institutional);
-  const isInstitutionalCat = cat && CATEGORIES.find(c=>c.id===cat)?.institutional;
+  const shopCats = PUBLIC_CATEGORIES.filter(c=>!c.institutional);
+  const institutionalCats = PUBLIC_CATEGORIES.filter(c=>c.institutional);
+  const isInstitutionalCat = cat && PUBLIC_CATEGORIES.find(c=>c.id===cat)?.institutional;
 
-  let filtered=PRODUCTS.filter(p=>{
+  let filtered=filterPharmaPublic(PRODUCTS).filter(p=>{
     const mc=!cat||p.category===cat;
     const q=search.toLowerCase();
     const ms=!q||p.name.toLowerCase().includes(q)||p.desc.toLowerCase().includes(q)||p.tag.toLowerCase().includes(q);
-    const notInstit = showAll||cat||q ? true : !CATEGORIES.find(c=>c.id===p.category)?.institutional;
+    const notInstit = showAll||cat||q ? true : !PUBLIC_CATEGORIES.find(c=>c.id===p.category)?.institutional;
     return mc&&ms&&notInstit;
   });
 
@@ -8847,7 +8855,7 @@ function ProductsPage({setPage,addToCart,setActiveCategory,activeCategory,wishli
   if(sortBy==="price-desc") filtered = [...filtered].sort((a,b)=>(b.price||0)-(a.price||0));
   if(sortBy==="name")       filtered = [...filtered].sort((a,b)=>a.name.localeCompare(b.name));
 
-  const shopProductCount = PRODUCTS.filter(p=>!CATEGORIES.find(c=>c.id===p.category)?.institutional).length;
+  const shopProductCount = filterPharmaPublic(PRODUCTS).filter(p=>!PUBLIC_CATEGORIES.find(c=>c.id===p.category)?.institutional).length;
   const clearFilters = ()=>{setSearch("");setCat(null);setActiveCategory(null);setSortBy("default");setShowAll(false);};
   const hasActiveFilters = !!cat || !!search || sortBy!=="default";
 
@@ -8974,7 +8982,7 @@ function ProductsPage({setPage,addToCart,setActiveCategory,activeCategory,wishli
         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:20,flexWrap:"wrap",gap:10}}>
           <div style={{fontSize:13,color:ds.color.textMuted}}>
             <strong style={{color:ds.color.textDark}}>{filtered.length}</strong> product{filtered.length!==1?"s":""} 
-            {cat && <> in <strong style={{color:ds.color.textDark}}>{CATEGORIES.find(c=>c.id===cat)?.label}</strong></>}
+            {cat && <> in <strong style={{color:ds.color.textDark}}>{PUBLIC_CATEGORIES.find(c=>c.id===cat)?.label}</strong></>}
             {search && <> matching "<strong style={{color:ds.color.textDark}}>{search}</strong>"</>}
             {hasActiveFilters && (
               <button onClick={clearFilters} style={{marginLeft:10,background:"none",border:"none",color:ds.color.red,fontWeight:600,cursor:"pointer",fontSize:12,fontFamily:ds.font.body,textDecoration:"underline"}}>Clear filters</button>
@@ -9045,11 +9053,11 @@ function ProductsPage({setPage,addToCart,setActiveCategory,activeCategory,wishli
 // ─── INSTITUTIONAL ORDERS PAGE ───────────────────────────────────────────────
 function InstitutionalOrdersPage({setPage}){
   const { products: PRODUCTS } = useProducts();
-  const institutionalCats = CATEGORIES.filter(c=>c.institutional);
-  const institutionalProducts = PRODUCTS.filter(p=>CATEGORIES.find(c=>c.id===p.category)?.institutional);
+  const institutionalCats = PUBLIC_CATEGORIES.filter(c=>c.institutional);
+  const institutionalProducts = filterPharmaPublic(PRODUCTS).filter(p=>PUBLIC_CATEGORIES.find(c=>c.id===p.category)?.institutional);
   return(
     <div style={{paddingTop:67}}>
-      <PageHero eyebrow="Institutional Orders" title="Specialized & Enterprise Healthcare Solutions" subtitle="For hospitals, diagnostic centers, and healthcare institutions requiring specialized equipment, bulk pharmaceutical supply, or complete facility setups."/>
+      <PageHero eyebrow="Institutional Orders" title="Specialized & Enterprise Healthcare Solutions" subtitle="For hospitals, diagnostic centers, and healthcare institutions requiring specialized equipment, bulk supplies, or complete facility setups."/>
       <div style={{maxWidth:1160,margin:"0 auto",padding:"72px 28px"}}>
         <div style={{background:ds.color.canvas,borderRadius:ds.radius.xl,border:`1px solid ${ds.color.border}`,padding:"32px 36px",marginBottom:56}}>
           <div style={{fontFamily:ds.font.display,fontSize:20,color:ds.color.textDark,marginBottom:20}}>How Institutional Orders Work</div>
@@ -10083,7 +10091,7 @@ function CartPage({cart,removeFromCart,updateQty,setPage,user,onOrderComplete}){
           fontSize:56,
         }}>🛒</div>
         <div style={{fontFamily:ds.font.display,fontSize:26,color:ds.color.textDark,marginBottom:10}}>Your cart is empty</div>
-        <p style={{fontSize:14.5,color:ds.color.textMuted,lineHeight:1.7,marginBottom:28}}>Browse our catalog of pharmaceuticals, medical equipment, and healthcare essentials. We deliver nationwide.</p>
+        <p style={{fontSize:14.5,color:ds.color.textMuted,lineHeight:1.7,marginBottom:28}}>Browse our catalog of medical equipment, devices, and healthcare essentials. We deliver nationwide.</p>
         <div style={{display:"flex",gap:10,justifyContent:"center",flexWrap:"wrap",marginBottom:32}}>
           <Btn variant="primary" size="lg" onClick={()=>setPage("products")}>Browse Products</Btn>
           <Btn variant="outline" size="lg" onClick={()=>setPage("quote")}>Request Quote</Btn>
@@ -10934,10 +10942,10 @@ function TermsPage(){
 function RefundPage(){
   const sections=[
     {title:"7-Day Replacement Guarantee",body:"If an item arrives damaged, defective, or different from what was ordered, contact us within 7 calendar days of delivery. We will arrange replacement or refund upon verification."},
-    {title:"Eligibility for Returns",body:"Items must be unused and in original packaging, returned within 7 days with proof of purchase. Pharmaceuticals, consumables, and Rx items are non-returnable unless damaged upon arrival."},
+    {title:"Eligibility for Returns",body:"Items must be unused and in original packaging, returned within 7 days with proof of purchase. Consumables and sterile-packaged items are non-returnable unless damaged upon arrival."},
     {title:"Refund Process",body:"Approved refunds are issued as Store Credit within 5–7 business days. Direct payment refunds may take 7–14 business days depending on your bank or payment provider."},
     {title:"Out-of-Stock Substitutions",body:"If an ordered item becomes unavailable, we'll offer a full refund as Store Credit, or an alternative product of equal or lesser value with your explicit approval."},
-    {title:"Non-Refundable Items",body:"Pharmaceuticals and medical consumables (opened or undamaged), prescription medicines without valid Rx, custom or special-order equipment, and shipping fees are non-refundable."},
+    {title:"Non-Refundable Items",body:"Medical consumables (opened or damaged), custom or special-order equipment, and shipping fees are non-refundable."},
     {title:"How to Request",body:"Email "+CONTACT.email+" or call "+CONTACT.phone1+" with your order number and photos. Our team will respond within 2 business days."},
   ];
   return(
@@ -10961,7 +10969,7 @@ function ShippingPage(){
     {title:"International Shipping",body:"We ship worldwide via FedEx, DHL, air cargo, and sea freight. Estimated: FedEx/DHL 3–7 days, Air Cargo 5–10 days, Sea Cargo 15–45 days. Shipping fees, import duties, and taxes are the buyer's responsibility."},
     {title:"Processing Time",body:"All orders are procurement-based. Processing typically takes 3–15 business days after payment confirmation. We'll notify you of the estimated timeline at order confirmation."},
     {title:"Order Tracking",body:"Tracking information will be provided via email once dispatched. For freight shipments, a bill of lading and export documentation will be provided."},
-    {title:"Shipping Restrictions",body:"Certain pharmaceutical products may have export restrictions. Prescription medicines require valid documentation for international shipment. DMEAST will advise on requirements for your destination."},
+    {title:"Shipping Restrictions",body:"Certain medical products may have export restrictions or require valid documentation for international shipment. DMEAST will advise on requirements for your destination."},
     {title:"Damaged in Transit",body:"If your shipment arrives damaged, photograph the packaging immediately and contact us within 24 hours of delivery. We will initiate a replacement or refund claim."},
   ];
   return(
@@ -11754,7 +11762,7 @@ function PostEditorModal({ post, onClose, onSaved }) {
 function CancellationPage(){
   const sections=[
     {title:"Customer-Initiated Order Cancellation",body:"You may cancel your order BEFORE it has been processed for shipment. To request cancellation, contact us immediately at "+CONTACT.email+" or "+CONTACT.phone1+" with your order reference number. Cancellations submitted before payment processing are eligible for a full refund. Once items have been packed, dispatched, or sourced from suppliers, cancellation is no longer available."},
-    {title:"Cancellation Request Window",body:"Standard online orders: cancellation must be requested within 2 hours of payment to qualify for full refund without penalty. Procurement-based orders (specialized equipment, bulk pharmaceuticals, institutional orders): cancellation must be requested within 24 hours of order confirmation. After these windows, cancellation is subject to supplier policies and any costs already incurred (e.g., supplier deposits, processing fees) will be deducted from the refund."},
+    {title:"Cancellation Request Window",body:"Standard online orders: cancellation must be requested within 2 hours of payment to qualify for full refund without penalty. Procurement-based orders (specialized equipment, bulk supplies, institutional orders): cancellation must be requested within 24 hours of order confirmation. After these windows, cancellation is subject to supplier policies and any costs already incurred (e.g., supplier deposits, processing fees) will be deducted from the refund."},
     {title:"Cancellation Fees",body:"Orders cancelled within the request window: NO fee, full refund. Orders cancelled after sourcing has begun: actual costs incurred (typically 15-30% of order value) will be deducted from refund. Orders cancelled after dispatch: not eligible for cancellation; refer to our Return & Refund Policy."},
     {title:"DMEAST-Initiated Order Cancellation",body:"DM EAST reserves the right to cancel any order at our discretion in cases including: pricing or product information errors, items becoming unavailable from suppliers, suspected fraudulent activity, payment verification failures, breach of these terms, force majeure events (natural disasters, government restrictions, etc.). When DM EAST cancels an order, you will receive a full 100% refund of all amounts paid, processed within 7-14 business days."},
     {title:"Refund Method for Cancellations",body:"Approved cancellation refunds are processed in the following order of preference: (1) Original payment method — for credit/debit card and online payment cancellations, refund posts to the original card or e-wallet within 7-14 business days. (2) Store credit — alternative option, available immediately. (3) Bank transfer — for bank transfer payments, refund issued back to your originating bank account within 5-10 business days. Processing times depend on your bank or payment provider; DMEAST cannot guarantee timing once the refund has been initiated."},
@@ -11822,7 +11830,7 @@ function Footer({setPage}){
           </div>
           <div>
             <div style={{fontSize:11,fontWeight:700,color:"rgba(255,255,255,0.35)",textTransform:"uppercase",letterSpacing:"0.14em",marginBottom:16}}>Shop Categories</div>
-            {CATEGORIES.filter(c=>!c.institutional).map(c=>(
+            {PUBLIC_CATEGORIES.filter(c=>!c.institutional).map(c=>(
               <button key={c.id} onClick={()=>setPage("products")} style={{display:"block",background:"none",border:"none",cursor:"pointer",fontSize:13.5,color:"rgba(255,255,255,0.6)",fontFamily:ds.font.body,padding:"4px 0",textAlign:"left"}}
                 onMouseEnter={e=>e.target.style.color="#F0A81C"} onMouseLeave={e=>e.target.style.color="rgba(255,255,255,0.6)"}>{c.label}</button>
             ))}
