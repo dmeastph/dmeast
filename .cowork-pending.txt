@@ -1,0 +1,2 @@
+chore/phase-1-extract-firebase
+refactor: extract Firebase init to src/lib/firebase.js + add push.bat helper

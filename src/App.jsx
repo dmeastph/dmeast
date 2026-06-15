@@ -406,15 +406,8 @@ const getPermissions = (email) => {
 
 
 
-import emailjs from "@emailjs/browser";
-const EMAILJS_CONFIG = {
-  serviceId:           "service_0hvjrv6",
-  orderTemplateId:     "template_udt3wjn",  // To: admin (info@dmeastph.com) — order received notification
-  templateId:          "template_5r24wue",  // To: {{to_email}} — universal customer notifications
-  receiptTemplateId:   "template_adb2so7",  // To: {{to_email}} — customer order receipt
-  pdfTemplateId:       "template_pdf_doc",  // v15.3: To: {{to_email}} — PDF document (Quotation/SO/DR/PR) with attachment. CONFIGURE IN EMAILJS DASHBOARD.
-  publicKey:           "gV5OXqbN2PHond86B",
-};
+// Phase 1 refactor: EmailJS SDK + config moved to src/lib/emailjs.js
+import { emailjs, EMAILJS_CONFIG } from "./lib/emailjs";
 
 // v13.0d: Unified email sender for status updates + general customer notifications
 async function sendCustomerStatusEmail({ order, subject, bodyText }) {
