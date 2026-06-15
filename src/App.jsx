@@ -384,6 +384,15 @@ const getPermissions = (email) => {
 // Phase 1 refactor: EmailJS SDK + config moved to src/lib/emailjs.js
 import { emailjs, EMAILJS_CONFIG } from "./lib/emailjs";
 
+// Phase 1 refactor: Maya payment helpers moved to src/lib/maya.js
+import {
+  DMEAST_MAYA_LINK,
+  MAYA_METHODS,
+  isMayaMethod,
+  createMayaCheckout,
+  verifyMayaPayment,
+} from "./lib/maya";
+
 // v13.0d: Unified email sender for status updates + general customer notifications
 async function sendCustomerStatusEmail({ order, subject, bodyText }) {
   if (!order || !order.email) return { ok: false, reason: "no email on order" };
@@ -2454,9 +2463,6 @@ const DMEAST_PAYPAL_INFO = {
   email:        "info@dmeastph.com",
   holdWarning:  "Important: PayPal holds transactions over $500 USD for up to 21 days. For faster processing on larger orders, please use wire transfer or credit/debit card instead.",
 };
-
-// v16.17: Maya static payment link (customer enters their own amount)
-const DMEAST_MAYA_LINK = "https://payments.maya.ph/invoice?id=7e50e078-1e45-4f3c-b431-2f8fa669a173";
 
 // v16.17: Default payment method toggle settings (used if Firestore not yet set)
 const DEFAULT_PAYMENT_METHODS = {
@@ -9359,45 +9365,8 @@ const ZIP_HINTS = {
 };
 const getZipHint = (countryCode) => ZIP_HINTS[countryCode] || "Optional";
 
-// ─── v16.10: MAYA PAYMENT INTEGRATION ────────────────────────────────────────
-// Methods that go through Maya Checkout (instead of manual bank transfer)
-const MAYA_METHODS = ["Maya", "GCash", "Visa", "Mastercard", "QR Ph"];
-const isMayaMethod = (method) => MAYA_METHODS.includes(method);
-
-// Call backend to create Maya checkout session, return redirect URL
-async function createMayaCheckout({ orderId, totalAmount, items, buyer }){
-  const res = await fetch("/api/maya-create-checkout", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      orderId,
-      totalAmount,
-      items: items.map(i => ({
-        name: i.name,
-        quantity: i.qty,
-        amount: i.price,
-        code: i.id,
-      })),
-      buyerEmail:     buyer.email,
-      buyerFirstName: buyer.firstName,
-      buyerLastName:  buyer.lastName,
-      buyerPhone:     buyer.phone,
-    }),
-  });
-  const data = await res.json();
-  if (!res.ok || !data.success) {
-    throw new Error(data.error || data.hint || "Failed to create Maya checkout");
-  }
-  return data;  // { success, checkoutId, redirectUrl, requestReferenceNumber }
-}
-
-// Manually verify a Maya payment via our backend (fallback if webhook delayed)
-async function verifyMayaPayment(checkoutId){
-  const res = await fetch(`/api/maya-verify?checkoutId=${encodeURIComponent(checkoutId)}`);
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || "Verification failed");
-  return data;
-}
+// Maya payment integration helpers (MAYA_METHODS, isMayaMethod, createMayaCheckout,
+// verifyMayaPayment) moved to src/lib/maya.js as part of Phase 1 refactor — see top of file.
 
 // v16.10: Payment return page (shown when customer comes back from Maya)
 function PaymentReturnPage({ status, orderId, setPage }){
