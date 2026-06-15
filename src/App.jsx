@@ -301,88 +301,27 @@ import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage
 // initializeApp/getAuth/getFirestore/getStorage calls) moved to src/lib/firebase.js
 import { auth, db, storage, IS_SANDBOX } from "./lib/firebase";
 
-const ADMIN_EMAILS = ["info@dmeastph.com", "admin@dmeastph.com"]; // Legacy - kept for backward compat
-
-// ─── v15 ROLE-BASED ACCESS CONTROL ───────────────────────────────────────────
-// Map admin emails to their role. Edit this list to add/remove staff.
-const ADMIN_ROLES = {
-  // 👑 SUPER ADMINS (Edward - owner) — full access to everything
-  "info@dmeastph.com":       "super",
-  "admin@dmeastph.com":      "super",
-  // 🔧 OPERATIONS ADMIN — sales coordinator / order processor
-  // Sees: Overview, Orders, Receivables, Products, Customers, Rx
-  // Cannot: see margins/expenses/billings/profits, delete orders
-  "ops@dmeastph.com":        "operations",
-  // 💼 ACCOUNTING ADMIN — bookkeeper / finance / accountant
-  // Sees: Overview, Receivables, Expenses, Billings, Margin, Customers (read-only)
-  // Cannot: edit orders or products, manage prescriptions
-  "accounting@dmeastph.com": "accounting",
-};
-
-// Role definitions and what each can access
-const ROLE_PERMISSIONS = {
-  super: {
-    label: "Super Admin",
-    icon: "👑",
-    color: "#7C3AED",
-    description: "Full access to all features",
-    tabs: ["overview","orders","receivables","expenses","billings","margin","products","customers","rx","blog","suppliers","rfq","settings"],
-    canEditOrders: true,
-    canDeleteOrders: true,
-    canEditProducts: true,
-    canSeeMargins: true,
-    canSeeExpenses: true,
-    canManageUsers: true,
-    canEditBlog: true,
-  },
-  operations: {
-    label: "Operations Admin",
-    icon: "🔧",
-    color: "#0EA5E9",
-    description: "Manages orders, customers, products, prescriptions, margin dashboard",
-    tabs: ["overview","orders","receivables","margin","products","customers","rx","blog"],
-    canEditOrders: true,
-    canDeleteOrders: false,        // Operations cannot delete orders
-    canEditProducts: true,
-    canSeeMargins: true,            // v15.2: now allowed to see margin dashboard
-    canSeeExpenses: false,           // but NOT detailed expenses (still hidden)
-    canManageUsers: false,
-    canEditBlog: true,              // v16.5: ops can manage blog
-  },
-  accounting: {
-    label: "Accounting Admin",
-    icon: "💼",
-    color: "#10B981",
-    description: "Manages financial records, expenses, billings",
-    tabs: ["overview","receivables","expenses","billings","margin","customers"],
-    canEditOrders: false,           // Read-only on orders
-    canDeleteOrders: false,
-    canEditProducts: false,
-    canSeeMargins: true,
-    canSeeExpenses: true,
-    canManageUsers: false,
-    canEditBlog: false,             // v16.5: accounting doesn't manage blog
-  },
-};
-
-// v15: Get role for current user (replaces simple admin email check)
-const getUserRole = (email) => {
-  if (!email) return null;
-  const lower = email.toLowerCase();
-  return ADMIN_ROLES[lower] || null;
-};
-
-const isAdminUser = (email) => getUserRole(email) !== null;
-
-const getPermissions = (email) => {
-  const role = getUserRole(email);
-  return role ? ROLE_PERMISSIONS[role] : null;
-};
+// Phase 1 refactor: ADMIN_EMAILS, ADMIN_ROLES, ROLE_PERMISSIONS + 3 auth helpers
+// (getUserRole, isAdminUser, getPermissions) moved to src/constants/admin.js
+import {
+  ADMIN_EMAILS,
+  ADMIN_ROLES,
+  ROLE_PERMISSIONS,
+  getUserRole,
+  isAdminUser,
+  getPermissions,
+} from "./constants/admin";
 
 
 
-// Phase 1 refactor: EmailJS SDK + config moved to src/lib/emailjs.js
+// Phase 1 refactor: EmailJS SDK + config in src/lib/emailjs.js,
+// 3 helper functions in src/lib/email-helpers.js
 import { emailjs, EMAILJS_CONFIG } from "./lib/emailjs";
+import {
+  sendCustomerStatusEmail,
+  sendAdminNewOrderNotification,
+  sendCustomerReceiptEmail,
+} from "./lib/email-helpers";
 
 // Phase 1 refactor: Maya payment helpers moved to src/lib/maya.js
 import {
@@ -396,80 +335,10 @@ import {
 // Phase 1 refactor: Claude RFQ API wrapper moved to src/lib/claude.js
 import { callClaudeRFQ } from "./lib/claude";
 
-// v13.0d: Unified email sender for status updates + general customer notifications
-async function sendCustomerStatusEmail({ order, subject, bodyText }) {
-  if (!order || !order.email) return { ok: false, reason: "no email on order" };
-  try {
-    await emailjs.send(EMAILJS_CONFIG.serviceId, EMAILJS_CONFIG.templateId, {
-      from_name: "DM EAST Team",
-      company: "DM EAST",
-      from_email: CONTACT.email,
-      phone: CONTACT.phone1,
-      product: subject,
-      quantity: "N/A",
-      budget: order.total ? formatPHP(order.total) : "N/A",
-      timeline: "Update",
-      location: order.address || "",
-      details: bodyText,
-      reply_to: CONTACT.email,
-      to_email: order.email,
-    }, EMAILJS_CONFIG.publicKey);
-    return { ok: true };
-  } catch (e) {
-    console.warn("Customer email failed:", e);
-    return { ok: false, reason: e.message };
-  }
-}
+// 3 email helper functions moved to src/lib/email-helpers.js (Phase 1 refactor).
 
-async function sendAdminNewOrderNotification(order) {
-  try {
-    await emailjs.send(EMAILJS_CONFIG.serviceId, EMAILJS_CONFIG.orderTemplateId, {
-      customer_name:    order.name || "Customer",
-      customer_email:   order.email || "Not provided",
-      customer_phone:   order.phone || "Not provided",
-      customer_address: order.address || "Not provided",
-      order_items:      (order.items||[]).map(i=>`${i.name} x${i.qty} — ${formatPHP(i.price*i.qty)}`).join("\n"),
-      order_total:      order.total ? formatPHP(order.total) : "—",
-      payment_method:   order.paymentMethod || order.paymentTerms || "—",
-    }, EMAILJS_CONFIG.publicKey);
-    return { ok: true };
-  } catch(e) {
-    console.warn("Admin notification email failed:", e);
-    return { ok: false, reason: e.message };
-  }
-}
-
-async function sendCustomerReceiptEmail(order) {
-  if (!order || !order.email) return { ok: false, reason: "no email" };
-  try {
-    await emailjs.send(EMAILJS_CONFIG.serviceId, EMAILJS_CONFIG.receiptTemplateId, {
-      customer_name:    order.name || "Customer",
-      customer_email:   order.email,
-      customer_phone:   order.phone || "—",
-      customer_address: order.address || "—",
-      order_items:      (order.items||[]).map(i=>`${i.name} x${i.qty} — ${formatPHP(i.price*i.qty)}`).join("\n"),
-      order_total:      order.total ? formatPHP(order.total) : "—",
-      payment_method:   order.paymentMethod || order.paymentTerms || "—",
-      to_email:         order.email,
-    }, EMAILJS_CONFIG.publicKey);
-    return { ok: true };
-  } catch(e) {
-    console.warn("Customer receipt email failed:", e);
-    return { ok: false, reason: e.message };
-  }
-}
-
-const POINTS_PER_PHP = 1 / 200;
-const POINT_VALUE    = 0.50;
-
-// ─── v13.0a CONSTANTS ────────────────────────────────────────────────────────
-// Business registration info (BIR documents)
-const DMEAST_BUSINESS_INFO = {
-  legalName: "DECON MEDICAL EQUIPMENT AND SUPPLIES TRADING",
-  proprietor: "EDILBERTO B. CONDE",
-  vatRegTIN: "417-877-476-00000",
-  registeredAddress: "1146 M. Natividad St., Cor. Mayhaligue St., Brgy 316 Zone 032, 1014 Sta. Cruz NCR, City of Manila, First District Philippines",
-};
+// Phase 1 refactor: POINTS_PER_PHP, POINT_VALUE, DMEAST_BUSINESS_INFO moved to src/constants/business.js
+import { POINTS_PER_PHP, POINT_VALUE, DMEAST_BUSINESS_INFO } from "./constants/business";
 
 // v13.0a: Order source channels
 const ORDER_SOURCES = [
