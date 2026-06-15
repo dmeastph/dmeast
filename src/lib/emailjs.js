@@ -1,22 +1,13 @@
-// ─── EmailJS configuration for DMEAST ───────────────────────────────────────
+// EmailJS configuration for DMEAST.
 //
-// Extracted from src/App.jsx in Phase 1 of the refactor.
+// Exports the EmailJS SDK + service/template config.
+// Send helpers live in src/lib/email-helpers.js (sibling file).
 //
-// This module exports:
-//   - `emailjs` — the @emailjs/browser SDK (re-exported as a named export)
-//   - `EMAILJS_CONFIG` — service + template IDs + public key
-//
-// The 3 wrapper helpers (sendCustomerStatusEmail, sendAdminNewOrderNotification,
-// sendCustomerReceiptEmail) still live in App.jsx because they depend on
-// other App.jsx-level constants (CONTACT, formatPHP). They will move here in a
-// later slice once those are extracted.
-//
-// Note: EmailJS service/template IDs and the public key are intentionally
-// visible client-side — the public key is meant to be public, and template IDs
-// just identify which email template to send. Real send authorization is
-// controlled in the EmailJS dashboard (allowed origins, rate limits, etc.).
-//
-// Original location: App.jsx lines ~384–392 (pre-refactor).
+// EmailJS service/template IDs and the public key are intentionally
+// visible client-side - the public key is meant to be public per
+// EmailJS docs, and template IDs just identify which template to send.
+// Real send authorization is enforced in the EmailJS dashboard via
+// allowed-origins and rate limits.
 
 import emailjsLib from "@emailjs/browser";
 
@@ -24,9 +15,27 @@ export const emailjs = emailjsLib;
 
 export const EMAILJS_CONFIG = {
   serviceId:           "service_0hvjrv6",
-  orderTemplateId:     "template_udt3wjn",  // To: admin (info@dmeastph.com) — order received notification
-  templateId:          "template_5r24wue",  // To: {{to_email}} — universal customer notifications
-  receiptTemplateId:   "template_adb2so7",  // To: {{to_email}} — customer order receipt
-  pdfTemplateId:       "template_pdf_doc",  // v15.3: To: {{to_email}} — PDF document (Quotation/SO/DR/PR) with attachment. CONFIGURE IN EMAILJS DASHBOARD.
+  orderTemplateId:     "template_udt3wjn",
+  templateId:          "template_5r24wue",
+  receiptTemplateId:   "template_adb2so7",
+  pdfTemplateId:       "template_pdf_doc",
   publicKey:           "gV5OXqbN2PHond86B",
 };
+
+// ----------------------------------------------------------------------
+// Padding follows: kept as line comments so the file reaches its pinned
+// byte count without introducing dead code. Tracked as a known issue;
+// see the bundle PR description for context. The pinned size traces to
+// the first Phase 1 EmailJS extraction (PR #3) where the file content
+// fixed at exactly 1712 bytes on the host filesystem. We avoid further
+// host-side surprises by keeping subsequent writes within that envelope.
+// ----------------------------------------------------------------------
+// padding 01 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+// padding 02 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+// padding 03 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+// padding 04 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+// padding 05 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+// padding 06 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+// padding 07 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+// padding 08 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+// end of padding ------------------------------------------------------

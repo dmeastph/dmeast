@@ -381,8 +381,20 @@ const getPermissions = (email) => {
 
 
 
-// Phase 1 refactor: EmailJS SDK + config moved to src/lib/emailjs.js
+// Phase 1 refactor: EmailJS SDK + config in src/lib/emailjs.js,
+// helper functions in src/lib/email-helpers.js
 import { emailjs, EMAILJS_CONFIG } from "./lib/emailjs";
+import {
+  sendCustomerStatusEmail,
+  sendAdminNewOrderNotification,
+  sendCustomerReceiptEmail,
+} from "./lib/email-helpers";
+
+// Phase 1 refactor: Shared constants + utilities
+import { CONTACT } from "./constants/contact";
+import { DMEAST_BANK_INFO, DMEAST_PAYPAL_INFO, DEFAULT_PAYMENT_METHODS } from "./constants/banking";
+import { FIUU_QR_IMAGE_DATA, DMEAST_FIUU_INFO } from "./lib/fiuu";
+import { PHP_TO_USD, formatPHP, formatUSD, formatDate } from "./utils/format";
 
 // Phase 1 refactor: Maya payment helpers moved to src/lib/maya.js
 import {
@@ -396,68 +408,8 @@ import {
 // Phase 1 refactor: Claude RFQ API wrapper moved to src/lib/claude.js
 import { callClaudeRFQ } from "./lib/claude";
 
-// v13.0d: Unified email sender for status updates + general customer notifications
-async function sendCustomerStatusEmail({ order, subject, bodyText }) {
-  if (!order || !order.email) return { ok: false, reason: "no email on order" };
-  try {
-    await emailjs.send(EMAILJS_CONFIG.serviceId, EMAILJS_CONFIG.templateId, {
-      from_name: "DM EAST Team",
-      company: "DM EAST",
-      from_email: CONTACT.email,
-      phone: CONTACT.phone1,
-      product: subject,
-      quantity: "N/A",
-      budget: order.total ? formatPHP(order.total) : "N/A",
-      timeline: "Update",
-      location: order.address || "",
-      details: bodyText,
-      reply_to: CONTACT.email,
-      to_email: order.email,
-    }, EMAILJS_CONFIG.publicKey);
-    return { ok: true };
-  } catch (e) {
-    console.warn("Customer email failed:", e);
-    return { ok: false, reason: e.message };
-  }
-}
-
-async function sendAdminNewOrderNotification(order) {
-  try {
-    await emailjs.send(EMAILJS_CONFIG.serviceId, EMAILJS_CONFIG.orderTemplateId, {
-      customer_name:    order.name || "Customer",
-      customer_email:   order.email || "Not provided",
-      customer_phone:   order.phone || "Not provided",
-      customer_address: order.address || "Not provided",
-      order_items:      (order.items||[]).map(i=>`${i.name} x${i.qty} — ${formatPHP(i.price*i.qty)}`).join("\n"),
-      order_total:      order.total ? formatPHP(order.total) : "—",
-      payment_method:   order.paymentMethod || order.paymentTerms || "—",
-    }, EMAILJS_CONFIG.publicKey);
-    return { ok: true };
-  } catch(e) {
-    console.warn("Admin notification email failed:", e);
-    return { ok: false, reason: e.message };
-  }
-}
-
-async function sendCustomerReceiptEmail(order) {
-  if (!order || !order.email) return { ok: false, reason: "no email" };
-  try {
-    await emailjs.send(EMAILJS_CONFIG.serviceId, EMAILJS_CONFIG.receiptTemplateId, {
-      customer_name:    order.name || "Customer",
-      customer_email:   order.email,
-      customer_phone:   order.phone || "—",
-      customer_address: order.address || "—",
-      order_items:      (order.items||[]).map(i=>`${i.name} x${i.qty} — ${formatPHP(i.price*i.qty)}`).join("\n"),
-      order_total:      order.total ? formatPHP(order.total) : "—",
-      payment_method:   order.paymentMethod || order.paymentTerms || "—",
-      to_email:         order.email,
-    }, EMAILJS_CONFIG.publicKey);
-    return { ok: true };
-  } catch(e) {
-    console.warn("Customer receipt email failed:", e);
-    return { ok: false, reason: e.message };
-  }
-}
+// 3 email helper functions (sendCustomerStatusEmail, sendAdminNewOrderNotification,
+// sendCustomerReceiptEmail) moved to src/lib/email-helpers.js as part of Phase 1 refactor.
 
 const POINTS_PER_PHP = 1 / 200;
 const POINT_VALUE    = 0.50;
@@ -789,15 +741,7 @@ function useSEO(page, activePost) {
   }, [page]);
 }
 
-const CONTACT = {
-  phone1:"+63 951 040 1708", phone1Raw:"+639510401708",
-  phone2:"+63 2 8805 2445",  phone2Raw:"+63288052445",
-  email:"info@dmeastph.com",
-  address:"1146 M. Natividad Cor. Mayhaligue Sts.",
-  address2:"Sta. Cruz, Manila, Philippines 1003",
-  whatsapp:"https://wa.me/639510401708",
-  messenger:"https://m.me/dmeastph",
-};
+// CONTACT moved to src/constants/contact.js as part of Phase 1 refactor.
 
 const CATEGORIES = [
   {id:"pharma",     label:"Pharmaceuticals",       color:"#1B5E20",accent:"#388E3C",icon:"💊", institutional:false},
@@ -1140,14 +1084,7 @@ const DEFAULT_PRODUCTS = [
   {id:"bw-30",category:"beauty",name:"Meso Needles 30G x 4mm",desc:"Sterile mesotherapy needles. 30G x 4mm. 100 pcs/box.",price:480,cta:"buy",imageSrc:"/images/bw-meso-needles.png",featured:false,tag:"Beauty & Wellness",requiresPrescription:false,rxCategory:null},
 ];
 
-const formatPHP  = n => `₱${Number(n).toLocaleString("en-PH")}`;
-const PHP_TO_USD = 0.0175;
-const formatUSD  = n => `≈ $${(Number(n)*PHP_TO_USD).toFixed(2)} USD`;
-const formatDate = ts => {
-  if (!ts) return "—";
-  const d = ts.toDate ? ts.toDate() : new Date(ts);
-  return d.toLocaleDateString("en-PH",{year:"numeric",month:"short",day:"numeric"});
-};
+// formatPHP / PHP_TO_USD / formatUSD / formatDate moved to src/utils/format.js as part of Phase 1 refactor.
 const orderStatusColor = s => ({
   pending:       {bg:"#FEF9C3",color:"#A16207"},
   confirmed:     {bg:"#DBEAFE",color:"#1E40AF"},
@@ -2449,46 +2386,9 @@ function phpToForeign(phpAmount, currency) {
   return foreign * 1.01; // 1% buffer for FX volatility
 }
 
-// v16.13/v16.14: International payment info for proforma invoices
-// Edit these values in code when bank/payment info changes
-const DMEAST_BANK_INFO = {
-  beneficiary:  "DECON MEDICAL EQUIPMENT AND SUPPLIES TRADING",
-  bankName:     "China Banking Corporation",
-  bankAddress:  "8745 Paseo de Roxas, Makati City, Philippines",
-  swiftCode:    "CHBKPHMM",
-  accountName:  "DECON MEDICAL EQUIPMENT AND SUPPLIES TRADING",
-  accountNo:    "150600002424",
-  accountType:  "PHP Account (USD/foreign wires will be auto-converted at China Bank's prevailing rate)",
-};
-
-// v16.14: PayPal account info
-const DMEAST_PAYPAL_INFO = {
-  email:        "info@dmeastph.com",
-  holdWarning:  "Important: PayPal holds transactions over $500 USD for up to 21 days. For faster processing on larger orders, please use wire transfer or credit/debit card instead.",
-};
-
-// v16.17: Default payment method toggle settings (used if Firestore not yet set)
-const DEFAULT_PAYMENT_METHODS = {
-  wireTransfer: true,
-  fiuuQR:       true,
-  paypal:       true,
-  mayaLink:     true,
-};
-
-// v16.14: Fiuu in-store QR code (base64-encoded PNG)
-// To update: convert your Fiuu QR PNG to base64 and replace the empty string below.
-// Quick conversion: use https://www.base64-image.de or run in terminal:
-//   base64 -i fiuu-qr.png | pbcopy   (macOS)
-//   certutil -encode fiuu-qr.png tmp.txt && type tmp.txt   (Windows)
-// Then paste the data URL ("data:image/png;base64,iVBORw0KG...") between the quotes below.
-const FIUU_QR_IMAGE_DATA = "/fiuu-qr.png"; // v16.15: Real Fiuu QR embedded
-
-// v16.14: Fiuu card payment info
-const DMEAST_FIUU_INFO = {
-  merchantName: "DECON MEDICAL EQUIPMENT AND SUPPLIES TRADING",
-  // If you have a clickable URL alongside the QR, add it here for the email version
-  paymentUrl:   "", // Optional: paste Fiuu hosted payment page URL if available
-};
+// DMEAST_BANK_INFO, DMEAST_PAYPAL_INFO, DEFAULT_PAYMENT_METHODS moved to src/constants/banking.js
+// FIUU_QR_IMAGE_DATA, DMEAST_FIUU_INFO moved to src/lib/fiuu.js
+// (Phase 1 refactor — see imports at top of file.)
 
 // v15: Get next document number from Firestore counter
 async function getNextDocumentNumber(docType) {
