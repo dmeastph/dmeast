@@ -393,6 +393,9 @@ import {
   verifyMayaPayment,
 } from "./lib/maya";
 
+// Phase 1 refactor: Claude RFQ API wrapper moved to src/lib/claude.js
+import { callClaudeRFQ } from "./lib/claude";
+
 // v13.0d: Unified email sender for status updates + general customer notifications
 async function sendCustomerStatusEmail({ order, subject, bodyText }) {
   if (!order || !order.email) return { ok: false, reason: "no email on order" };
@@ -6686,13 +6689,7 @@ function RFQTab(){
         requestBody={maxTokens:16000,system:systemPrompt,isPdf:false,userMessage:`Parse this RFQ. Respond ONLY with the raw JSON array:\n\n${fc.slice(0,12000)}`};
       }
 
-      const response=await fetch("/api/claude-rfq",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(requestBody)});
-      const data=await response.json();
-
-      if(data.anthropicError||(!data.content&&data.error)){
-        const m=data.error?.error?.message||data.error||"API error";
-        throw new Error(typeof m==="string"?m:JSON.stringify(m));
-      }
+      const data = await callClaudeRFQ(requestBody);
 
       let parsed=[];
       if(data.parsedItems&&Array.isArray(data.parsedItems)){
