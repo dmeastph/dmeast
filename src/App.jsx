@@ -301,83 +301,7 @@ import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage
 // initializeApp/getAuth/getFirestore/getStorage calls) moved to src/lib/firebase.js
 import { auth, db, storage, IS_SANDBOX } from "./lib/firebase";
 
-const ADMIN_EMAILS = ["info@dmeastph.com", "admin@dmeastph.com"]; // Legacy - kept for backward compat
-
-// ─── v15 ROLE-BASED ACCESS CONTROL ───────────────────────────────────────────
-// Map admin emails to their role. Edit this list to add/remove staff.
-const ADMIN_ROLES = {
-  // 👑 SUPER ADMINS (Edward - owner) — full access to everything
-  "info@dmeastph.com":       "super",
-  "admin@dmeastph.com":      "super",
-  // 🔧 OPERATIONS ADMIN — sales coordinator / order processor
-  // Sees: Overview, Orders, Receivables, Products, Customers, Rx
-  // Cannot: see margins/expenses/billings/profits, delete orders
-  "ops@dmeastph.com":        "operations",
-  // 💼 ACCOUNTING ADMIN — bookkeeper / finance / accountant
-  // Sees: Overview, Receivables, Expenses, Billings, Margin, Customers (read-only)
-  // Cannot: edit orders or products, manage prescriptions
-  "accounting@dmeastph.com": "accounting",
-};
-
-// Role definitions and what each can access
-const ROLE_PERMISSIONS = {
-  super: {
-    label: "Super Admin",
-    icon: "👑",
-    color: "#7C3AED",
-    description: "Full access to all features",
-    tabs: ["overview","orders","receivables","expenses","billings","margin","products","customers","rx","blog","suppliers","rfq","settings"],
-    canEditOrders: true,
-    canDeleteOrders: true,
-    canEditProducts: true,
-    canSeeMargins: true,
-    canSeeExpenses: true,
-    canManageUsers: true,
-    canEditBlog: true,
-  },
-  operations: {
-    label: "Operations Admin",
-    icon: "🔧",
-    color: "#0EA5E9",
-    description: "Manages orders, customers, products, prescriptions, margin dashboard",
-    tabs: ["overview","orders","receivables","margin","products","customers","rx","blog"],
-    canEditOrders: true,
-    canDeleteOrders: false,        // Operations cannot delete orders
-    canEditProducts: true,
-    canSeeMargins: true,            // v15.2: now allowed to see margin dashboard
-    canSeeExpenses: false,           // but NOT detailed expenses (still hidden)
-    canManageUsers: false,
-    canEditBlog: true,              // v16.5: ops can manage blog
-  },
-  accounting: {
-    label: "Accounting Admin",
-    icon: "💼",
-    color: "#10B981",
-    description: "Manages financial records, expenses, billings",
-    tabs: ["overview","receivables","expenses","billings","margin","customers"],
-    canEditOrders: false,           // Read-only on orders
-    canDeleteOrders: false,
-    canEditProducts: false,
-    canSeeMargins: true,
-    canSeeExpenses: true,
-    canManageUsers: false,
-    canEditBlog: false,             // v16.5: accounting doesn't manage blog
-  },
-};
-
-// v15: Get role for current user (replaces simple admin email check)
-const getUserRole = (email) => {
-  if (!email) return null;
-  const lower = email.toLowerCase();
-  return ADMIN_ROLES[lower] || null;
-};
-
-const isAdminUser = (email) => getUserRole(email) !== null;
-
-const getPermissions = (email) => {
-  const role = getUserRole(email);
-  return role ? ROLE_PERMISSIONS[role] : null;
-};
+import { ADMIN_EMAILS, ADMIN_ROLES, ROLE_PERMISSIONS, getUserRole, isAdminUser, getPermissions } from "./constants/admin";
 
 
 
@@ -411,17 +335,7 @@ import { callClaudeRFQ } from "./lib/claude";
 // 3 email helper functions (sendCustomerStatusEmail, sendAdminNewOrderNotification,
 // sendCustomerReceiptEmail) moved to src/lib/email-helpers.js as part of Phase 1 refactor.
 
-const POINTS_PER_PHP = 1 / 200;
-const POINT_VALUE    = 0.50;
-
-// ─── v13.0a CONSTANTS ────────────────────────────────────────────────────────
-// Business registration info (BIR documents)
-const DMEAST_BUSINESS_INFO = {
-  legalName: "DECON MEDICAL EQUIPMENT AND SUPPLIES TRADING",
-  proprietor: "EDILBERTO B. CONDE",
-  vatRegTIN: "417-877-476-00000",
-  registeredAddress: "1146 M. Natividad St., Cor. Mayhaligue St., Brgy 316 Zone 032, 1014 Sta. Cruz NCR, City of Manila, First District Philippines",
-};
+import { POINTS_PER_PHP, POINT_VALUE, DMEAST_BUSINESS_INFO } from "./constants/business";
 
 // v13.0a: Order source channels
 const ORDER_SOURCES = [
