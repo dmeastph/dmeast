@@ -29,14 +29,14 @@ export function ProductCard({ product, addToCart, setPage, wishlist, toggleWishl
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
       style={{
-        background: ds.color.white,
-        border: `1px solid ${hover ? accentColor + "55" : ds.color.border}`,
-        borderRadius: ds.radius.lg,
+        background: "#FFFFFF",
+        border: `0.5px solid ${hover ? accentColor + "40" : "rgba(0,0,0,0.08)"}`,
+        borderRadius: 12,
         overflow: "hidden",
-        boxShadow: hover ? ds.shadow.md : ds.shadow.xs,
+        boxShadow: hover ? "0 4px 20px rgba(0,0,0,0.10)" : "0 1px 4px rgba(0,0,0,0.05)",
         position: "relative",
-        transform: hover ? "translateY(-3px)" : "translateY(0)",
-        transition: "all 0.2s ease",
+        transform: hover ? "translateY(-2px)" : "translateY(0)",
+        transition: "all 0.18s ease",
         display: "flex",
         flexDirection: "column",
         height: "100%",
@@ -48,7 +48,7 @@ export function ProductCard({ product, addToCart, setPage, wishlist, toggleWishl
           <button
             onClick={e => { e.stopPropagation(); toggleWishlist(product.id); }}
             title={inWishlist ? "Remove from wishlist" : "Add to wishlist"}
-            style={{ background: "rgba(255,255,255,0.95)", border: `1px solid ${ds.color.border}`, borderRadius: "50%", width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15, cursor: "pointer", boxShadow: ds.shadow.xs }}
+            style={{ background: "rgba(255,255,255,0.90)", border: "0.5px solid rgba(0,0,0,0.10)", borderRadius: "50%", width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15, cursor: "pointer", backdropFilter: "blur(8px)" }}
           >
             {inWishlist ? "❤️" : "🤍"}
           </button>
@@ -58,8 +58,8 @@ export function ProductCard({ product, addToCart, setPage, wishlist, toggleWishl
       {/* Top-left CTA badge */}
       {product.cta && product.cta !== "buy" && (
         <div style={{ position: "absolute", top: 10, left: 10, zIndex: 2 }}>
-          {product.cta === "quote" && <span style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: "0.06em", padding: "3px 8px", borderRadius: ds.radius.pill, background: ds.color.goldLight, color: ds.color.gold, border: `1px solid ${ds.color.goldBorder}`, textTransform: "uppercase" }}>By Quote</span>}
-          {product.cta === "sales" && <span style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: "0.06em", padding: "3px 8px", borderRadius: ds.radius.pill, background: ds.color.canvas, color: ds.color.textBody, border: `1px solid ${ds.color.border}`, textTransform: "uppercase" }}>Contact Sales</span>}
+          {product.cta === "quote" && <span style={{ fontSize: 9.5, fontWeight: 600, letterSpacing: "0.05em", padding: "3px 9px", borderRadius: 980, background: ds.color.goldLight, color: ds.color.gold, border: `0.5px solid ${ds.color.goldBorder}`, textTransform: "uppercase" }}>By Quote</span>}
+          {product.cta === "sales" && <span style={{ fontSize: 9.5, fontWeight: 600, letterSpacing: "0.05em", padding: "3px 9px", borderRadius: 980, background: "rgba(0,0,0,0.05)", color: ds.color.textMuted, border: "0.5px solid rgba(0,0,0,0.10)", textTransform: "uppercase" }}>Contact Sales</span>}
         </div>
       )}
 
@@ -68,9 +68,9 @@ export function ProductCard({ product, addToCart, setPage, wishlist, toggleWishl
         <ProductImg imageSrc={product.imageSrc} category={product.category} name={product.name} />
       </div>
 
-      <div style={{ padding: "16px 18px 18px", display: "flex", flexDirection: "column", flex: 1 }}>
+      <div style={{ padding: "14px 16px 16px", display: "flex", flexDirection: "column", flex: 1 }}>
         {cat && (
-          <div style={{ fontSize: 10, fontWeight: 700, color: accentColor, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6 }}>
+          <div style={{ fontSize: 10, fontWeight: 600, color: accentColor, letterSpacing: "0.07em", textTransform: "uppercase", marginBottom: 5 }}>
             {cat.label}
           </div>
         )}
@@ -78,7 +78,7 @@ export function ProductCard({ product, addToCart, setPage, wishlist, toggleWishl
         {/* Product name — clickable to detail page */}
         <h3
           onClick={goToDetail}
-          style={{ fontSize: 14, fontWeight: 600, color: ds.color.textDark, lineHeight: 1.35, marginBottom: 6, minHeight: 38, cursor: "pointer", textDecoration: "none" }}
+          style={{ fontSize: 13.5, fontWeight: 500, color: ds.color.textDark, lineHeight: 1.35, marginBottom: 6, minHeight: 36, cursor: "pointer", textDecoration: "none", letterSpacing: "-0.01em" }}
           onMouseEnter={e => { e.currentTarget.style.color = accentColor; }}
           onMouseLeave={e => { e.currentTarget.style.color = ds.color.textDark; }}
         >
@@ -86,9 +86,9 @@ export function ProductCard({ product, addToCart, setPage, wishlist, toggleWishl
         </h3>
 
         {product.requiresPrescription && (
-          <div style={{ display: "inline-flex", alignItems: "center", gap: 4, background: "#FFF3CD", border: "1px solid #FBBF24", borderRadius: ds.radius.pill, padding: "2px 8px", marginBottom: 8, alignSelf: "flex-start" }}>
+          <div style={{ display: "inline-flex", alignItems: "center", gap: 4, background: "#FFF3CD", border: "0.5px solid #FBBF24", borderRadius: 980, padding: "2px 8px", marginBottom: 8, alignSelf: "flex-start" }}>
             <span style={{ fontSize: 10 }}>💊</span>
-            <span style={{ fontSize: 9, fontWeight: 700, color: "#92400E", letterSpacing: "0.05em", textTransform: "uppercase" }}>Rx Required</span>
+            <span style={{ fontSize: 9, fontWeight: 600, color: "#92400E", letterSpacing: "0.05em", textTransform: "uppercase" }}>Rx Required</span>
           </div>
         )}
 

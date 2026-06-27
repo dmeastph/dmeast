@@ -50,14 +50,15 @@ export function TopAnnouncementBar(){
 export function HeroSectionV16({setPage}){
   return (
     <section className="dm-hero-section" style={{
-      background: `linear-gradient(150deg, ${ds.color.canvasWarm} 0%, ${ds.color.white} 60%, ${ds.color.canvasGold} 100%)`,
+      background: "#FFFFFF",
       padding: "72px 0 80px",
       position: "relative",
       overflow: "hidden",
+      borderBottom: "0.5px solid rgba(0,0,0,0.07)",
     }}>
-      <div className="dm-dot-bg" style={{position:"absolute",right:0,top:0,width:"55%",height:"100%",opacity:0.55,pointerEvents:"none"}}/>
-      <div style={{position:"absolute",top:"-100px",right:"-80px",width:480,height:480,borderRadius:"50%",border:`2px solid ${ds.color.goldBright}25`,pointerEvents:"none"}}/>
-      <div style={{position:"absolute",bottom:"-160px",left:"-100px",width:380,height:380,borderRadius:"50%",background:`radial-gradient(circle, ${ds.color.redLight} 0%, transparent 70%)`,opacity:0.6,pointerEvents:"none"}}/>
+      <div className="dm-dot-bg" style={{position:"absolute",right:0,top:0,width:"55%",height:"100%",opacity:0.30,pointerEvents:"none"}}/>
+      <div style={{position:"absolute",top:"-100px",right:"-80px",width:480,height:480,borderRadius:"50%",border:`1.5px solid ${ds.color.goldBright}20`,pointerEvents:"none"}}/>
+      <div style={{position:"absolute",bottom:"-160px",left:"-100px",width:380,height:380,borderRadius:"50%",background:`radial-gradient(circle, ${ds.color.redLight} 0%, transparent 70%)`,opacity:0.45,pointerEvents:"none"}}/>
       
       <div style={{maxWidth:1280,margin:"0 auto",padding:"0 28px",position:"relative",zIndex:1}}>
         <div className="dm-hero-grid">
@@ -77,29 +78,27 @@ export function HeroSectionV16({setPage}){
               </span>
             </div>
             
-            <h1 className="dm-fade-up dm-fade-up-1" style={{fontFamily:ds.font.display,fontSize:"clamp(2.2rem,4.5vw,3.6rem)",fontWeight:400,color:ds.color.textDark,lineHeight:1.1,marginBottom:8}}>
-              Your Trusted Source for
+            <h1 className="dm-fade-up dm-fade-up-1" style={{fontFamily:ds.font.display,fontSize:"clamp(2.4rem,4.5vw,3.8rem)",fontWeight:600,color:ds.color.textDark,lineHeight:1.08,letterSpacing:"-0.03em",marginBottom:8}}>
+              Your trusted source for
             </h1>
-            <h1 className="dm-fade-up dm-fade-up-2" style={{fontFamily:ds.font.display,fontSize:"clamp(2.2rem,4.5vw,3.6rem)",fontWeight:400,lineHeight:1.1,marginBottom:24}}>
-              <span style={{color:ds.color.red}}>Quality Medical</span><br/>
-              <span style={{color:ds.color.textDark}}>Solutions</span>
+            <h1 className="dm-fade-up dm-fade-up-2" style={{fontFamily:ds.font.display,fontSize:"clamp(2.4rem,4.5vw,3.8rem)",fontWeight:600,lineHeight:1.08,letterSpacing:"-0.03em",marginBottom:24}}>
+              <span style={{color:ds.color.red}}>quality medical</span><br/>
+              <span style={{color:ds.color.textDark}}>solutions</span>
               <span style={{color:ds.color.gold}}>.</span>
             </h1>
             
-            <p className="dm-fade-up dm-fade-up-3" style={{fontSize:16,color:ds.color.textMuted,lineHeight:1.75,maxWidth:520,marginBottom:32}}>
-              Pharmaceuticals, medical equipment, and healthcare essentials —
-              delivered nationwide. Trusted by hospitals, clinics, LGUs, and 
-              individuals across the Philippines.
+            <p className="dm-fade-up dm-fade-up-3" style={{fontSize:16,color:ds.color.textMuted,lineHeight:1.65,maxWidth:500,marginBottom:32,fontWeight:400}}>
+              Pharmaceuticals, medical equipment, and healthcare essentials — delivered nationwide. Trusted by hospitals, clinics, LGUs, and individuals across the Philippines.
             </p>
             
             {/* Search bar */}
             <div className="dm-fade-up dm-fade-up-3" style={{maxWidth:520,marginBottom:24}}>
               <button onClick={()=>setPage("products")} style={{
                 width:"100%",
-                background:"#fff",
-                border:`2px solid ${ds.color.border}`,
-                borderRadius:ds.radius.lg,
-                padding:"14px 18px 14px 50px",
+                background:"#F5F5F7",
+                border:"0.5px solid rgba(0,0,0,0.10)",
+                borderRadius:12,
+                padding:"13px 16px 13px 46px",
                 fontSize:14,
                 color:ds.color.textMuted,
                 cursor:"pointer",
@@ -107,14 +106,14 @@ export function HeroSectionV16({setPage}){
                 fontFamily:ds.font.body,
                 textAlign:"left",
                 transition:"border-color 0.15s, box-shadow 0.15s",
-                boxShadow:ds.shadow.xs,
+                letterSpacing:"-0.01em",
               }}
-              onMouseEnter={e=>{e.currentTarget.style.borderColor=ds.color.red;e.currentTarget.style.boxShadow=ds.shadow.sm;}}
-              onMouseLeave={e=>{e.currentTarget.style.borderColor=ds.color.border;e.currentTarget.style.boxShadow=ds.shadow.xs;}}
+              onMouseEnter={e=>{e.currentTarget.style.borderColor="rgba(204,47,60,0.35)";e.currentTarget.style.background="#fff";}}
+              onMouseLeave={e=>{e.currentTarget.style.borderColor="rgba(0,0,0,0.10)";e.currentTarget.style.background="#F5F5F7";}}
               >
-                <span style={{position:"absolute",left:18,top:"50%",transform:"translateY(-50%)",fontSize:18}}>🔍</span>
+                <span style={{position:"absolute",left:16,top:"50%",transform:"translateY(-50%)",fontSize:16,opacity:0.5}}>🔍</span>
                 Search products, equipment, or browse our catalog…
-                <span style={{position:"absolute",right:14,top:"50%",transform:"translateY(-50%)",background:ds.color.red,color:"#fff",borderRadius:ds.radius.md,padding:"6px 14px",fontSize:12,fontWeight:700}}>Browse →</span>
+                <span style={{position:"absolute",right:12,top:"50%",transform:"translateY(-50%)",background:ds.color.red,color:"#fff",borderRadius:980,padding:"5px 14px",fontSize:11.5,fontWeight:500}}>Browse →</span>
               </button>
             </div>
             
@@ -142,34 +141,35 @@ export function HeroSectionV16({setPage}){
           <div className="dm-hero-right" style={{display:"flex",flexDirection:"column",gap:16}}>
             <div className="dm-grid-4" style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:14}}>
               {[
-                {v:"5+",l:"Years Serving PH",accent:ds.color.red},
-                {v:"500+",l:"Clients Nationwide",accent:ds.color.goldBright},
-                {v:"9",l:"Product Categories",accent:ds.color.red},
-                {v:"24/7",l:"Order Support",accent:ds.color.goldBright}
+                {v:"5+",l:"Years serving PH",accent:ds.color.red},
+                {v:"500+",l:"Clients nationwide",accent:ds.color.goldBright},
+                {v:"9",l:"Product categories",accent:ds.color.red},
+                {v:"24/7",l:"Order support",accent:ds.color.goldBright}
               ].map((s,i)=>(
                 <div key={i} style={{
-                  background:ds.color.white,
-                  border:`1px solid ${ds.color.border}`,
-                  borderRadius:ds.radius.lg,
-                  padding:"22px 18px",
+                  background:"#FFFFFF",
+                  border:"0.5px solid rgba(0,0,0,0.08)",
+                  borderRadius:12,
+                  padding:"20px 16px",
                   textAlign:"center",
-                  borderTop:`3px solid ${s.accent}`,
-                  boxShadow:ds.shadow.xs
+                  borderTop:`2.5px solid ${s.accent}`,
+                  boxShadow:"0 1px 4px rgba(0,0,0,0.05)",
                 }}>
-                  <div style={{fontFamily:ds.font.display,fontSize:"2rem",color:s.accent,lineHeight:1}}>{s.v}</div>
-                  <div style={{fontSize:11,color:ds.color.textMuted,marginTop:6,fontWeight:500,letterSpacing:"0.04em",textTransform:"uppercase"}}>{s.l}</div>
+                  <div style={{fontFamily:ds.font.display,fontSize:"1.9rem",fontWeight:600,color:s.accent,lineHeight:1,letterSpacing:"-0.03em"}}>{s.v}</div>
+                  <div style={{fontSize:10.5,color:ds.color.textMuted,marginTop:5,fontWeight:400,letterSpacing:"0.01em"}}>{s.l}</div>
                 </div>
               ))}
             </div>
             <div style={{
-              background:ds.color.textDark,
-              borderRadius:ds.radius.lg,
-              padding:"22px 24px"
+              background:"#1D1D1F",
+              borderRadius:12,
+              padding:"22px 24px",
+              border:"0.5px solid rgba(255,255,255,0.08)",
             }}>
-              <div style={{fontSize:10,fontWeight:700,color:ds.color.goldBright,letterSpacing:"0.14em",textTransform:"uppercase",marginBottom:8}}>Why Choose DMEAST</div>
-              <div style={{fontSize:15,fontWeight:600,color:"#fff",marginBottom:8}}>Products from Authorized Suppliers</div>
-              <div style={{fontSize:13,color:"rgba(255,255,255,0.6)",lineHeight:1.7}}>
-                All products are sourced from verified and authorized suppliers. Standard items available for direct purchase. Institutional and specialized orders handled upon request.
+              <div style={{fontSize:10,fontWeight:600,color:ds.color.goldBright,letterSpacing:"0.10em",textTransform:"uppercase",marginBottom:8}}>Why choose DMEAST</div>
+              <div style={{fontSize:15,fontWeight:500,color:"#fff",marginBottom:8,letterSpacing:"-0.01em"}}>Products from authorized suppliers</div>
+              <div style={{fontSize:13,color:"rgba(255,255,255,0.55)",lineHeight:1.65,fontWeight:400}}>
+                All products sourced from verified and authorized suppliers. Standard items available for direct purchase. Institutional orders handled upon request.
               </div>
             </div>
           </div>
@@ -189,17 +189,17 @@ export function StatsTrustBand(){
     { icon:"⭐", value:"100%", label:"Quality-First Promise", color:ds.color.goldBright },
   ];
   return (
-    <section style={{background:ds.color.white,padding:"40px 28px",borderTop:`1px solid ${ds.color.borderLight}`,borderBottom:`1px solid ${ds.color.borderLight}`}}>
+    <section style={{background:"#F5F5F7",padding:"36px 28px",borderTop:"0.5px solid rgba(0,0,0,0.07)",borderBottom:"0.5px solid rgba(0,0,0,0.07)"}}>
       <div style={{maxWidth:1280,margin:"0 auto"}}>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))",gap:20}}>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))",gap:16}}>
           {stats.map((s,i)=>(
-            <div key={i} style={{display:"flex",alignItems:"center",gap:14,padding:"4px"}}>
-              <div style={{width:50,height:50,borderRadius:ds.radius.md,background:s.color+"15",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,flexShrink:0}}>
+            <div key={i} style={{display:"flex",alignItems:"center",gap:14,background:"#fff",borderRadius:12,padding:"18px 20px",border:"0.5px solid rgba(0,0,0,0.07)"}}>
+              <div style={{width:44,height:44,borderRadius:10,background:s.color+"12",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>
                 {s.icon}
               </div>
               <div>
-                <div style={{fontFamily:ds.font.display,fontSize:24,color:s.color,lineHeight:1,fontWeight:400}}>{s.value}</div>
-                <div style={{fontSize:12,color:ds.color.textMuted,marginTop:4,fontWeight:500}}>{s.label}</div>
+                <div style={{fontFamily:ds.font.display,fontSize:22,color:s.color,lineHeight:1,fontWeight:600,letterSpacing:"-0.02em"}}>{s.value}</div>
+                <div style={{fontSize:11.5,color:ds.color.textMuted,marginTop:4,fontWeight:400}}>{s.label}</div>
               </div>
             </div>
           ))}
@@ -213,45 +213,45 @@ export function StatsTrustBand(){
 export function CategoryGridV16({setPage,setActiveCategory}){
   const allCats = PUBLIC_CATEGORIES.filter(c => !c.institutional);
   return (
-    <section style={{background:ds.color.canvas,padding:"64px 28px"}}>
+    <section style={{background:"#F5F5F7",padding:"64px 28px"}}>
       <div style={{maxWidth:1280,margin:"0 auto"}}>
         <div style={{textAlign:"center",marginBottom:36}}>
-          <div style={{fontSize:11,fontWeight:700,color:ds.color.gold,letterSpacing:"0.14em",textTransform:"uppercase",marginBottom:10}}>Browse by Category</div>
-          <h2 style={{fontFamily:ds.font.display,fontSize:"clamp(1.6rem,3vw,2.2rem)",color:ds.color.textDark,fontWeight:400,marginBottom:8}}>What are you looking for today?</h2>
-          <p style={{fontSize:14,color:ds.color.textMuted,maxWidth:560,margin:"0 auto"}}>Find medical equipment, devices, and healthcare essentials — all in one place.</p>
+          <div style={{fontSize:11,fontWeight:600,color:ds.color.gold,letterSpacing:"0.10em",textTransform:"uppercase",marginBottom:10}}>Browse by category</div>
+          <h2 style={{fontFamily:ds.font.display,fontSize:"clamp(1.6rem,3vw,2.2rem)",color:ds.color.textDark,fontWeight:600,marginBottom:8,letterSpacing:"-0.03em"}}>What are you looking for today?</h2>
+          <p style={{fontSize:14,color:ds.color.textMuted,maxWidth:520,margin:"0 auto",fontWeight:400}}>Find medical equipment, devices, and healthcare essentials — all in one place.</p>
         </div>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:14}}>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:12}}>
           {allCats.map((cat,i)=>{
             const colors = [ds.color.red, ds.color.gold, ds.color.red, ds.color.gold];
             const accent = colors[i % colors.length];
             return (
               <button key={cat.id} onClick={()=>{setActiveCategory(cat.id);setPage("products");}} style={{
-                background:"#fff",
-                border:`1px solid ${ds.color.border}`,
-                borderRadius:ds.radius.lg,
-                padding:"24px 16px",
+                background:"#FFFFFF",
+                border:"0.5px solid rgba(0,0,0,0.08)",
+                borderRadius:12,
+                padding:"22px 14px",
                 cursor:"pointer",
                 fontFamily:ds.font.body,
                 transition:"transform 0.15s, border-color 0.15s, box-shadow 0.15s",
-                boxShadow:ds.shadow.xs,
+                boxShadow:"0 1px 3px rgba(0,0,0,0.05)",
                 textAlign:"center",
               }}
-              onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-2px)";e.currentTarget.style.borderColor=accent;e.currentTarget.style.boxShadow=ds.shadow.md;}}
-              onMouseLeave={e=>{e.currentTarget.style.transform="translateY(0)";e.currentTarget.style.borderColor=ds.color.border;e.currentTarget.style.boxShadow=ds.shadow.xs;}}
+              onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-2px)";e.currentTarget.style.borderColor=accent+"60";e.currentTarget.style.boxShadow="0 4px 16px rgba(0,0,0,0.09)";}}
+              onMouseLeave={e=>{e.currentTarget.style.transform="translateY(0)";e.currentTarget.style.borderColor="rgba(0,0,0,0.08)";e.currentTarget.style.boxShadow="0 1px 3px rgba(0,0,0,0.05)";}}
               >
                 <div style={{
-                  width:54,
-                  height:54,
-                  borderRadius:"50%",
-                  background:`linear-gradient(135deg, ${accent}22 0%, ${accent}11 100%)`,
+                  width:52,
+                  height:52,
+                  borderRadius:14,
+                  background:`${accent}10`,
                   display:"flex",alignItems:"center",justifyContent:"center",
                   margin:"0 auto 12px",
-                  fontSize:24,
-                  border:`2px solid ${accent}33`,
+                  fontSize:22,
+                  border:`0.5px solid ${accent}25`,
                 }}>
                   {cat.icon || "💊"}
                 </div>
-                <div style={{fontSize:13,fontWeight:700,color:ds.color.textDark,marginBottom:4}}>{cat.label}</div>
+                <div style={{fontSize:12.5,fontWeight:500,color:ds.color.textDark,marginBottom:4,letterSpacing:"-0.01em"}}>{cat.label}</div>
                 <div style={{fontSize:11,color:ds.color.textMuted}}>Browse →</div>
               </button>
             );
@@ -273,13 +273,13 @@ export function TrendingProductsV16({setPage, addToCart}){
   const display = fallback.length >= 4 ? fallback : trending;
 
   return (
-    <section style={{background:ds.color.white,padding:"64px 28px"}}>
+    <section style={{background:"#FFFFFF",padding:"64px 28px",borderTop:"0.5px solid rgba(0,0,0,0.07)"}}>
       <div style={{maxWidth:1280,margin:"0 auto"}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-end",marginBottom:32,flexWrap:"wrap",gap:16}}>
           <div>
-            <div style={{fontSize:11,fontWeight:700,color:ds.color.red,letterSpacing:"0.14em",textTransform:"uppercase",marginBottom:8}}>🔥 Trending</div>
-            <h2 style={{fontFamily:ds.font.display,fontSize:"clamp(1.6rem,3vw,2.2rem)",color:ds.color.textDark,fontWeight:400,marginBottom:6}}>Most Popular Products</h2>
-            <p style={{fontSize:14,color:ds.color.textMuted,maxWidth:520}}>Top-selling healthcare essentials, ready to ship.</p>
+            <div style={{fontSize:11,fontWeight:600,color:ds.color.red,letterSpacing:"0.10em",textTransform:"uppercase",marginBottom:8}}>Trending</div>
+            <h2 style={{fontFamily:ds.font.display,fontSize:"clamp(1.6rem,3vw,2.1rem)",color:ds.color.textDark,fontWeight:600,marginBottom:6,letterSpacing:"-0.03em"}}>Most popular products</h2>
+            <p style={{fontSize:14,color:ds.color.textMuted,maxWidth:520,fontWeight:400}}>Top-selling healthcare essentials, ready to ship.</p>
           </div>
           <button onClick={()=>setPage("products")} style={{background:"none",border:"none",color:ds.color.red,fontWeight:700,cursor:"pointer",fontSize:13,fontFamily:ds.font.body,padding:"6px 0"}}>
             See All Products →
