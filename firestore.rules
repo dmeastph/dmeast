@@ -1,0 +1,126 @@
+rules_version = '2';
+
+// ─── DMEAST Firestore Security Rules ────────────────────────────────────────
+//
+// Admin identity: stored in /admins/{uid} collection (see DEPLOYMENT GUIDE).
+// To grant admin, run from Firebase Admin SDK or console:
+//   db.collection('admins').doc(uid).set({ email: 'info@dmeastph.com', role: 'super_admin' })
+//
+// ⚠️  NEVER relax these rules without PayRex / business approval.
+// ⚠️  The pharma category restriction (HIDE_PHARMA_PUBLIC) is enforced client-side only;
+//     these rules do not hide pharma products from authenticated API users.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ─── Helpers ────────────────────────────────────────────────────────────
+
+    // User is signed in
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // User is the owner of this document (uid field matches their auth uid)
+    function isOwner(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    // User is an admin (document exists in /admins/{uid})
+    function isAdmin() {
+      return isSignedIn() &&
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+
+    // Only admins can read the admins collection (prevent enumeration)
+    match /admins/{uid} {
+      allow read:  if isAdmin();
+      allow write: if false; // Managed via Firebase Admin SDK only
+    }
+
+    // ─── Products ───────────────────────────────────────────────────────────
+    // Public catalog — everyone can browse; only admins can modify
+    match /products/{productId} {
+      allow read:  if true;
+      allow write: if isAdmin();
+    }
+
+    // ─── Blog Posts ─────────────────────────────────────────────────────────
+    // Published posts are public; drafts are admin-only
+    match /blogPosts/{postId} {
+      allow read:  if resource.data.status == 'published' || isAdmin();
+      allow write: if isAdmin();
+    }
+
+    // Legacy blog collection (same rules)
+    match /posts/{postId} {
+      allow read:  if resource.data.status == 'published' || isAdmin();
+      allow write: if isAdmin();
+    }
+
+    // ─── Customers ──────────────────────────────────────────────────────────
+    // Each user can only read/write their own profile; admins see all
+    match /customers/{uid} {
+      allow read:  if isOwner(uid) || isAdmin();
+      allow create: if isOwner(uid);
+      allow update: if isOwner(uid) || isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // ─── Orders ─────────────────────────────────────────────────────────────
+    // Customers can view their own orders; anyone can place an order (guest checkout).
+    // Admins can read and modify all orders.
+    match /orders/{orderId} {
+      allow read:   if (isSignedIn() && resource.data.uid == request.auth.uid) || isAdmin();
+      allow create: if true; // Guest checkout allowed — no auth required to place order
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // ─── Rx Uploads ─────────────────────────────────────────────────────────
+    // Patients can see their own uploads; admins see all
+    match /rxUploads/{uid} {
+      allow read:   if isOwner(uid) || isAdmin();
+      allow create: if isSignedIn();
+      allow update: if isOwner(uid) || isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // ─── Quotes / RFQ ───────────────────────────────────────────────────────
+    // Anyone can submit a quote request (lead gen form); only admins can read
+    match /quotes/{quoteId} {
+      allow read:   if isAdmin();
+      allow create: if true;  // Public quote request form
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // ─── Admin-only collections ──────────────────────────────────────────────
+    // Expenses, manual billings, suppliers, supplier products, settings
+    // — internal business data, never exposed to customers
+
+    match /expenses/{docId} {
+      allow read, write: if isAdmin();
+    }
+
+    match /manualBillings/{docId} {
+      allow read, write: if isAdmin();
+    }
+
+    match /suppliers/{docId} {
+      allow read, write: if isAdmin();
+    }
+
+    match /supplier_products/{docId} {
+      allow read, write: if isAdmin();
+    }
+
+    match /settings/{docId} {
+      allow read, write: if isAdmin();
+    }
+
+    // ─── Catch-all: deny everything not explicitly matched ───────────────────
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
