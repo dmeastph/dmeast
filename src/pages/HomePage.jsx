@@ -8,6 +8,7 @@ import { Btn, CtaBadge, Tag, SectionHeader, BrandLogo, Spinner, PageHero, Divide
 import { ProductCard } from "../components/ProductCard";
 import { usePublishedPosts } from "../lib/blog";
 import { CONTACT } from "../constants/contact";
+import { LatestArticlesSection } from "./LatestArticlesSection";
 
 export function TopAnnouncementBar(){
   const [show, setShow] = useState(true);
