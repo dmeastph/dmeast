@@ -6,6 +6,7 @@ import { formatDate, formatPHP } from "../utils/format";
 import { orderStatusColor, paymentStatusColor, ORDER_STATUS_LABELS, PAYMENT_STATUS_LABELS } from "../constants/status";
 import { Btn, Spinner, PageHero, Tag } from "../components/ui";
 import { CONTACT } from "../constants/contact";
+import { PaymentProofUpload } from "../components/PaymentProofUpload";
 
 export function TrackOrderPage(){
   const [refInput, setRefInput] = useState("");

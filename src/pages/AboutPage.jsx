@@ -2,6 +2,7 @@ import { ds } from "../constants/design";
 import { CONTACT } from "../constants/contact";
 import { CLIENT_TYPES, COMPANY_MILESTONES } from "../constants/content";
 import { Btn, SectionHeader, PageHero } from "../components/ui";
+import { WhyChooseSection } from "./HomePage";
 
 export function AboutPage(){
   return(

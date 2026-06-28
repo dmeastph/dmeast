@@ -16,6 +16,8 @@ import { sendCustomerReceiptEmail, sendAdminNewOrderNotification } from "../lib/
 import { sendSMS, orderConfirmationSMS } from "../lib/sms";
 import { computeVATBreakdown } from "../lib/pdf";
 import { Btn, Spinner, Tag } from "../components/ui";
+import { LeafletAddressMap } from "../components/LeafletAddressMap";
+import { PaymentProofUpload } from "../components/PaymentProofUpload";
 
 export function CartPage({cart,removeFromCart,updateQty,setPage,user,onOrderComplete}){
   const [step,setStep]         = useState(1);
