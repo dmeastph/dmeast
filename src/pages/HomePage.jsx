@@ -47,7 +47,7 @@ export function TopAnnouncementBar(){
 }
 
 // v16.0: Modern hero with photo slot, trust badges, dual CTA
-export function HeroSectionV16({setPage}){
+export function HeroSectionV16({setPage,setActiveCategory}){
   return (
     <section className="dm-hero-section" style={{
       background: "#FFFFFF",
@@ -78,9 +78,10 @@ export function HeroSectionV16({setPage}){
               </span>
             </div>
             
-            <h1 className="dm-fade-up dm-fade-up-1" style={{fontFamily:ds.font.display,fontSize:"clamp(2.2rem,4.2vw,3.6rem)",fontWeight:600,lineHeight:1.1,letterSpacing:"-0.03em",marginBottom:24}}>
-              <span style={{color:ds.color.textDark}}>Your trusted source for </span>
-              <span style={{color:ds.color.red}}>quality medical solutions</span>
+            <h1 className="dm-fade-up dm-fade-up-1" style={{fontFamily:ds.font.display,fontSize:"clamp(2.2rem,4.2vw,3.8rem)",fontWeight:700,lineHeight:1.03,letterSpacing:"-0.04em",marginBottom:24}}>
+              <span style={{color:ds.color.textDark}}>Healthcare supplies,</span><br/>
+              <span style={{color:ds.color.red}}>delivered</span>
+              <span style={{color:ds.color.textDark}}> to your door</span>
               <span style={{color:ds.color.gold}}>.</span>
             </h1>
             
@@ -134,41 +135,40 @@ export function HeroSectionV16({setPage}){
             </div>
           </div>
           
-          {/* RIGHT: v15-style stat tiles + dark info panel — hidden on mobile via dm-hero-right */}
-          <div className="dm-hero-right" style={{display:"flex",flexDirection:"column",gap:16}}>
-            <div className="dm-grid-4" style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:14}}>
-              {[
-                {v:"5+",l:"Years serving PH",accent:ds.color.red},
-                {v:"500+",l:"Clients nationwide",accent:ds.color.goldBright},
-                {v:"9",l:"Product categories",accent:ds.color.red},
-                {v:"24/7",l:"Order support",accent:ds.color.goldBright}
-              ].map((s,i)=>(
-                <div key={i} style={{
-                  background:"#FFFFFF",
-                  border:"0.5px solid rgba(0,0,0,0.08)",
-                  borderRadius:12,
-                  padding:"20px 16px",
-                  textAlign:"center",
-                  borderTop:`2.5px solid ${s.accent}`,
-                  boxShadow:"0 1px 4px rgba(0,0,0,0.05)",
-                }}>
-                  <div style={{fontFamily:ds.font.display,fontSize:"1.9rem",fontWeight:600,color:s.accent,lineHeight:1,letterSpacing:"-0.03em"}}>{s.v}</div>
-                  <div style={{fontSize:10.5,color:ds.color.textMuted,marginTop:5,fontWeight:400,letterSpacing:"0.01em"}}>{s.l}</div>
+          {/* RIGHT: Category quicklinks (clinical style) — hidden on mobile */}
+          <div className="dm-hero-right" style={{display:"flex",flexDirection:"column",gap:8}}>
+            <div style={{fontSize:10,fontWeight:600,letterSpacing:"0.10em",textTransform:"uppercase",color:ds.color.textMuted,marginBottom:4}}>Browse by category</div>
+            {PUBLIC_CATEGORIES.filter(c=>!c.institutional).map(cat=>(
+              <button key={cat.id} onClick={()=>setActiveCategory?.(cat.id)} style={{
+                display:"flex",alignItems:"center",justifyContent:"space-between",
+                padding:"11px 14px",background:"#fff",border:"0.5px solid rgba(0,0,0,0.08)",
+                borderRadius:10,cursor:"pointer",fontFamily:ds.font.body,
+                transition:"border-color 0.15s,background 0.15s",textAlign:"left",width:"100%",
+              }}
+              onMouseEnter={e=>{e.currentTarget.style.borderColor=ds.color.redBorder;e.currentTarget.style.background=ds.color.redLight;}}
+              onMouseLeave={e=>{e.currentTarget.style.borderColor="rgba(0,0,0,0.08)";e.currentTarget.style.background="#fff";}}
+              >
+                <div style={{display:"flex",alignItems:"center",gap:10}}>
+                  <div style={{width:30,height:30,borderRadius:7,background:ds.color.redLight,display:"flex",alignItems:"center",justifyContent:"center",fontSize:15,flexShrink:0}}>
+                    {cat.icon||"💊"}
+                  </div>
+                  <span style={{fontSize:13,fontWeight:500,color:ds.color.textDark}}>{cat.label}</span>
                 </div>
-              ))}
-            </div>
-            <div style={{
-              background:"#1D1D1F",
-              borderRadius:12,
-              padding:"22px 24px",
-              border:"0.5px solid rgba(255,255,255,0.08)",
+                <span style={{color:ds.color.textMuted,fontSize:18,lineHeight:1}}>›</span>
+              </button>
+            ))}
+            <button onClick={()=>setPage("institutional")} style={{
+              display:"flex",alignItems:"center",justifyContent:"space-between",
+              padding:"11px 14px",background:ds.color.redLight,border:`0.5px solid ${ds.color.redBorder}`,
+              borderRadius:10,cursor:"pointer",fontFamily:ds.font.body,textAlign:"left",
+              marginTop:4,width:"100%",
             }}>
-              <div style={{fontSize:10,fontWeight:600,color:ds.color.goldBright,letterSpacing:"0.10em",textTransform:"uppercase",marginBottom:8}}>Why choose DMEAST</div>
-              <div style={{fontSize:15,fontWeight:500,color:"#fff",marginBottom:8,letterSpacing:"-0.01em"}}>Products from authorized suppliers</div>
-              <div style={{fontSize:13,color:"rgba(255,255,255,0.55)",lineHeight:1.65,fontWeight:400}}>
-                All products sourced from verified and authorized suppliers. Standard items available for direct purchase. Institutional orders handled upon request.
+              <div style={{display:"flex",alignItems:"center",gap:10}}>
+                <div style={{width:30,height:30,borderRadius:7,background:ds.color.red,display:"flex",alignItems:"center",justifyContent:"center",fontSize:15,flexShrink:0}}>🏥</div>
+                <span style={{fontSize:13,fontWeight:600,color:ds.color.red}}>Institutional orders</span>
               </div>
-            </div>
+              <span style={{color:ds.color.red,fontSize:18,lineHeight:1}}>›</span>
+            </button>
           </div>
         </div>
       </div>
@@ -200,6 +200,67 @@ export function StatsTrustBand(){
               </div>
             </div>
           ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// Hybrid: Watsons-style warm deal cards using featured products
+export function DealsSection({setPage,addToCart}){
+  const { products: PRODUCTS } = useProducts();
+  const featured = filterPharmaPublic(PRODUCTS).filter(p=>p.featured&&p.cta==="buy"&&!p.requiresPrescription&&!CATEGORIES.find(c=>c.id===p.category)?.institutional).slice(0,3);
+  const display = featured.length>=2 ? featured : filterPharmaPublic(PRODUCTS).filter(p=>p.cta==="buy").slice(0,3);
+  if(!display.length) return null;
+
+  const dealStyles=[
+    {bg:"#FFF0F1",badge:"Best seller",badgeBg:ds.color.red,badgeColor:"#fff"},
+    {bg:"#FFF9EC",badge:"Popular",badgeBg:ds.color.goldBright,badgeColor:"#7A5200"},
+    {bg:"#F0F5FF",badge:"New arrival",badgeBg:"#3B82F6",badgeColor:"#fff"},
+  ];
+
+  return (
+    <section style={{background:"#F5F5F7",padding:"56px 28px",borderTop:"0.5px solid rgba(0,0,0,0.07)"}}>
+      <div style={{maxWidth:1280,margin:"0 auto"}}>
+        <div style={{display:"flex",alignItems:"flex-end",justifyContent:"space-between",marginBottom:24,flexWrap:"wrap",gap:12}}>
+          <div>
+            <div style={{fontSize:11,fontWeight:600,letterSpacing:"0.10em",textTransform:"uppercase",color:ds.color.red,marginBottom:6}}>Featured right now</div>
+            <h2 style={{fontFamily:ds.font.display,fontSize:"clamp(1.5rem,2.8vw,2rem)",fontWeight:700,color:ds.color.textDark,letterSpacing:"-0.03em"}}>Deals of the week</h2>
+          </div>
+          <button onClick={()=>setPage("products")} style={{background:"none",border:"none",color:ds.color.red,fontWeight:600,cursor:"pointer",fontSize:13,fontFamily:ds.font.body}}>View all products →</button>
+        </div>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(260px,1fr))",gap:14}}>
+          {display.map((p,i)=>{
+            const s=dealStyles[i%dealStyles.length];
+            const catLabel=CATEGORIES.find(c=>c.id===p.category)?.label||"Healthcare";
+            return (
+              <div key={p.id} style={{background:"#fff",border:"0.5px solid rgba(0,0,0,0.08)",borderRadius:14,overflow:"hidden",cursor:"pointer",transition:"transform 0.15s"}}
+                onClick={()=>setPage("products")}
+                onMouseEnter={e=>e.currentTarget.style.transform="translateY(-2px)"}
+                onMouseLeave={e=>e.currentTarget.style.transform="translateY(0)"}
+              >
+                <div style={{height:110,background:s.bg,display:"flex",alignItems:"center",justifyContent:"center",position:"relative"}}>
+                  <span style={{fontSize:44}}>💊</span>
+                  <span style={{position:"absolute",top:10,left:10,background:s.badgeBg,color:s.badgeColor,fontSize:9.5,fontWeight:700,padding:"3px 10px",borderRadius:999}}>
+                    {s.badge}
+                  </span>
+                </div>
+                <div style={{padding:"14px 16px 16px"}}>
+                  <div style={{fontSize:9.5,fontWeight:600,letterSpacing:"0.08em",textTransform:"uppercase",color:ds.color.textMuted,marginBottom:4}}>{catLabel}</div>
+                  <div style={{fontSize:13.5,fontWeight:500,color:ds.color.textDark,marginBottom:10,lineHeight:1.35}}>{p.name}</div>
+                  <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+                    {p.price
+                      ? <span style={{fontSize:16,fontWeight:700,color:ds.color.red}}>{formatPHP(p.price)}</span>
+                      : <span style={{fontSize:12,color:ds.color.red,fontWeight:600}}>Request price</span>
+                    }
+                    <button onClick={e=>{e.stopPropagation();addToCart&&addToCart(p);}} style={{background:ds.color.red,color:"#fff",border:"none",borderRadius:999,padding:"6px 14px",fontSize:11,fontWeight:500,cursor:"pointer",fontFamily:ds.font.body}}>
+                      Add to cart
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
     </section>
@@ -778,10 +839,11 @@ export function HomePage({setPage,setActiveCategory,addToCart,setActivePost}){
   return(
     <div style={{paddingTop:67}}>
       <TopAnnouncementBar/>
-      <HeroSectionV16 setPage={setPage}/>
+      <HeroSectionV16 setPage={setPage} setActiveCategory={setActiveCategory}/>
+      <StatsTrustBand/>
+      <DealsSection setPage={setPage} addToCart={addToCart}/>
       <CategoryGridV16 setPage={setPage} setActiveCategory={setActiveCategory}/>
       <TrendingProductsV16 setPage={setPage} addToCart={addToCart}/>
-      <PromoCardsV16 setPage={setPage}/>
       <WhyDMEASTV16/>
       <InstitutionalCTABannerV16 setPage={setPage}/>
       <TestimonialsV16/>
