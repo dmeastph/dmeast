@@ -129,7 +129,11 @@ export function BrandLogo({ height = 40, darkMode = false }) {
       <img
         src="/logo.png"
         alt="DM EAST"
-        style={{ height, width: "auto", objectFit: "contain", filter: darkMode ? "brightness(0) invert(1)" : "none" }}
+        style={{
+          height, width: "auto", objectFit: "contain",
+          filter: darkMode ? "brightness(0) invert(1)" : "none",
+          mixBlendMode: darkMode ? "normal" : "multiply",
+        }}
         onError={e => { e.target.style.display = "none"; e.target.nextSibling.style.display = "flex"; }}
       />
       <div style={{ display: "none", alignItems: "center", gap: 2 }}>

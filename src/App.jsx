@@ -149,11 +149,11 @@ export default function App(){
 
   return(
     <ProductsProvider>
-    <div style={{fontFamily:ds.font.body,minHeight:"100vh",background:ds.color.white,color:ds.color.textBody}}>
+    <div style={{fontFamily:ds.font.body,minHeight:"100vh",background:ds.color.surface,color:ds.color.textBody}}>
       <style>{GLOBAL_CSS}</style>
       <Navbar activePage={activePage} setPage={setPage} cartCount={cartCount} user={user} isAdmin={isAdmin} onSignIn={handleSignIn} onSignOut={handleSignOut}/>
       <main>
-      <ErrorBoundary>
+      <ErrorBoundary key={location.pathname}>
       <Suspense fallback={<PageSpinner/>}>
         <Routes>
           <Route path="/" element={<HomePage setPage={setPage} addToCart={addToCart} setActiveCategory={setActiveCategory} setActivePost={setActivePost} wishlist={wishlist} toggleWishlist={toggleWishlist}/>}/>
