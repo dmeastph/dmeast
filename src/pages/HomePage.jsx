@@ -78,12 +78,9 @@ export function HeroSectionV16({setPage}){
               </span>
             </div>
             
-            <h1 className="dm-fade-up dm-fade-up-1" style={{fontFamily:ds.font.display,fontSize:"clamp(2.4rem,4.5vw,3.8rem)",fontWeight:600,color:ds.color.textDark,lineHeight:1.08,letterSpacing:"-0.03em",marginBottom:8}}>
-              Your trusted source for
-            </h1>
-            <h1 className="dm-fade-up dm-fade-up-2" style={{fontFamily:ds.font.display,fontSize:"clamp(2.4rem,4.5vw,3.8rem)",fontWeight:600,lineHeight:1.08,letterSpacing:"-0.03em",marginBottom:24}}>
-              <span style={{color:ds.color.red}}>quality medical</span><br/>
-              <span style={{color:ds.color.textDark}}>solutions</span>
+            <h1 className="dm-fade-up dm-fade-up-1" style={{fontFamily:ds.font.display,fontSize:"clamp(2.2rem,4.2vw,3.6rem)",fontWeight:600,lineHeight:1.1,letterSpacing:"-0.03em",marginBottom:24}}>
+              <span style={{color:ds.color.textDark}}>Your trusted source for </span>
+              <span style={{color:ds.color.red}}>quality medical solutions</span>
               <span style={{color:ds.color.gold}}>.</span>
             </h1>
             

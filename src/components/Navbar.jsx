@@ -80,7 +80,7 @@ export function Navbar({ activePage, setPage, cartCount, user, isAdmin, onSignIn
           onClick={() => nav("home")}
           style={{ background: "none", border: "none", cursor: "pointer", padding: 0, display: "flex", alignItems: "center", flexShrink: 0 }}
         >
-          <BrandLogo height={44} />
+          <BrandLogo height={56} />
         </button>
 
         {/* CENTER: Nav links */}

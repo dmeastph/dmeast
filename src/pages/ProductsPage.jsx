@@ -9,8 +9,8 @@ import { CategoryCard } from "../components/CategoryCard";
 
 export function ProductsPage({setPage,addToCart,wishlist,toggleWishlist}){
   const { products: PRODUCTS } = useProducts();
-  const [search,setSearch]=useState(()=>searchParams.get("q")||"");
   const [searchParams,setSearchParams]=useSearchParams();
+  const [search,setSearch]=useState(()=>searchParams.get("q")||"");
   const [cat,setCat]=useState(searchParams.get("cat")||null);
   const [showAll,setShowAll]=useState(false);
   const [sortBy,setSortBy]=useState("default"); // default | price-asc | price-desc | name
