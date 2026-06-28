@@ -15,7 +15,7 @@ export function ContactPage(){
     setSent(true);
   };
   return(
-    <div style={{paddingTop:67}}>
+    <div style={{paddingTop:74}}>
       <PageHero eyebrow="Contact" title="Get in Touch" subtitle="Ready to order, request a quote, or explore a project? We're here to help."/>
       <div style={{maxWidth:1160,margin:"0 auto",padding:"64px 28px"}}>
         <div className="dm-grid-2" style={{gap:52}}>

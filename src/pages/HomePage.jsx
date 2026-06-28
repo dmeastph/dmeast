@@ -209,8 +209,9 @@ export function StatsTrustBand(){
 // Hybrid: Watsons-style warm deal cards using featured products
 export function DealsSection({setPage,addToCart}){
   const { products: PRODUCTS } = useProducts();
-  const featured = filterPharmaPublic(PRODUCTS).filter(p=>p.featured&&p.cta==="buy"&&!p.requiresPrescription&&!CATEGORIES.find(c=>c.id===p.category)?.institutional).slice(0,3);
-  const display = featured.length>=2 ? featured : filterPharmaPublic(PRODUCTS).filter(p=>p.cta==="buy").slice(0,3);
+  const withMedia = p => p.cta==="buy" && !p.requiresPrescription && p.price && p.imageSrc && !CATEGORIES.find(c=>c.id===p.category)?.institutional;
+  const featured = filterPharmaPublic(PRODUCTS).filter(p=>p.featured&&withMedia(p)).slice(0,3);
+  const display = featured.length>=1 ? featured : filterPharmaPublic(PRODUCTS).filter(withMedia).slice(0,3);
   if(!display.length) return null;
 
   const dealStyles=[
@@ -239,8 +240,11 @@ export function DealsSection({setPage,addToCart}){
                 onMouseEnter={e=>e.currentTarget.style.transform="translateY(-2px)"}
                 onMouseLeave={e=>e.currentTarget.style.transform="translateY(0)"}
               >
-                <div style={{height:110,background:s.bg,display:"flex",alignItems:"center",justifyContent:"center",position:"relative"}}>
-                  <span style={{fontSize:44}}>💊</span>
+                <div style={{height:130,background:s.bg,display:"flex",alignItems:"center",justifyContent:"center",position:"relative",overflow:"hidden"}}>
+                  <img src={p.imageSrc} alt={p.name} style={{maxWidth:"80%",maxHeight:"90%",objectFit:"contain"}}
+                    onError={e=>{e.target.style.display="none";e.target.nextSibling.style.display="flex";}}
+                  />
+                  <span style={{display:"none",fontSize:36,width:"100%",height:"100%",alignItems:"center",justifyContent:"center"}}>💊</span>
                   <span style={{position:"absolute",top:10,left:10,background:s.badgeBg,color:s.badgeColor,fontSize:9.5,fontWeight:700,padding:"3px 10px",borderRadius:999}}>
                     {s.badge}
                   </span>
@@ -773,85 +777,4 @@ export function CtaBanner({setPage}){
       <div style={{maxWidth:800,margin:"0 auto",textAlign:"center"}}>
         <div style={{fontFamily:ds.font.display,fontSize:"clamp(1.8rem,3.5vw,2.6rem)",color:"#fff",lineHeight:1.2,marginBottom:16}}>Your health needs, delivered nationwide.</div>
         <p style={{fontSize:16,color:"rgba(255,255,255,0.8)",lineHeight:1.7,marginBottom:32}}>From everyday health essentials to professional clinic supplies — DMEAST has you covered with fast, reliable delivery across the Philippines.</p>
-        <div style={{display:"flex",gap:12,justifyContent:"center",flexWrap:"wrap"}}>
-          <Btn variant="dark" size="xl" onClick={()=>setPage("products")}>Shop Now →</Btn>
-          <Btn href={CONTACT.whatsapp} variant="outline" size="xl">💬 Chat with Us</Btn>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-export function PaymentMethodsSection(){
-  return(
-    <section style={{background:ds.color.white,padding:"60px 28px"}}>
-      <div style={{maxWidth:900,margin:"0 auto",textAlign:"center"}}>
-        <div style={{fontSize:11,fontWeight:700,letterSpacing:"0.14em",textTransform:"uppercase",color:ds.color.red,marginBottom:12}}>Secure Payments</div>
-        <h2 style={{fontFamily:ds.font.display,fontSize:"clamp(1.5rem,2.5vw,2rem)",fontWeight:400,color:ds.color.textDark,marginBottom:12}}>Multiple Payment Options</h2>
-        <p style={{fontSize:15,color:ds.color.textMuted,marginBottom:32,maxWidth:500,margin:"0 auto 32px"}}>Pay your way — we accept all major payment methods for a smooth and secure checkout experience.</p>
-        <div style={{display:"flex",justifyContent:"center",gap:16,flexWrap:"wrap",marginBottom:20}}>
-          {[{icon:"💳",label:"Credit Card",sub:"Visa & Mastercard"},{icon:"💳",label:"Debit Card",sub:"All major banks"},{icon:"📱",label:"GCash",sub:"Instant transfer"},{icon:"💜",label:"Maya",sub:"Instant transfer"},{icon:"🏦",label:"Bank Transfer",sub:"All PH banks"},{icon:"📲",label:"QR Ph",sub:"Scan & pay"}].map(m=>(
-            <div key={m.label} style={{background:ds.color.canvas,border:`1px solid ${ds.color.border}`,borderRadius:ds.radius.lg,padding:"20px 24px",textAlign:"center",minWidth:110}}>
-              <div style={{fontSize:28,marginBottom:8}}>{m.icon}</div>
-              <div style={{fontSize:13,fontWeight:700,color:ds.color.textDark}}>{m.label}</div>
-              <div style={{fontSize:11,color:ds.color.textMuted,marginTop:3}}>{m.sub}</div>
-            </div>
-          ))}
-        </div>
-        <div style={{display:"inline-flex",alignItems:"center",gap:8,background:ds.color.successBg,border:`1px solid ${ds.color.successBorder}`,borderRadius:ds.radius.pill,padding:"8px 20px",fontSize:13,color:ds.color.success,fontWeight:600}}>
-          🔒 All transactions are SSL-secured and encrypted
-        </div>
-      </div>
-    </section>
-  );
-}
-
-export function WhyChooseSection(){
-  const points=[
-    {icon:"✅",title:"Authorized Suppliers",desc:"All products are sourced from verified and authorized suppliers. Quality you can trust."},
-    {icon:"🚚",title:"Nationwide Delivery",desc:"We deliver to all Philippine regions — Metro Manila, Visayas, Mindanao, and everywhere in between."},
-    {icon:"💊",title:"Wide Product Range",desc:"Pharmaceuticals, diagnostic devices, beauty & wellness, and healthcare essentials all in one place."},
-    {icon:"🏥",title:"Trusted by Clinics",desc:"Hundreds of clinics, pharmacies, and healthcare businesses rely on DMEAST for their supply needs."},
-    {icon:"💬",title:"Dedicated Support",desc:"Our team is ready to assist with orders, inquiries, and after-sales questions via call, email, or chat."},
-    {icon:"🌍",title:"International Shipping",desc:"We serve customers worldwide. International orders handled with full export documentation."},
-  ];
-  return(
-    <section style={{background:ds.color.canvasWarm,padding:"80px 28px"}}>
-      <div style={{maxWidth:1280,margin:"0 auto"}}>
-        <SectionHeader eyebrow="Why Choose DMEAST" title="Reliable. Affordable. Trusted." subtitle="Here's why clinics, businesses, and individuals across the Philippines choose us." center/>
-        <div className="dm-grid-3">
-          {points.map((p,i)=>(
-            <div key={i} style={{background:ds.color.white,border:`1px solid ${ds.color.border}`,borderRadius:ds.radius.lg,padding:"26px 24px",boxShadow:ds.shadow.xs,display:"flex",gap:16}}>
-              <div style={{width:44,height:44,borderRadius:ds.radius.md,background:ds.color.redLight,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>{p.icon}</div>
-              <div>
-                <div style={{fontSize:14.5,fontWeight:700,color:ds.color.textDark,marginBottom:6}}>{p.title}</div>
-                <div style={{fontSize:13.5,color:ds.color.textMuted,lineHeight:1.65}}>{p.desc}</div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-export function HomePage({setPage,setActiveCategory,addToCart,setActivePost}){
-  return(
-    <div style={{paddingTop:67}}>
-      <TopAnnouncementBar/>
-      <HeroSectionV16 setPage={setPage} setActiveCategory={setActiveCategory}/>
-      <StatsTrustBand/>
-      <DealsSection setPage={setPage} addToCart={addToCart}/>
-      <CategoryGridV16 setPage={setPage} setActiveCategory={setActiveCategory}/>
-      <TrendingProductsV16 setPage={setPage} addToCart={addToCart}/>
-      <WhyDMEASTV16/>
-      <InstitutionalCTABannerV16 setPage={setPage}/>
-      <TestimonialsV16/>
-      <FAQAccordionV16/>
-      <LatestArticlesSection setPage={setPage}/>
-      <CtaBanner setPage={setPage}/>
-    </div>
-  );
-}
-
-export default HomePage;
+        <div style={{display:"flex",gap:12,justifyCont

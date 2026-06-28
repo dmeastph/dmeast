@@ -72,7 +72,7 @@ export function Navbar({ activePage, setPage, cartCount, user, isAdmin, onSignIn
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
-        height: 56,
+        height: 68,
         gap: 16,
       }}>
         {/* LEFT: Logo */}
@@ -80,7 +80,7 @@ export function Navbar({ activePage, setPage, cartCount, user, isAdmin, onSignIn
           onClick={() => nav("home")}
           style={{ background: "none", border: "none", cursor: "pointer", padding: 0, display: "flex", alignItems: "center", flexShrink: 0 }}
         >
-          <BrandLogo height={56} />
+          <BrandLogo height={64} />
         </button>
 
         {/* CENTER: Nav links */}
@@ -159,159 +159,4 @@ export function Navbar({ activePage, setPage, cartCount, user, isAdmin, onSignIn
                   onMouseLeave={e => { if (!acctOpen) e.currentTarget.style.background = "none"; }}
                 >
                   <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/>
-                  </svg>
-                </button>
-
-                {acctOpen && (
-                  <div style={{
-                    position: "absolute",
-                    top: "calc(100% + 8px)",
-                    right: 0,
-                    background: "rgba(255,255,255,0.95)",
-                    backdropFilter: "blur(20px)",
-                    WebkitBackdropFilter: "blur(20px)",
-                    border: "0.5px solid rgba(0,0,0,0.12)",
-                    borderRadius: 12,
-                    padding: "6px",
-                    minWidth: 180,
-                    boxShadow: "0 8px 32px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.08)",
-                    zIndex: 200,
-                  }}>
-                    <div style={{ padding: "8px 12px 10px", borderBottom: "0.5px solid rgba(0,0,0,0.07)", marginBottom: 4 }}>
-                      <div style={{ fontSize: 12, color: ds.color.textMuted, fontWeight: 400 }}>Signed in as</div>
-                      <div style={{ fontSize: 13, color: ds.color.textDark, fontWeight: 500, marginTop: 2 }}>{user.email || "Account"}</div>
-                    </div>
-                    {[
-                      { id: "portal", icon: "📋", label: "My Portal" },
-                      ...(isAdmin ? [{ id: "admin", icon: "⚙️", label: "Admin Dashboard" }] : []),
-                    ].map(item => (
-                      <button key={item.id} onClick={() => { nav(item.id); setAcctOpen(false); }} style={{
-                        display: "flex", alignItems: "center", gap: 8,
-                        width: "100%", textAlign: "left",
-                        background: "none", border: "none",
-                        padding: "9px 12px", fontSize: 13, fontWeight: 400,
-                        color: ds.color.textDark, cursor: "pointer",
-                        borderRadius: 8, transition: "background 0.1s",
-                        fontFamily: ds.font.body,
-                      }}
-                        onMouseEnter={e => e.currentTarget.style.background = "rgba(0,0,0,0.05)"}
-                        onMouseLeave={e => e.currentTarget.style.background = "none"}
-                      >
-                        <span>{item.icon}</span>{item.label}
-                      </button>
-                    ))}
-                    <div style={{ height: "0.5px", background: "rgba(0,0,0,0.07)", margin: "4px 6px" }} />
-                    <button onClick={() => { onSignOut(); setAcctOpen(false); }} style={{
-                      display: "flex", alignItems: "center", gap: 8,
-                      width: "100%", textAlign: "left",
-                      background: "none", border: "none",
-                      padding: "9px 12px", fontSize: 13, fontWeight: 400,
-                      color: ds.color.red, cursor: "pointer",
-                      borderRadius: 8, transition: "background 0.1s",
-                      fontFamily: ds.font.body,
-                    }}
-                      onMouseEnter={e => e.currentTarget.style.background = ds.color.redLight}
-                      onMouseLeave={e => e.currentTarget.style.background = "none"}
-                    >
-                      <span>↩</span> Sign out
-                    </button>
-                  </div>
-                )}
-              </>
-            ) : (
-              <button
-                onClick={onSignIn}
-                title="Sign in"
-                style={{
-                  ...iconBtn,
-                  background: "rgba(204,47,60,0.08)",
-                  color: ds.color.red,
-                }}
-                onMouseEnter={e => e.currentTarget.style.background = "rgba(204,47,60,0.14)"}
-                onMouseLeave={e => e.currentTarget.style.background = "rgba(204,47,60,0.08)"}
-              >
-                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/>
-                </svg>
-              </button>
-            )}
-          </div>
-
-          {/* Get a Quote CTA */}
-          <button
-            onClick={() => nav("quote")}
-            style={{
-              background: ds.color.red,
-              color: "#fff",
-              border: "none",
-              borderRadius: ds.radius.pill,
-              padding: "8px 16px",
-              fontSize: 12.5,
-              fontWeight: 500,
-              cursor: "pointer",
-              fontFamily: ds.font.body,
-              letterSpacing: "-0.01em",
-              marginLeft: 4,
-              transition: "opacity 0.15s",
-              whiteSpace: "nowrap",
-            }}
-            onMouseEnter={e => e.currentTarget.style.opacity = "0.88"}
-            onMouseLeave={e => e.currentTarget.style.opacity = "1"}
-          >
-            Get a quote
-          </button>
-        </div>
-
-        {/* Mobile hamburger */}
-        <button
-          className="dm-mobile-btn"
-          onClick={() => setMenuOpen(o => !o)}
-          style={{ background: "none", border: "none", fontSize: 20, color: ds.color.textDark, width: 40, height: 40, alignItems: "center", justifyContent: "center", cursor: "pointer" }}
-        >
-          {menuOpen ? "✕" : "☰"}
-        </button>
-      </div>
-
-      {/* Mobile menu */}
-      {menuOpen && (
-        <div style={{
-          background: "rgba(245,245,247,0.97)",
-          backdropFilter: "blur(20px)",
-          WebkitBackdropFilter: "blur(20px)",
-          borderTop: "0.5px solid rgba(0,0,0,0.08)",
-          padding: "12px 20px 20px",
-        }}>
-          {links.map(l => (
-            <button key={l.id} onClick={() => nav(l.id)} style={{
-              display: "block", width: "100%", textAlign: "left",
-              background: activePage === l.id ? ds.color.redLight : "none",
-              border: "none", cursor: "pointer",
-              color: activePage === l.id ? ds.color.red : ds.color.textDark,
-              fontSize: 15, fontWeight: 400,
-              padding: "12px 14px", borderRadius: 10,
-              marginBottom: 2, fontFamily: ds.font.body,
-            }}>
-              {l.label}
-            </button>
-          ))}
-          <div style={{ marginTop: 12, display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <button onClick={() => nav("cart")} style={{ flex: 1, background: ds.color.redLight, color: ds.color.red, border: "none", borderRadius: ds.radius.pill, padding: "10px 16px", fontSize: 13, fontWeight: 500, cursor: "pointer" }}>
-              🛒 Cart {cartCount > 0 ? `(${cartCount})` : ""}
-            </button>
-            {user ? (
-              <>
-                <button onClick={() => nav("portal")} style={{ flex: 1, background: "rgba(0,0,0,0.05)", color: ds.color.textDark, border: "none", borderRadius: ds.radius.pill, padding: "10px 16px", fontSize: 13, cursor: "pointer" }}>Portal</button>
-                {isAdmin && <button onClick={() => nav("admin")} style={{ flex: 1, background: ds.color.goldLight, color: ds.color.gold, border: "none", borderRadius: ds.radius.pill, padding: "10px 16px", fontSize: 13, cursor: "pointer" }}>Admin</button>}
-                <button onClick={onSignOut} style={{ flex: 1, background: "none", color: ds.color.red, border: `1px solid ${ds.color.redBorder}`, borderRadius: ds.radius.pill, padding: "10px 16px", fontSize: 13, cursor: "pointer" }}>Sign out</button>
-              </>
-            ) : (
-              <button onClick={onSignIn} style={{ flex: 1, background: "none", color: ds.color.red, border: `1px solid ${ds.color.redBorder}`, borderRadius: ds.radius.pill, padding: "10px 16px", fontSize: 13, cursor: "pointer" }}>Sign in</button>
-            )}
-            <button onClick={() => nav("quote")} style={{ width: "100%", background: ds.color.red, color: "#fff", border: "none", borderRadius: ds.radius.pill, padding: "12px", fontSize: 14, fontWeight: 500, cursor: "pointer", marginTop: 4 }}>Get a quote</button>
-          </div>
-        </div>
-      )}
-    </nav>
-  );
-}
+                    <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="

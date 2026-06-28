@@ -122,7 +122,3 @@ export function ProductCard({ product, addToCart, setPage, wishlist, toggleWishl
         {product.cta === "buy"   && <Btn variant={feedback === "added" ? "success" : "primary"} size="sm" fullWidth onClick={handleBuy}>{feedback === "added" ? "✓ Added to Cart" : "+ Add to Cart"}</Btn>}
         {product.cta === "quote" && <Btn variant="gold"      size="sm" fullWidth onClick={() => navigate("/quote")}>Request Quote</Btn>}
         {product.cta === "sales" && <Btn variant="secondary" size="sm" fullWidth onClick={() => navigate("/contact")}>Talk to Sales</Btn>}
-      </div>
-    </div>
-  );
-}

@@ -411,7 +411,7 @@ export function AdminDashboard({ user }){
   const selS={padding:"7px 12px",border:`1px solid ${ds.color.border}`,borderRadius:ds.radius.md,fontSize:13,outline:"none",fontFamily:ds.font.body,background:"#fff",cursor:"pointer"};
 
   if(loading) return(
-    <div style={{paddingTop:67,minHeight:"80vh",display:"flex",alignItems:"center",justifyContent:"center"}}>
+    <div style={{paddingTop:74,minHeight:"80vh",display:"flex",alignItems:"center",justifyContent:"center"}}>
       <div style={{textAlign:"center"}}><Spinner size={36}/><div style={{marginTop:16,color:ds.color.textMuted,fontSize:14}}>Loading dashboard…</div></div>
     </div>
   );
@@ -473,7 +473,7 @@ export function AdminDashboard({ user }){
   const tabs = userPerms ? allTabs.filter(t=>userPerms.tabs.includes(t.id)) : allTabs;
 
   return(
-    <div style={{paddingTop:67,background:ds.color.canvas,minHeight:"100vh"}}>
+    <div style={{paddingTop:74,background:ds.color.canvas,minHeight:"100vh"}}>
       <div style={{background:ds.color.textDark,padding:"28px 0"}}>
         <div style={{maxWidth:1280,margin:"0 auto",padding:"0 28px",display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:16}}>
           <div>

@@ -125,14 +125,22 @@ export function SectionHeader({ eyebrow, title, subtitle, center, dark }) {
 
 export function BrandLogo({ height = 40, darkMode = false }) {
   return (
-    <div style={{ position: "relative" }}>
+    <div style={{
+      position: "relative",
+      display: "inline-flex",
+      alignItems: "center",
+      background: darkMode ? "transparent" : "#ffffff",
+      mixBlendMode: darkMode ? "normal" : "multiply",
+      borderRadius: 6,
+      padding: darkMode ? 0 : "1px 2px",
+    }}>
       <img
         src="/logo.png"
         alt="DM EAST"
         style={{
           height, width: "auto", objectFit: "contain",
+          display: "block",
           filter: darkMode ? "brightness(0) invert(1)" : "none",
-          mixBlendMode: darkMode ? "normal" : "multiply",
         }}
         onError={e => { e.target.style.display = "none"; e.target.nextSibling.style.display = "flex"; }}
       />
@@ -165,40 +173,4 @@ export function ProductImg({ imageSrc, category, name, height = 180 }) {
 }
 
 export function Spinner({ size = 20, color = ds.color.red }) {
-  return <div style={{ width: size, height: size, border: `2px solid ${color}25`, borderTopColor: color, borderRadius: "50%", animation: "spin 0.7s linear infinite", flexShrink: 0 }} />;
-}
-
-export function PageHero({ eyebrow, title, subtitle }) {
-  return (
-    <div style={{
-      background: "#fff",
-      padding: "80px 24px 64px",
-      borderBottom: "0.5px solid rgba(0,0,0,0.08)",
-      position: "relative",
-      overflow: "hidden",
-    }}>
-      {/* top accent stripe */}
-      <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, background: `linear-gradient(90deg, ${ds.color.red}, ${ds.color.goldBright})` }} />
-      <div className="dm-dot-bg" style={{ position: "absolute", right: 0, top: 0, width: "40%", height: "100%", opacity: 0.35 }} />
-      <div style={{ maxWidth: 800, margin: "0 auto", textAlign: "center", position: "relative" }}>
-        {eyebrow && (
-          <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.10em", textTransform: "uppercase", color: ds.color.red, marginBottom: 12 }}>
-            {eyebrow}
-          </div>
-        )}
-        <h1 style={{ fontFamily: ds.font.display, fontSize: "clamp(1.8rem, 4vw, 2.6rem)", fontWeight: 600, color: ds.color.textDark, lineHeight: 1.15, letterSpacing: "-0.03em", marginBottom: 16 }}>
-          {title}
-        </h1>
-        {subtitle && (
-          <p style={{ fontSize: 16, color: ds.color.textMuted, lineHeight: 1.7, maxWidth: 580, margin: "0 auto", fontWeight: 400 }}>
-            {subtitle}
-          </p>
-        )}
-      </div>
-    </div>
-  );
-}
-
-export function Divider() {
-  return <div style={{ height: "0.5px", background: "rgba(0,0,0,0.07)" }} />;
-}
+  

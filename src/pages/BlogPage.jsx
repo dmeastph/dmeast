@@ -28,7 +28,7 @@ export function BlogPage({ setPage }) {
   };
   
   return (
-    <div style={{paddingTop:67}}>
+    <div style={{paddingTop:74}}>
       <PageHero 
         eyebrow="Insights & News" 
         title="DMEAST Blog" 

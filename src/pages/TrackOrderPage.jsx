@@ -37,7 +37,7 @@ export function TrackOrderPage(){
   const inp = {width:"100%",padding:"14px 18px",border:"2px solid "+ds.color.border,borderRadius:ds.radius.lg,fontSize:16,outline:"none",fontFamily:ds.font.body,color:ds.color.textDark,boxSizing:"border-box",background:"#fff",textAlign:"center",letterSpacing:"0.1em",fontWeight:700,textTransform:"uppercase"};
 
   return(
-    <div style={{paddingTop:67}}>
+    <div style={{paddingTop:74}}>
       <PageHero eyebrow="Order Tracking" title="Track Your Order" subtitle="Enter your order reference number to check the current status of your order."/>
       <div style={{maxWidth:600,margin:"0 auto",padding:"48px 24px"}}>
         <div style={{background:"#fff",borderRadius:ds.radius.xl,padding:"32px 36px",boxShadow:ds.shadow.md,border:"1px solid "+ds.color.borderLight,marginBottom:32}}>
@@ -149,10 +149,4 @@ export function TrackOrderPage(){
             <div style={{fontSize:32,marginBottom:12}}>🔍</div>
             <div style={{fontSize:14}}>No order found. Please double-check your reference number.</div>
           </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-export default TrackOrderPage;
+   

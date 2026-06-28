@@ -37,7 +37,7 @@ export function ProductsPage({setPage,addToCart,wishlist,toggleWishlist}){
   const hasActiveFilters = !!cat || !!search || sortBy!=="default";
 
   return(
-    <div style={{paddingTop:67}}>
+    <div style={{paddingTop:74}}>
       <PageHero eyebrow="Online Shop" title="Healthcare Products & Medical Supplies" subtitle={`${shopProductCount}+ products available for direct purchase with nationwide delivery.`}/>
       
       <div style={{maxWidth:1280,margin:"0 auto",padding:"32px 28px"}}>
