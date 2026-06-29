@@ -186,4 +186,6 @@ export default function App(){
       <SandboxBanner/>
       {showAuth&&<AuthModal onClose={()=>setShowAuth(false)} onSuccess={handleAuthSuccess}/>}
     </div>
-    <
+    </ProductsProvider>
+  );
+}
