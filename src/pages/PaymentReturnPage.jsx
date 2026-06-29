@@ -47,7 +47,7 @@ export function PaymentReturnPage({ setPage }){
       : "You cancelled the payment. Your order is still pending — you can complete payment anytime.";
   
   return (
-    <div style={{paddingTop:83,minHeight:"calc(100vh - 67px)",background:ds.color.canvas}}>
+    <div style={{paddingTop:91,minHeight:"calc(100vh - 67px)",background:ds.color.canvas}}>
       <div style={{maxWidth:580,margin:"0 auto",padding:"60px 28px"}}>
         <div style={{background:"#fff",borderRadius:ds.radius.xl,padding:"48px 36px",boxShadow:ds.shadow.md,textAlign:"center",border:`1px solid ${ds.color.borderLight}`}}>
           <div style={{

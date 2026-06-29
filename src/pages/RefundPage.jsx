@@ -12,7 +12,7 @@ export function RefundPage(){
     {title:"How to Request",body:"Email "+CONTACT.email+" or call "+CONTACT.phone1+" with your order number and photos. Our team will respond within 2 business days."},
   ];
   return(
-    <div style={{paddingTop:83}}>
+    <div style={{paddingTop:91}}>
       <PageHero eyebrow="Legal" title="Return & Refund Policy" subtitle={`Last updated: ${new Date().toLocaleDateString("en-PH",{year:"numeric",month:"long",day:"numeric"})}`}/>
       <div style={{maxWidth:820,margin:"0 auto",padding:"60px 28px"}}>
         {sections.map((s,i)=>(

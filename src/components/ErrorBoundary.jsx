@@ -32,7 +32,7 @@ export class ErrorBoundary extends Component {
     if (this.state.hasError) {
       return (
         <div style={{
-          paddingTop: 83, minHeight: "80vh",
+          paddingTop: 91, minHeight: "80vh",
           display: "flex", alignItems: "center", justifyContent: "center",
           padding: "80px 28px",
         }}>

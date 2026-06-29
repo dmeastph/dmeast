@@ -117,7 +117,7 @@ export default function BlogPostPage({ setPage }) {
 
   if (loading) {
     return (
-      <div style={{paddingTop:83,textAlign:"center",padding:"100px 28px"}}>
+      <div style={{paddingTop:91,textAlign:"center",padding:"100px 28px"}}>
         <div style={{fontSize:14,color:ds.color.textMuted}}>Loading article…</div>
       </div>
     );
@@ -125,7 +125,7 @@ export default function BlogPostPage({ setPage }) {
 
   if (!post) {
     return (
-      <div style={{paddingTop:83,textAlign:"center",padding:"100px 28px"}}>
+      <div style={{paddingTop:91,textAlign:"center",padding:"100px 28px"}}>
         <div style={{fontSize:48,marginBottom:16,opacity:0.6}}>📰</div>
         <div style={{fontFamily:ds.font.display,fontSize:24,color:ds.color.textDark,marginBottom:12}}>Article not found</div>
         <p style={{fontSize:14,color:ds.color.textMuted,marginBottom:24}}>The article you're looking for might have been moved or removed.</p>
@@ -137,7 +137,7 @@ export default function BlogPostPage({ setPage }) {
   const related = allPosts.filter(p => p.id !== post.id && p.category === post.category).slice(0, 3);
 
   return (
-    <div style={{paddingTop:83}}>
+    <div style={{paddingTop:91}}>
       {/* Hero */}
       <div style={{
         background: post.featuredImage
