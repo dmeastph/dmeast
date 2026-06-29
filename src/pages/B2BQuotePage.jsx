@@ -92,7 +92,7 @@ export default function B2BQuotePage() {
   const lbl = { fontSize: 12.5, fontWeight: 600, color: ds.color.textDark, display: "block", marginBottom: 5 };
 
   if (done) return (
-    <div style={{ paddingTop: 91, minHeight: "80vh", display: "flex", alignItems: "center", justifyContent: "center", padding: "100px 28px" }}>
+    <div style={{ paddingTop: 103, minHeight: "80vh", display: "flex", alignItems: "center", justifyContent: "center", padding: "100px 28px" }}>
       <div style={{ textAlign: "center", maxWidth: 520 }}>
         <div style={{ fontSize: 52, marginBottom: 16 }}>✅</div>
         <div style={{ fontFamily: ds.font.display, fontSize: 26, color: ds.color.textDark, marginBottom: 12 }}>RFQ Submitted!</div>
@@ -114,7 +114,7 @@ export default function B2BQuotePage() {
   );
 
   return (
-    <div style={{ paddingTop: 91 }}>
+    <div style={{ paddingTop: 103 }}>
       {/* Hero */}
       <div style={{ background: `linear-gradient(135deg, ${ds.color.red} 0%, #8B1D27 100%)`, padding: "52px 28px", textAlign: "center" }}>
         <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.7)", letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 12 }}>Institutional Procurement</div>

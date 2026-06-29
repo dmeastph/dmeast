@@ -6,7 +6,7 @@ import { WhyChooseSection } from "./HomePage";
 
 export function AboutPage(){
   return(
-    <div style={{paddingTop:91}}>
+    <div style={{paddingTop:103}}>
       <PageHero eyebrow="About Us" title="Affordable Healthcare Products, Delivered Nationwide" subtitle="Since 2020, DMEAST has been a trusted source of medical supplies, diagnostic devices, and healthcare essentials for clinics, businesses, and individuals across the Philippines."/>
       <div style={{maxWidth:1160,margin:"0 auto",padding:"72px 28px"}}>
         <div className="dm-grid-2" style={{gap:64,marginBottom:72}}>

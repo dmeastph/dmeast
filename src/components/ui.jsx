@@ -130,7 +130,7 @@ export function BrandLogo({ height = 40, darkMode = false }) {
       display: "inline-flex",
       alignItems: "center",
       background: darkMode ? "transparent" : "#ffffff",
-      mixBlendMode: darkMode ? "normal" : "multiply",
+      mixBlendMode: darkMode ? "normal" : "darken",
       borderRadius: 6,
       padding: darkMode ? 0 : "1px 2px",
     }}>

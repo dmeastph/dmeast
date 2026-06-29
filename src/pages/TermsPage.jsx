@@ -18,7 +18,7 @@ export function TermsPage(){
     {title:"Limitation of Liability",body:"DMEAST's maximum liability shall not exceed the total amount paid for the relevant order. We are not responsible for delays due to force majeure events."},
   ];
   return(
-    <div style={{paddingTop:91}}>
+    <div style={{paddingTop:103}}>
       <PageHero eyebrow="Legal" title="Terms & Conditions" subtitle={`Last updated: ${new Date().toLocaleDateString("en-PH",{year:"numeric",month:"long",day:"numeric"})}`}/>
       <div style={{maxWidth:820,margin:"0 auto",padding:"60px 28px"}}>
         {sections.map((s,i)=>(

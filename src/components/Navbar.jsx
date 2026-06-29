@@ -72,7 +72,7 @@ export function Navbar({ activePage, setPage, cartCount, user, isAdmin, onSignIn
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
-        height: 88,
+        height: 100,
         gap: 16,
       }}>
         {/* LEFT: Logo */}
@@ -80,7 +80,7 @@ export function Navbar({ activePage, setPage, cartCount, user, isAdmin, onSignIn
           onClick={() => nav("home")}
           style={{ background: "none", border: "none", cursor: "pointer", padding: 0, display: "flex", alignItems: "center", flexShrink: 0 }}
         >
-          <BrandLogo height={100} />
+          <BrandLogo height={130} />
         </button>
 
         {/* CENTER: Nav links */}

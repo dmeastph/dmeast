@@ -54,7 +54,7 @@ export function CustomerPortal({user,setPage,addToCart,wishlist,toggleWishlist})
   const inp={width:"100%",padding:"11px 14px",border:`1.5px solid ${ds.color.border}`,borderRadius:ds.radius.md,fontSize:14,outline:"none",fontFamily:ds.font.body,color:ds.color.textDark,boxSizing:"border-box",background:"#fff",transition:"border-color 0.15s"};
 
   if(loading) return(
-    <div style={{paddingTop:91,minHeight:"80vh",display:"flex",alignItems:"center",justifyContent:"center"}}>
+    <div style={{paddingTop:103,minHeight:"80vh",display:"flex",alignItems:"center",justifyContent:"center"}}>
       <div style={{textAlign:"center"}}><Spinner size={36}/><div style={{marginTop:16,color:ds.color.textMuted,fontSize:14}}>Loading your portal…</div></div>
     </div>
   );
@@ -87,7 +87,7 @@ export function CustomerPortal({user,setPage,addToCart,wishlist,toggleWishlist})
   const tabs=[{id:"overview",label:"Overview",icon:"📊"},{id:"orders",label:"Orders",icon:"📦"},{id:"wishlist",label:"Wishlist",icon:"❤️"},{id:"address",label:"My Address",icon:"📍"},{id:"rx",label:"Rx History",icon:"💊"},{id:"rewards",label:"Rewards",icon:"⭐"}];
 
   return(
-    <div style={{paddingTop:91,background:ds.color.canvas,minHeight:"100vh"}}>
+    <div style={{paddingTop:103,background:ds.color.canvas,minHeight:"100vh"}}>
       <div style={{background:ds.color.textDark,padding:"28px 0"}}>
         <div style={{maxWidth:1280,margin:"0 auto",padding:"0 28px",display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:16}}>
           <div>

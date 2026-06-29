@@ -425,7 +425,7 @@ export function CartPage({cart,removeFromCart,updateQty,setPage,user,onOrderComp
 
   // V11 FIX: Show success screen FIRST (before empty cart check) so it persists after cart clears
   if(step===5 && successOrder) return(
-    <div style={{paddingTop:91,background:ds.color.canvas,minHeight:"100vh"}}>
+    <div style={{paddingTop:103,background:ds.color.canvas,minHeight:"100vh"}}>
       <div style={{maxWidth:680,margin:"0 auto",padding:"48px 24px"}}>
 
         <div style={{textAlign:"center",marginBottom:24}}>
@@ -579,7 +579,7 @@ export function CartPage({cart,removeFromCart,updateQty,setPage,user,onOrderComp
 
   // v16.2: Better empty cart state with trust signals
   if(cart.length===0) return(
-    <div style={{paddingTop:91,minHeight:"80vh",background:`linear-gradient(180deg, ${ds.color.canvas} 0%, ${ds.color.canvasWarm} 100%)`,display:"flex",alignItems:"center",justifyContent:"center"}}>
+    <div style={{paddingTop:103,minHeight:"80vh",background:`linear-gradient(180deg, ${ds.color.canvas} 0%, ${ds.color.canvasWarm} 100%)`,display:"flex",alignItems:"center",justifyContent:"center"}}>
       <div style={{textAlign:"center",maxWidth:480,padding:"40px 24px"}}>
         <div style={{
           width:120,height:120,borderRadius:"50%",
@@ -608,7 +608,7 @@ export function CartPage({cart,removeFromCart,updateQty,setPage,user,onOrderComp
 
   // ── Step 0 — Choose Local or International
   if(orderMode===null) return(
-    <div style={{paddingTop:91,minHeight:"80vh",background:ds.color.canvas,display:"flex",alignItems:"center",justifyContent:"center"}}>
+    <div style={{paddingTop:103,minHeight:"80vh",background:ds.color.canvas,display:"flex",alignItems:"center",justifyContent:"center"}}>
       <div style={{maxWidth:620,width:"100%",padding:"0 24px"}}>
         <div style={{textAlign:"center",marginBottom:36}}>
           <div style={{fontFamily:ds.font.display,fontSize:26,color:ds.color.textDark,marginBottom:10}}>Where are you ordering from?</div>
@@ -636,7 +636,7 @@ export function CartPage({cart,removeFromCart,updateQty,setPage,user,onOrderComp
   // ── International
   if(orderMode==="intl"){
     if(intlDone) return(
-      <div style={{paddingTop:91,minHeight:"80vh",display:"flex",alignItems:"center",justifyContent:"center",background:ds.color.canvas}}>
+      <div style={{paddingTop:103,minHeight:"80vh",display:"flex",alignItems:"center",justifyContent:"center",background:ds.color.canvas}}>
         <div style={{textAlign:"center",maxWidth:460,padding:"0 24px"}}>
           <div style={{width:76,height:76,borderRadius:"50%",background:"#FEF6E0",border:`2px solid ${ds.color.goldBorder}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:30,margin:"0 auto 24px"}}>🌍</div>
           <div style={{fontFamily:ds.font.display,fontSize:26,color:ds.color.textDark,marginBottom:10}}>International Inquiry Received!</div>
@@ -646,7 +646,7 @@ export function CartPage({cart,removeFromCart,updateQty,setPage,user,onOrderComp
       </div>
     );
     return(
-      <div style={{paddingTop:91,background:ds.color.canvas,minHeight:"80vh"}}>
+      <div style={{paddingTop:103,background:ds.color.canvas,minHeight:"80vh"}}>
         <div style={{maxWidth:860,margin:"0 auto",padding:"44px 28px"}}>
           <div style={{display:"flex",alignItems:"center",gap:14,marginBottom:28}}>
             <button onClick={()=>setOrderMode(null)} style={{background:"none",border:"none",cursor:"pointer",fontSize:20,color:ds.color.textMuted}}>←</button>
@@ -847,7 +847,7 @@ export function CartPage({cart,removeFromCart,updateQty,setPage,user,onOrderComp
   const stepLabels=[["1","Review"],["2","Details"],["3","Rx"],["4","Payment"]];
 
   return(
-    <div style={{paddingTop:91,background:ds.color.canvas,minHeight:"80vh"}}>
+    <div style={{paddingTop:103,background:ds.color.canvas,minHeight:"80vh"}}>
       <div style={{maxWidth:900,margin:"0 auto",padding:"40px 28px"}}>
 
         <div style={{display:"flex",alignItems:"center",gap:0,marginBottom:32,maxWidth:500}}>
