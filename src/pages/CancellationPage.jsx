@@ -16,7 +16,7 @@ export function CancellationPage(){
     {title:"Updates to This Policy",body:"DM EAST may update this Cancellation Policy from time to time. The latest version will always be posted on this page with the \"Last updated\" date. Continued use of our services constitutes acceptance of any updates."},
   ];
   return(
-    <div style={{paddingTop:74}}>
+    <div style={{paddingTop:83}}>
       <PageHero eyebrow="Legal" title="Cancellation & Termination Policy" subtitle={`Last updated: ${new Date().toLocaleDateString("en-PH",{year:"numeric",month:"long",day:"numeric"})}`}/>
       <div style={{maxWidth:820,margin:"0 auto",padding:"60px 28px"}}>
         <div style={{background:ds.color.goldLight,border:`1px solid ${ds.color.goldBorder}`,borderRadius:ds.radius.lg,padding:"18px 22px",marginBottom:40,fontSize:14,color:ds.color.gold,lineHeight:1.7}}>

@@ -12,7 +12,7 @@ export function ShippingPage(){
     {title:"Damaged in Transit",body:"If your shipment arrives damaged, photograph the packaging immediately and contact us within 24 hours of delivery. We will initiate a replacement or refund claim."},
   ];
   return(
-    <div style={{paddingTop:74}}>
+    <div style={{paddingTop:83}}>
       <PageHero eyebrow="Legal" title="Shipping Policy" subtitle={`Last updated: ${new Date().toLocaleDateString("en-PH",{year:"numeric",month:"long",day:"numeric"})}`}/>
       <div style={{maxWidth:820,margin:"0 auto",padding:"60px 28px"}}>
         {sections.map((s,i)=>(

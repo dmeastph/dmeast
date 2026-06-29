@@ -106,12 +106,12 @@ export default function ProductDetailPage({ addToCart, wishlist, toggleWishlist,
   }, [product, category]);
 
   if (products.length === 0) {
-    return <div style={{ paddingTop: 74, display: "flex", justifyContent: "center", padding: "100px 28px" }}><Spinner /></div>;
+    return <div style={{ paddingTop: 83, display: "flex", justifyContent: "center", padding: "100px 28px" }}><Spinner /></div>;
   }
 
   if (!product) {
     return (
-      <div style={{ paddingTop: 74, textAlign: "center", padding: "100px 28px" }}>
+      <div style={{ paddingTop: 83, textAlign: "center", padding: "100px 28px" }}>
         <div style={{ fontSize: 48, marginBottom: 16, opacity: 0.6 }}>📦</div>
         <div style={{ fontFamily: ds.font.display, fontSize: 24, color: ds.color.textDark, marginBottom: 12 }}>Product not found</div>
         <p style={{ fontSize: 14, color: ds.color.textMuted, marginBottom: 24 }}>This product may have been removed or is unavailable publicly.</p>
@@ -130,7 +130,7 @@ export default function ProductDetailPage({ addToCart, wishlist, toggleWishlist,
   };
 
   return (
-    <div style={{ paddingTop: 74 }}>
+    <div style={{ paddingTop: 83 }}>
       {/* Breadcrumb */}
       <div style={{ background: ds.color.canvas, borderBottom: `1px solid ${ds.color.border}`, padding: "10px 28px" }}>
         <div style={{ maxWidth: 1280, margin: "0 auto", display: "flex", gap: 6, alignItems: "center", fontSize: 12.5, color: ds.color.textMuted, flexWrap: "wrap" }}>

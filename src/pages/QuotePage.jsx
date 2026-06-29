@@ -60,7 +60,7 @@ export function QuotePage(){
   };
 
   if(status==="success") return(
-    <div style={{paddingTop:74,minHeight:"80vh",display:"flex",alignItems:"center",justifyContent:"center",background:ds.color.canvas}}>
+    <div style={{paddingTop:83,minHeight:"80vh",display:"flex",alignItems:"center",justifyContent:"center",background:ds.color.canvas}}>
       <div style={{textAlign:"center",maxWidth:460,padding:"0 24px"}}>
         <div style={{width:76,height:76,borderRadius:"50%",background:ds.color.successBg,border:`2px solid ${ds.color.successBorder}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:28,margin:"0 auto 24px"}}>✓</div>
         <div style={{fontFamily:ds.font.display,fontSize:26,color:ds.color.textDark,marginBottom:10}}>Quote Request Sent!</div>
@@ -71,7 +71,7 @@ export function QuotePage(){
   );
 
   return(
-    <div style={{paddingTop:74}}>
+    <div style={{paddingTop:83}}>
       <PageHero eyebrow="Quote Request" title="Request a Quotation" subtitle="Fill in the form and we'll prepare a formal quotation for your requirements."/>
       <div style={{maxWidth:860,margin:"0 auto",padding:"60px 28px"}}>
         <div style={{background:ds.color.white,borderRadius:ds.radius.xl,padding:"40px 48px",boxShadow:ds.shadow.md,border:`1px solid ${ds.color.borderLight}`}}>
