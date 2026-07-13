@@ -55,7 +55,7 @@ export function Navbar({ activePage, setPage, cartCount, user, isAdmin, onSignIn
       position: "fixed",
       top: 0, left: 0, right: 0,
       zIndex: 1000,
-      background: scrolled ? "rgba(245,245,247,0.85)" : "rgba(245,245,247,0.70)",
+      background: scrolled ? "#F5F5F7" : "rgba(245,245,247,0.96)",
       backdropFilter: "blur(20px)",
       WebkitBackdropFilter: "blur(20px)",
       borderBottom: `0.5px solid ${scrolled ? "rgba(0,0,0,0.10)" : "rgba(0,0,0,0.06)"}`,

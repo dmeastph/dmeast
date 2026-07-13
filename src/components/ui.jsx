@@ -129,10 +129,6 @@ export function BrandLogo({ height = 40, darkMode = false }) {
       position: "relative",
       display: "inline-flex",
       alignItems: "center",
-      background: darkMode ? "transparent" : "#ffffff",
-      mixBlendMode: darkMode ? "normal" : "darken",
-      borderRadius: 6,
-      padding: darkMode ? 0 : "1px 2px",
     }}>
       <img
         src="/logo.png"
@@ -141,6 +137,7 @@ export function BrandLogo({ height = 40, darkMode = false }) {
           height, width: "auto", objectFit: "contain",
           display: "block",
           filter: darkMode ? "brightness(0) invert(1)" : "none",
+          mixBlendMode: darkMode ? "normal" : "multiply",
         }}
         onError={e => { e.target.style.display = "none"; e.target.nextSibling.style.display = "flex"; }}
       />
