@@ -21,9 +21,16 @@ if exist "%USERPROFILE%\Downloads\icu-04.png" (
 ) else (
   echo [SKIP] icu-04.png not in Downloads
 )
+if exist "%USERPROFILE%\Downloads\lab-08.png" (
+  copy /Y "%USERPROFILE%\Downloads\lab-08.png" "public\images\lab-08.png"
+  del "%USERPROFILE%\Downloads\lab-08.png" 2>nul
+  echo [OK] lab-08.png (clinical centrifuge)
+) else (
+  echo [SKIP] lab-08.png not in Downloads
+)
 
 git add -A
-git commit -m "feat: Maya payment — redirect Visa/Mastercard to paymaya.me link; add product images" --allow-empty
+git commit -m "feat: Maya payment link + product images (icu-04, lab-07, lab-08 centrifuge)" --allow-empty
 git push origin main
 echo.
 echo Done! Vercel will deploy in ~30-60 seconds.
