@@ -32,10 +32,9 @@ export const firebaseConfig = {
 export const IS_SANDBOX = (
   // Explicit env flag (set in Vercel for sandbox deploy)
   import.meta.env.VITE_ENVIRONMENT === "sandbox" ||
-  // Auto-detect by hostname (fallback if env var not set)
+  // Auto-detect by hostname — only sandbox. subdomain or localhost
   (typeof window !== "undefined" && window.location.hostname.includes("sandbox.")) ||
-  // Vercel preview deployments are also non-production
-  (typeof window !== "undefined" && window.location.hostname.includes(".vercel.app"))
+  (typeof window !== "undefined" && window.location.hostname === "localhost")
 );
 
 export const firebaseApp = initializeApp(firebaseConfig);

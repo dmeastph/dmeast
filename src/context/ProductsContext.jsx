@@ -20,7 +20,12 @@ export function ProductsProvider({ children }){
         const live = snap.docs
           .map(d => ({ ...d.data(), _docId: d.id }))
           .filter(p => p.visible !== false);
-        setProducts(live);
+        // Merge: include any DEFAULT_PRODUCTS entries whose id isn't in Firestore yet.
+        // This means adding a product to products.js is enough to make it appear on
+        // the site immediately — no manual Firestore entry needed.
+        const liveIds = new Set(live.map(p => p.id).filter(Boolean));
+        const codeOnly = DEFAULT_PRODUCTS.filter(p => !liveIds.has(p.id));
+        setProducts([...live, ...codeOnly]);
       }
     } catch (e) {
       console.warn("Products fetch failed, using defaults:", e);
