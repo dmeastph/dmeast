@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "rm -rf node_modules/.vite node_modules/.rolldown .vite .rolldown 2>/dev/null; vite build",
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest run",
