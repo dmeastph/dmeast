@@ -20,7 +20,7 @@
 //   - MAYA_METHODS et al:  App.jsx lines ~9362–9400
 
 // v16.17: Maya static payment link (customer enters their own amount)
-export const DMEAST_MAYA_LINK = "https://payments.maya.ph/invoice?id=7e50e078-1e45-4f3c-b431-2f8fa669a173";
+export const DMEAST_MAYA_LINK = "https://paymaya.me/DECONMEDICALEQUIPME";
 
 // ─── v16.10: MAYA PAYMENT INTEGRATION ────────────────────────────────────────
 // Methods that go through Maya Checkout (instead of manual bank transfer)

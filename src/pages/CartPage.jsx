@@ -11,7 +11,7 @@ import { CATEGORIES } from "../constants/categories";
 import { CONTACT } from "../constants/contact";
 import { DMEAST_BANK_INFO } from "../constants/banking";
 import { COUNTRY_CODES, validateEmail, validateName, validatePhone, PAYMENT_METHODS_DATA, COUNTRIES, ZIP_HINTS, getZipHint } from "../constants/cart";
-import { createMayaCheckout, isMayaMethod } from "../lib/maya";
+import { DMEAST_MAYA_LINK, isMayaMethod } from "../lib/maya";
 import { sendCustomerReceiptEmail, sendAdminNewOrderNotification } from "../lib/email-helpers";
 import { sendSMS, orderConfirmationSMS } from "../lib/sms";
 import { computeVATBreakdown } from "../lib/pdf";
@@ -218,46 +218,11 @@ export function CartPage({cart,removeFromCart,updateQty,setPage,user,onOrderComp
     try {
       const orderRef = await withTimeout(addDoc(collection(db,"orders"), orderData));
       
-      // v16.10: If Maya-supported method, redirect to Maya Checkout instead of regular flow
+      // v16.10: If Maya-supported method, open the PayMaya payment link in a new tab
       if (isMayaMethod(method)) {
-        try {
-          // Split name into first + last for Maya buyer info
-          const nameParts = (details.name || "").trim().split(/\s+/);
-          const firstName = nameParts[0] || "Customer";
-          const lastName = nameParts.slice(1).join(" ") || "";
-          
-          // Use Firestore doc ID as orderId reference
-          const mayaResult = await createMayaCheckout({
-            orderId: orderRef.id,
-            totalAmount: finalTotal,
-            items: cart,
-            buyer: {
-              email: details.email,
-              firstName,
-              lastName,
-              phone,
-            },
-          });
-          
-          // Update order with Maya checkout ID before redirect
-          try {
-            await updateDoc(doc(db, "orders", orderRef.id), {
-              mayaCheckoutId: mayaResult.checkoutId,
-              paymentStatus: "redirecting_to_maya",
-            });
-          } catch(_){}
-          
-          // Redirect customer to Maya hosted checkout
-          window.location.href = mayaResult.redirectUrl;
-          return;  // Stop here — customer is leaving the site
-        } catch (mayaErr) {
-          console.error("Maya checkout failed:", mayaErr);
-          setErrMsg("Couldn't connect to " + method + " payment gateway: " + mayaErr.message + ". Please try a different payment method or contact us.");
-          setSending(false);
-          // Note: order is still created in Firestore with paymentStatus "awaiting"
-          // Customer can retry with a different method
-          return;
-        }
+        // Open PayMaya link — customer enters the amount and pays there
+        window.open(DMEAST_MAYA_LINK, "_blank", "noopener,noreferrer");
+        // Fall through to the normal success screen so the customer sees their order
       }
       
       // Non-Maya flow continues here (Bank Transfer, etc.)
@@ -439,6 +404,24 @@ export function CartPage({cart,removeFromCart,updateQty,setPage,user,onOrderComp
             Order Reference: <span style={{color:ds.color.red,fontFamily:"monospace"}}>#{successOrder.id.slice(-6).toUpperCase()}</span>
           </div>
         </div>
+
+        {/* Maya payment link button — shown when Visa / Mastercard / Maya / GCash / QR Ph selected */}
+        {isMayaMethod(successOrder.method) && (
+          <div style={{background:"#05426A",borderRadius:ds.radius.xl,padding:"20px 24px",boxShadow:ds.shadow.md,marginBottom:20,textAlign:"center"}}>
+            <div style={{fontSize:13,color:"rgba(255,255,255,0.8)",marginBottom:4}}>Complete your payment via Maya</div>
+            <div style={{fontFamily:ds.font.display,fontSize:22,color:"#fff",marginBottom:4}}>Total: {formatPHP(successOrder.total)}</div>
+            <div style={{fontSize:12,color:"rgba(255,255,255,0.65)",marginBottom:16}}>Enter the exact amount on the payment page · {successOrder.method} accepted</div>
+            <a
+              href={DMEAST_MAYA_LINK}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{display:"inline-block",background:"#fff",color:"#05426A",fontWeight:700,fontSize:15,padding:"12px 32px",borderRadius:ds.radius.pill,textDecoration:"none",boxShadow:"0 2px 8px rgba(0,0,0,0.18)"}}
+            >
+              💳 Pay Now via Maya →
+            </a>
+            <div style={{fontSize:11,color:"rgba(255,255,255,0.55)",marginTop:10}}>A new tab will open. Come back here after paying to upload your payment proof.</div>
+          </div>
+        )}
 
         {/* v15.2: PROMINENT Payment Proof Upload Section — directly after order confirmation */}
         {successOrder.method !== "International Inquiry" && (
