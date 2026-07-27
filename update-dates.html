@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>DMEAST – Update Order Dates</title>
+<style>
+  body { font-family: Arial, sans-serif; max-width: 520px; margin: 60px auto; padding: 20px; background: #f5f5f7; }
+  h2 { color: #c0392b; margin-bottom: 4px; }
+  p  { font-size: 13px; color: #666; margin-top: 4px; }
+  label { display: block; margin-top: 14px; font-size: 13px; font-weight: 700; color: #333; }
+  input { width: 100%; padding: 10px 12px; border: 1.5px solid #ccc; border-radius: 8px; font-size: 14px; box-sizing: border-box; margin-top: 5px; }
+  button { margin-top: 24px; width: 100%; padding: 14px; background: #c0392b; color: #fff; border: none; border-radius: 10px; font-size: 15px; font-weight: 700; cursor: pointer; }
+  button:disabled { background: #999; cursor: not-allowed; }
+  #log { margin-top: 20px; padding: 16px; background: #fff; border-radius: 10px; font-size: 13px; line-height: 2; border: 1px solid #ddd; min-height: 60px; white-space: pre-wrap; }
+  .ok  { color: #27ae60; font-weight: 700; }
+  .err { color: #c0392b; font-weight: 700; }
+</style>
+
+<!-- Firebase compat SDK (works from file://) -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+</head>
+<body>
+
+<h2>📅 Update Order Dates</h2>
+<p>Sign in with your DM EAST admin account to update the Firestore dates.</p>
+
+<label>Admin Email</label>
+<input id="email" type="email" value="info@dmeastph.com" />
+
+<label>Admin Password</label>
+<input id="pass" type="password" placeholder="Enter your password" />
+
+<button id="btn" onclick="run()">🔄 Update Dates Now</button>
+
+<div id="log">Ready — enter your password and click the button.</div>
+
+<script>
+firebase.initializeApp({
+  apiKey:            "AIzaSyAV30NWtnxAnj8jIjN4f5Pa6je43oM4rrw",
+  authDomain:        "dmeast-516cc.firebaseapp.com",
+  projectId:         "dmeast-516cc",
+  storageBucket:     "dmeast-516cc.firebasestorage.app",
+  messagingSenderId: "805825630764",
+  appId:             "1:805825630764:web:9aa00bf55ece3b3f37b789",
+});
+
+var auth = firebase.auth();
+var db   = firebase.firestore();
+
+function log(msg, cls) {
+  var el = document.getElementById('log');
+  el.innerHTML += '<span class="' + (cls||'') + '">' + msg + '</span>\n';
+  el.scrollTop = el.scrollHeight;
+}
+
+var TARGETS = {
+  KDFAFY: {
+    createdAt:   new Date('2026-07-09T00:00:00+08:00'),
+    deliveredAt: new Date('2026-07-14T00:00:00+08:00'),
+  },
+  ZRXZDZ: {
+    createdAt:   new Date('2026-07-01T00:00:00+08:00'),
+    deliveredAt: new Date('2026-07-10T00:00:00+08:00'),
+  },
+};
+
+async function run() {
+  var btn = document.getElementById('btn');
+  btn.disabled = true;
+  document.getElementById('log').innerHTML = '';
+
+  var email = document.getElementById('email').value.trim();
+  var pass  = document.getElementById('pass').value;
+
+  try {
+    log('🔐 Signing in as ' + email + '...');
+    await auth.signInWithEmailAndPassword(email, pass);
+    log('✅ Signed in!', 'ok');
+
+    log('📋 Loading all orders...');
+    var snap = await db.collection('orders').get();
+    log('✅ Found ' + snap.docs.length + ' orders', 'ok');
+
+    var updated = 0;
+    for (var d of snap.docs) {
+      var suffix = d.id.slice(-6).toUpperCase();
+      if (!TARGETS[suffix]) continue;
+
+      var t = TARGETS[suffix];
+      log('Updating #' + suffix + ' (' + d.id + ')...');
+
+      await db.collection('orders').doc(d.id).update({
+        createdAt:   firebase.firestore.Timestamp.fromDate(t.createdAt),
+        deliveredAt: firebase.firestore.Timestamp.fromDate(t.deliveredAt),
+      });
+
+      log('✅ #' + suffix + ' → Placed: ' + t.createdAt.toDateString() + ' / Delivered: ' + t.deliveredAt.toDateString(), 'ok');
+      updated++;
+    }
+
+    if (updated === 0) {
+      log('❌ No matching orders found! (KDFAFY / ZRXZDZ)', 'err');
+    } else {
+      log('\n🎉 Done! ' + updated + ' order(s) updated.', 'ok');
+      log('Refresh your admin dashboard to see the changes.', 'ok');
+    }
+
+  } catch(e) {
+    log('❌ ERROR: ' + e.message, 'err');
+  }
+
+  btn.disabled = false;
+}
+</script>
+</body>
+</html>

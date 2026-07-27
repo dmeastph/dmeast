@@ -20,7 +20,7 @@ echo [OK] Staged all changes.
 REM ── Commit if there is anything new ──────────────────────────
 git diff --cached --quiet
 if errorlevel 1 (
-    git commit -m "fix: editable order dates + remove date from track page"
+    git commit -m "fix: edit the REAL components in App.jsx - remove date from track page, add editable date pickers to order editor"
     echo [OK] Committed.
 ) else (
     echo [INFO] Nothing new to commit.

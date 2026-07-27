@@ -294,7 +294,7 @@ import {
 } from "firebase/auth";
 import {
   getFirestore, doc, getDoc, setDoc, updateDoc, addDoc, deleteDoc,
-  collection, query, where, orderBy, getDocs, serverTimestamp, writeBatch,
+  collection, query, where, orderBy, getDocs, serverTimestamp, writeBatch, Timestamp,
 } from "firebase/firestore";
 import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
 
@@ -5336,7 +5336,19 @@ function MarginDashboardTab({ orders, expenses }){
 // payment method, source, status, supplier cost, notes, address, recipient
 function OrderEditorModal({ order, products: existingProducts, onClose, onSaved, onDeleted, onGeneratePDF, showMarginFields = true, canDelete = true, canEdit = true }){
   const [tab, setTab] = useState("info"); // info | items | details
-  
+
+  // Editable order dates (yyyy-mm-dd for <input type="date">)
+  const toDateStr = (v) => {
+    if (!v) return "";
+    const d = v?.toDate ? v.toDate() : (v?.seconds ? new Date(v.seconds*1000) : new Date(v));
+    if (isNaN(d)) return "";
+    const p = new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Manila",year:"numeric",month:"2-digit",day:"2-digit"}).format(d);
+    return p;
+  };
+  const [editCreatedAt,   setEditCreatedAt]   = useState(toDateStr(order.createdAt));
+  const [editShippedAt,   setEditShippedAt]   = useState(toDateStr(order.shippedAt));
+  const [editDeliveredAt, setEditDeliveredAt] = useState(toDateStr(order.deliveredAt));
+
   // Customer info
   const [name, setName]               = useState(order.name || "");
   const [email, setEmail]             = useState(order.email || "");
@@ -5452,7 +5464,13 @@ function OrderEditorModal({ order, products: existingProducts, onClose, onSaved,
         lastEditedAt: serverTimestamp(),
         lastEditedBy: "admin",
       };
-      
+
+      // Editable dates — write as Manila-midnight timestamps (or clear if blank)
+      const mkTs = (s) => s ? Timestamp.fromDate(new Date(s + "T00:00:00+08:00")) : null;
+      if (editCreatedAt   !== toDateStr(order.createdAt))   payload.createdAt   = mkTs(editCreatedAt);
+      if (editShippedAt   !== toDateStr(order.shippedAt))   payload.shippedAt   = mkTs(editShippedAt);
+      if (editDeliveredAt !== toDateStr(order.deliveredAt)) payload.deliveredAt = mkTs(editDeliveredAt);
+
       await updateDoc(doc(db, "orders", order.id), payload);
       
       // v13.0d: Send email if status changed
@@ -5512,10 +5530,18 @@ function OrderEditorModal({ order, products: existingProducts, onClose, onSaved,
         <div style={{padding:"18px 28px",borderBottom:`1px solid ${ds.color.border}`,display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10}}>
           <div>
             <div style={{fontFamily:ds.font.display,fontSize:20,color:ds.color.textDark}}>Edit Order #{order.id.slice(-6).toUpperCase()}</div>
-            <div style={{fontSize:12,color:ds.color.textMuted,marginTop:2}}>
-              Created: {formatDate(order.createdAt)}
-              {order.lastEditedAt && <span> · Last edited: {formatDate(order.lastEditedAt)}</span>}
+            <div style={{display:"flex",gap:14,marginTop:8,flexWrap:"wrap"}}>
+              {[["Date Placed",editCreatedAt,setEditCreatedAt],
+                ["Date Shipped",editShippedAt,setEditShippedAt],
+                ["Date Delivered",editDeliveredAt,setEditDeliveredAt]].map(([lbl,val,set])=>(
+                <div key={lbl}>
+                  <div style={{fontSize:10,fontWeight:700,color:ds.color.textMuted,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:3}}>{lbl}</div>
+                  <input type="date" value={val} disabled={!canEdit} onChange={e=>set(e.target.value)}
+                    style={{padding:"5px 8px",border:`1px solid ${ds.color.border}`,borderRadius:ds.radius.sm,fontSize:12,fontFamily:ds.font.body,color:ds.color.textDark,background:"#fff"}}/>
+                </div>
+              ))}
             </div>
+            {order.lastEditedAt && <div style={{fontSize:11,color:ds.color.textMuted,marginTop:6}}>Last edited: {formatDate(order.lastEditedAt)}</div>}
           </div>
           <button onClick={onClose} style={{background:"none",border:"none",cursor:"pointer",fontSize:24,color:ds.color.textMuted,padding:4}}>✕</button>
         </div>
@@ -10770,7 +10796,6 @@ function TrackOrderPage(){
               </div>
               <div style={{textAlign:"right"}}>
                 <span style={{fontSize:12,fontWeight:700,padding:"5px 14px",borderRadius:ds.radius.pill,background:orderStatusColor(order.status||"pending").bg,color:orderStatusColor(order.status||"pending").color}}>{ORDER_STATUS_LABELS[order.status]||"Pending"}</span>
-                <div style={{fontSize:11,color:ds.color.textMuted,marginTop:6}}>{formatDate(order.createdAt)}</div>
               </div>
             </div>
 
