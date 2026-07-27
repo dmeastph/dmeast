@@ -20,7 +20,7 @@ echo [OK] Staged all changes.
 REM ── Commit if there is anything new ──────────────────────────
 git diff --cached --quiet
 if errorlevel 1 (
-    git commit -m "feat: macOS UI - SF Pro typography, F5F5F7 surfaces, frosted glass navbar (ported into App.jsx)"
+    git commit -m "fix: bump serif-era heading weights to 600 for SF Pro"
     echo [OK] Committed.
 ) else (
     echo [INFO] Nothing new to commit.
