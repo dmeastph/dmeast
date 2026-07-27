@@ -10831,6 +10831,27 @@ function TrackOrderPage(){
               </div>
             )}
 
+            {/* Order timeline — Placed / Shipped / Delivered */}
+            {order.status!=="cancelled"&&(()=>{
+              const rows=[
+                {icon:"📝",label:"Date Placed",   value:order.createdAt},
+                {icon:"🚚",label:"Date Shipped",  value:order.shippedAt},
+                {icon:"📦",label:"Date Delivered",value:order.deliveredAt},
+              ].filter(r=>r.value);
+              if(!rows.length) return null;
+              return(
+                <div style={{background:ds.color.canvas,borderRadius:ds.radius.md,padding:"14px 18px",marginBottom:20}}>
+                  <div style={{fontSize:11,fontWeight:700,color:ds.color.textMuted,textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:12}}>Order Timeline</div>
+                  {rows.map((r,i)=>(
+                    <div key={r.label} style={{display:"flex",justifyContent:"space-between",alignItems:"center",fontSize:13,color:ds.color.textBody,padding:"7px 0",borderBottom:i<rows.length-1?"1px solid "+ds.color.borderLight:"none"}}>
+                      <span style={{display:"flex",alignItems:"center",gap:8}}><span>{r.icon}</span>{r.label}</span>
+                      <span style={{fontWeight:600,color:ds.color.textDark}}>{formatDate(r.value)}</span>
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
+
             {order.status==="out_of_stock"&&(
               <div style={{background:"#FFF7ED",border:"1px solid #FED7AA",borderRadius:ds.radius.md,padding:"12px 16px",marginBottom:20,fontSize:13,color:"#C2410C"}}>
                 ⚠️ <strong>Item(s) unavailable.</strong> Our team has been notified and will contact you to discuss alternatives or arrange a refund. Call us: <strong>{CONTACT.phone1}</strong>
