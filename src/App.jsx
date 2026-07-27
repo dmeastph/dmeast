@@ -601,20 +601,27 @@ const calculateDueDate = (orderDate, paymentTermsId) => {
 
 const ds = {
   color: {
-    white:"#FFFFFF", canvas:"#FAFAFA", canvasWarm:"#FFF8F6", canvasGold:"#FFFBF0",
+    white:"#FFFFFF", canvas:"#F5F5F7", canvasWarm:"#FFF8F6", canvasGold:"#FFFBF0",
     red:"#CC2F3C", redDark:"#A8252F", redLight:"#FDECEA", redBorder:"#F5C4C7",
     gold:"#D4900F", goldBright:"#F0A81C", goldLight:"#FEF6E0", goldBorder:"#F5D98A",
     pink:"#E8837A", pinkLight:"#FDF0EE",
-    textDark:"#1A1410", textBody:"#3D3530", textMuted:"#7A706A", textLight:"#A89E98",
-    border:"#E8E0DA", borderLight:"#F0EAE6",
+    textDark:"#1D1D1F", textBody:"#3D3530", textMuted:"#6E6E73", textLight:"#A89E98",
+    border:"rgba(0,0,0,0.08)", borderLight:"rgba(0,0,0,0.05)",
     success:"#1A7F5B", successBg:"#E6F5EF", successBorder:"#A3D9C3",
+    // macOS surfaces
+    surface:"#F5F5F7", surfaceCard:"#FFFFFF", surfaceGlass:"rgba(245,245,247,0.80)",
+    surfaceDark:"#1D1D1F", surfaceDarkCard:"rgba(255,255,255,0.06)",
   },
-  font: { display:"'DM Serif Display','Georgia',serif", body:"'DM Sans','Segoe UI',system-ui,sans-serif" },
-  radius: { sm:6, md:10, lg:14, xl:20, pill:999 },
+  font: {
+    display:"-apple-system,'SF Pro Display','Helvetica Neue','Segoe UI',sans-serif",
+    body:"-apple-system,'SF Pro Text','Helvetica Neue','Segoe UI',sans-serif",
+    serif:"'DM Serif Display','Georgia',serif",
+  },
+  radius: { sm:6, md:8, lg:12, xl:18, pill:980 },
   shadow: {
-    xs:"0 1px 4px rgba(26,20,16,0.06)", sm:"0 2px 10px rgba(26,20,16,0.08)",
-    md:"0 4px 20px rgba(26,20,16,0.10)", lg:"0 8px 40px rgba(26,20,16,0.12)",
-    red:"0 4px 18px rgba(204,47,60,0.28)",
+    xs:"0 1px 3px rgba(0,0,0,0.06)", sm:"0 2px 8px rgba(0,0,0,0.08)",
+    md:"0 4px 16px rgba(0,0,0,0.10)", lg:"0 8px 32px rgba(0,0,0,0.12)",
+    red:"0 4px 18px rgba(204,47,60,0.22)",
   },
 };
 
@@ -622,9 +629,11 @@ const GLOBAL_CSS = `
   @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600;700&display=swap');
   @import url('https://unpkg.com/leaflet@1.9.4/dist/leaflet.css');
   *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-  :root{--red:#CC2F3C;--gold:#F0A81C;--canvas:#FAFAFA;--border:#E8E0DA;--text:#1A1410;--font-display:'DM Serif Display','Georgia',serif;--font-body:'DM Sans','Segoe UI',system-ui,sans-serif}
+  :root{--red:#CC2F3C;--gold:#F0A81C;--canvas:#F5F5F7;--border:rgba(0,0,0,0.08);--text:#1D1D1F;--muted:#6E6E73;--font-display:-apple-system,'SF Pro Display','Helvetica Neue','Segoe UI',sans-serif;--font-body:-apple-system,'SF Pro Text','Helvetica Neue','Segoe UI',sans-serif}
   html{scroll-behavior:smooth}
-  body{font-family:var(--font-body);color:var(--text);background:#fff;-webkit-font-smoothing:antialiased}
+  body{font-family:var(--font-body);color:var(--text);background:#F5F5F7;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
+  h1,h2,h3,h4,h5,h6{font-family:var(--font-display);letter-spacing:-0.022em}
+  .mac-glass{background:rgba(245,245,247,0.80);backdrop-filter:saturate(180%) blur(20px);-webkit-backdrop-filter:saturate(180%) blur(20px)}
   button{cursor:pointer;font-family:inherit}a{text-decoration:none;color:inherit}img{display:block;max-width:100%}input,textarea,select{font-family:inherit}
   .dm-desktop-nav{display:flex}.dm-mobile-btn{display:none}
   @media(max-width:900px){.dm-desktop-nav{display:none!important}.dm-mobile-btn{display:flex!important}}
@@ -645,18 +654,18 @@ const GLOBAL_CSS = `
   @keyframes dm-chat-fade-in{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
   @media(max-width:900px){.dm-cart-grid{grid-template-columns:1fr !important}.dm-cart-summary{position:relative !important;top:auto !important}}
   @media(max-width:560px){.dm-cart-item{grid-template-columns:1fr !important;gap:10px !important;padding:18px 0 !important}}
-  .dm-card-hover{transition:transform .22s ease,box-shadow .22s ease,border-color .22s ease}
-  .dm-card-hover:hover{transform:translateY(-3px);box-shadow:0 8px 40px rgba(26,20,16,.12);border-color:#F5C4C7!important}
-  .dm-nav-link{position:relative;background:none;border:none;font-family:var(--font-body);font-size:14px;font-weight:500;letter-spacing:.01em;padding:6px 0;color:#3D3530;transition:color .18s;cursor:pointer}
+  .dm-card-hover{transition:transform .22s cubic-bezier(.25,.1,.25,1),box-shadow .22s ease,border-color .22s ease}
+  .dm-card-hover:hover{transform:translateY(-3px);box-shadow:0 8px 32px rgba(0,0,0,.12);border-color:rgba(0,0,0,.12)!important}
+  .dm-nav-link{position:relative;background:none;border:none;font-family:var(--font-body);font-size:14px;font-weight:500;letter-spacing:-.01em;padding:6px 0;color:var(--text);transition:color .18s;cursor:pointer}
   .dm-nav-link::after{content:'';position:absolute;bottom:0;left:0;right:0;height:2px;background:var(--red);border-radius:99px;transform:scaleX(0);transition:transform .2s ease}
   .dm-nav-link:hover{color:var(--red)}.dm-nav-link:hover::after,.dm-nav-link.active::after{transform:scaleX(1)}.dm-nav-link.active{color:var(--red)}
   @keyframes dmFadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
   .dm-fade-up{animation:dmFadeUp .5s ease both}.dm-fade-up-1{animation-delay:.08s}.dm-fade-up-2{animation-delay:.16s}.dm-fade-up-3{animation-delay:.24s}.dm-fade-up-4{animation-delay:.32s}
-  .dm-dot-bg{background-image:radial-gradient(circle,#E8E0DA 1px,transparent 1px);background-size:24px 24px}
+  .dm-dot-bg{background-image:radial-gradient(circle,rgba(0,0,0,0.06) 1px,transparent 1px);background-size:24px 24px}
   @keyframes spin{to{transform:rotate(360deg)}}
   @keyframes modalIn{from{opacity:0;transform:translateY(20px) scale(.97)}to{opacity:1;transform:translateY(0) scale(1)}}
   @media print{nav,footer,.dm-no-print{display:none!important}body{background:#fff!important}#dmeast-order-receipt{box-shadow:none!important;border:1px solid #ccc!important}}
-  ::-webkit-scrollbar{width:5px}::-webkit-scrollbar-track{background:#FAFAFA}::-webkit-scrollbar-thumb{background:#E8E0DA;border-radius:99px}
+  ::-webkit-scrollbar{width:8px;height:8px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:rgba(0,0,0,0.22);border-radius:99px;border:2px solid transparent;background-clip:content-box}::-webkit-scrollbar-thumb:hover{background:rgba(0,0,0,0.36);background-clip:content-box}
   .leaflet-container{font-family:var(--font-body);border-radius:10px}
   .leaflet-popup-content{font-size:12px}
 `;
@@ -1244,9 +1253,9 @@ function ProductsProvider({ children }){
 
 // ─── PRIMITIVE COMPONENTS ────────────────────────────────────────────────────
 function Btn({variant="primary",size="md",onClick,children,disabled,fullWidth,href,type="button"}){
-  const base={display:"inline-flex",alignItems:"center",justifyContent:"center",gap:8,fontFamily:ds.font.body,fontWeight:600,letterSpacing:"0.01em",borderRadius:ds.radius.md,border:"2px solid transparent",transition:"all 0.18s ease",cursor:disabled?"not-allowed":"pointer",opacity:disabled?0.5:1,width:fullWidth?"100%":"auto",textDecoration:"none"};
-  const sizes={sm:{fontSize:13,padding:"8px 18px"},md:{fontSize:14,padding:"11px 24px"},lg:{fontSize:15,padding:"13px 30px"},xl:{fontSize:16,padding:"15px 38px"}};
-  const variants={primary:{background:ds.color.red,color:"#fff",borderColor:ds.color.red,boxShadow:ds.shadow.red},secondary:{background:"#fff",color:ds.color.red,borderColor:ds.color.red},outline:{background:"#fff",color:ds.color.textBody,borderColor:ds.color.border},gold:{background:ds.color.goldLight,color:ds.color.gold,borderColor:ds.color.goldBorder},ghost:{background:"rgba(204,47,60,0.07)",color:ds.color.red,borderColor:"transparent"},dark:{background:ds.color.textDark,color:"#fff",borderColor:"transparent"},success:{background:ds.color.successBg,color:ds.color.success,borderColor:ds.color.successBorder}};
+  const base={display:"inline-flex",alignItems:"center",justifyContent:"center",gap:8,fontFamily:ds.font.body,fontWeight:500,letterSpacing:"-0.01em",borderRadius:ds.radius.md,border:"1px solid transparent",transition:"all 0.18s cubic-bezier(.25,.1,.25,1)",cursor:disabled?"not-allowed":"pointer",opacity:disabled?0.5:1,width:fullWidth?"100%":"auto",textDecoration:"none"};
+  const sizes={sm:{fontSize:13,padding:"7px 16px"},md:{fontSize:14,padding:"9px 20px"},lg:{fontSize:15,padding:"11px 26px"},xl:{fontSize:16,padding:"13px 34px"}};
+  const variants={primary:{background:ds.color.red,color:"#fff",borderColor:ds.color.red,boxShadow:ds.shadow.red},secondary:{background:"#fff",color:ds.color.red,borderColor:ds.color.red},outline:{background:"rgba(255,255,255,0.9)",color:ds.color.textBody,borderColor:"rgba(0,0,0,0.12)"},gold:{background:ds.color.goldLight,color:ds.color.gold,borderColor:ds.color.goldBorder},ghost:{background:"rgba(204,47,60,0.07)",color:ds.color.red,borderColor:"transparent"},dark:{background:ds.color.textDark,color:"#fff",borderColor:"transparent"},success:{background:ds.color.successBg,color:ds.color.success,borderColor:ds.color.successBorder}};
   const style={...base,...sizes[size],...variants[variant]};
   if(href) return <a href={href} target="_blank" rel="noopener noreferrer" style={style}>{children}</a>;
   return <button type={type} onClick={onClick} disabled={disabled} style={style}>{children}</button>;
@@ -1266,7 +1275,7 @@ function SectionHeader({eyebrow,title,subtitle,center,dark}){
   return(
     <div style={{textAlign:center?"center":"left",marginBottom:48}}>
       {eyebrow&&<div style={{fontSize:11,fontWeight:700,letterSpacing:"0.16em",textTransform:"uppercase",color:dark?"rgba(255,255,255,0.6)":ds.color.red,marginBottom:10}}>{eyebrow}</div>}
-      <h2 style={{fontFamily:ds.font.display,fontSize:"clamp(1.75rem,3vw,2.3rem)",fontWeight:400,color:dark?"#fff":ds.color.textDark,lineHeight:1.25,marginBottom:subtitle?14:0}}>{title}</h2>
+      <h2 style={{fontFamily:ds.font.display,fontSize:"clamp(1.75rem,3vw,2.3rem)",fontWeight:600,letterSpacing:"-0.022em",color:dark?"#fff":ds.color.textDark,lineHeight:1.2,marginBottom:subtitle?14:0}}>{title}</h2>
       {subtitle&&<p style={{fontSize:15,color:dark?"rgba(255,255,255,0.65)":ds.color.textMuted,lineHeight:1.75,maxWidth:center?560:"none",margin:center?"0 auto":0}}>{subtitle}</p>}
     </div>
   );
@@ -1493,7 +1502,7 @@ function AuthModal({onClose,onSuccess}){
         <button onClick={onClose} style={{position:"absolute",top:16,right:16,background:"none",border:"none",fontSize:20,color:ds.color.textMuted,cursor:"pointer",lineHeight:1}}>✕</button>
         <div style={{textAlign:"center",marginBottom:28}}>
           <BrandLogo height={36}/>
-          <div style={{fontFamily:ds.font.display,fontSize:22,color:ds.color.textDark,marginTop:16,marginBottom:4}}>
+          <div style={{fontFamily:ds.font.display,fontWeight:600,fontSize:22,color:ds.color.textDark,marginTop:16,marginBottom:4}}>
             {mode==="login"?"Welcome back":mode==="signup"?"Create your account":"Reset password"}
           </div>
           <div style={{fontSize:13,color:ds.color.textMuted}}>
@@ -1558,8 +1567,8 @@ function Navbar({activePage,setPage,cartCount,user,isAdmin,onSignIn,onSignOut}){
   const nav=id=>{setPage(id);setMenuOpen(false);};
 
   return(
-    <nav style={{position:"fixed",top:0,left:0,right:0,zIndex:1000,background:scrolled?"rgba(255,255,255,0.97)":"#fff",backdropFilter:"blur(12px)",borderBottom:`1px solid ${scrolled?ds.color.border:ds.color.borderLight}`,boxShadow:scrolled?ds.shadow.sm:"none",transition:"all 0.25s ease"}}>
-      <div style={{height:3,background:`linear-gradient(90deg,${ds.color.red},${ds.color.goldBright})`}}/>
+    <nav style={{position:"fixed",top:0,left:0,right:0,zIndex:1000,background:scrolled?"rgba(245,245,247,0.72)":"rgba(245,245,247,0.90)",backdropFilter:"saturate(180%) blur(20px)",WebkitBackdropFilter:"saturate(180%) blur(20px)",borderBottom:`0.5px solid ${scrolled?"rgba(0,0,0,0.12)":"rgba(0,0,0,0.06)"}`,boxShadow:scrolled?"0 1px 3px rgba(0,0,0,0.06)":"none",transition:"background .3s ease,border-color .3s ease,box-shadow .3s ease"}}>
+      <div style={{height:2,background:`linear-gradient(90deg,${ds.color.red},${ds.color.goldBright})`}}/>
       <div style={{maxWidth:1280,margin:"0 auto",padding:"0 28px",display:"flex",alignItems:"center",justifyContent:"space-between",height:64}}>
         <button onClick={()=>nav("home")} style={{background:"none",border:"none",cursor:"pointer",padding:0,display:"flex",alignItems:"center"}}><BrandLogo height={38}/></button>
         <div className="dm-desktop-nav" style={{alignItems:"center",gap:8}}>
@@ -1574,7 +1583,7 @@ function Navbar({activePage,setPage,cartCount,user,isAdmin,onSignIn,onSignOut}){
                   👤 My Account ▾
                 </button>
                 {acctOpen&&(
-                  <div style={{position:"absolute",top:"calc(100% + 8px)",right:0,background:"#fff",border:`1px solid ${ds.color.border}`,borderRadius:ds.radius.lg,padding:8,minWidth:180,boxShadow:ds.shadow.md,zIndex:100}}>
+                  <div style={{position:"absolute",top:"calc(100% + 8px)",right:0,background:"rgba(255,255,255,0.86)",backdropFilter:"saturate(180%) blur(20px)",WebkitBackdropFilter:"saturate(180%) blur(20px)",border:`0.5px solid ${ds.color.border}`,borderRadius:ds.radius.lg,padding:6,minWidth:190,boxShadow:"0 8px 32px rgba(0,0,0,0.16)",zIndex:100}}>
                     <button onClick={()=>{nav("portal");setAcctOpen(false);}} style={{display:"block",width:"100%",textAlign:"left",background:"none",border:"none",padding:"10px 14px",fontSize:13,fontWeight:500,color:ds.color.textBody,cursor:"pointer",borderRadius:ds.radius.sm}}>📋 My Portal</button>
                     {isAdmin&&<button onClick={()=>{nav("admin");setAcctOpen(false);}} style={{display:"block",width:"100%",textAlign:"left",background:"none",border:"none",padding:"10px 14px",fontSize:13,fontWeight:500,color:ds.color.gold,cursor:"pointer",borderRadius:ds.radius.sm}}>⚙️ Admin Dashboard</button>}
                     <div style={{height:1,background:ds.color.borderLight,margin:"4px 0"}}/>
@@ -1591,7 +1600,7 @@ function Navbar({activePage,setPage,cartCount,user,isAdmin,onSignIn,onSignOut}){
         <button className="dm-mobile-btn" onClick={()=>setMenuOpen(o=>!o)} style={{background:"none",border:"none",fontSize:22,color:ds.color.textDark,width:40,height:40,alignItems:"center",justifyContent:"center"}}>{menuOpen?"✕":"☰"}</button>
       </div>
       {menuOpen&&(
-        <div style={{background:"#fff",borderTop:`1px solid ${ds.color.border}`,padding:"16px 24px 24px"}}>
+        <div style={{background:"rgba(245,245,247,0.94)",backdropFilter:"saturate(180%) blur(20px)",WebkitBackdropFilter:"saturate(180%) blur(20px)",borderTop:`0.5px solid ${ds.color.border}`,padding:"16px 24px 24px"}}>
           {links.map(l=><button key={l.id} onClick={()=>nav(l.id)} style={{display:"block",width:"100%",textAlign:"left",background:activePage===l.id?ds.color.redLight:"none",border:"none",cursor:"pointer",color:activePage===l.id?ds.color.red:ds.color.textBody,fontSize:15,fontWeight:500,padding:"12px 14px",borderRadius:ds.radius.md,marginBottom:2,fontFamily:ds.font.body}}>{l.label}</button>)}
           <div style={{marginTop:12,display:"flex",gap:10,flexWrap:"wrap"}}>
             <Btn variant="outline" size="sm" onClick={()=>nav("cart")} fullWidth>🛒 Cart ({cartCount})</Btn>
@@ -1981,12 +1990,12 @@ function CustomerPortal({user,setPage,addToCart,wishlist,toggleWishlist}){
         <div style={{maxWidth:1280,margin:"0 auto",padding:"0 28px",display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:16}}>
           <div>
             <div style={{fontSize:11,fontWeight:700,color:ds.color.goldBright,textTransform:"uppercase",letterSpacing:"0.12em",marginBottom:4}}>Customer Portal</div>
-            <div style={{fontFamily:ds.font.display,fontSize:22,color:"#fff"}}>Hello, {profile?.name||user.email}! 👋</div>
+            <div style={{fontFamily:ds.font.display,fontWeight:600,fontSize:22,color:"#fff"}}>Hello, {profile?.name||user.email}! 👋</div>
           </div>
           <div style={{display:"flex",gap:12}}>
             {[{v:totalOrders,l:"Orders"},{v:`${points.toLocaleString()} pts`,l:"Points"},{v:formatPHP(totalSpent),l:"Total Spent"}].map((s,i)=>(
               <div key={i} style={{textAlign:"center",background:"rgba(255,255,255,0.07)",borderRadius:ds.radius.lg,padding:"12px 20px"}}>
-                <div style={{fontFamily:ds.font.display,fontSize:18,color:ds.color.goldBright}}>{s.v}</div>
+                <div style={{fontFamily:ds.font.display,fontWeight:600,fontSize:18,color:ds.color.goldBright}}>{s.v}</div>
                 <div style={{fontSize:11,color:"rgba(255,255,255,0.5)",textTransform:"uppercase",letterSpacing:"0.08em"}}>{s.l}</div>
               </div>
             ))}
@@ -2015,7 +2024,7 @@ function CustomerPortal({user,setPage,addToCart,wishlist,toggleWishlist}){
               ))}
             </div>
             <div style={{background:"#fff",border:`1px solid ${ds.color.border}`,borderRadius:ds.radius.lg,padding:"24px 28px",boxShadow:ds.shadow.xs}}>
-              <div style={{fontFamily:ds.font.display,fontSize:18,color:ds.color.textDark,marginBottom:18}}>Recent Orders</div>
+              <div style={{fontFamily:ds.font.display,fontWeight:600,fontSize:18,color:ds.color.textDark,marginBottom:18}}>Recent Orders</div>
               {orders.length===0?(
                 <div style={{textAlign:"center",padding:"32px 0",color:ds.color.textMuted,fontSize:14}}>No orders yet. <button onClick={()=>setPage("products")} style={{background:"none",border:"none",color:ds.color.red,cursor:"pointer",fontWeight:600,fontFamily:ds.font.body,fontSize:14}}>Browse products →</button></div>
               ):orders.slice(0,5).map(o=>{
@@ -2039,7 +2048,7 @@ function CustomerPortal({user,setPage,addToCart,wishlist,toggleWishlist}){
 
         {tab==="orders"&&(
           <div style={{background:"#fff",border:`1px solid ${ds.color.border}`,borderRadius:ds.radius.lg,padding:"24px 28px",boxShadow:ds.shadow.xs}}>
-            <div style={{fontFamily:ds.font.display,fontSize:18,color:ds.color.textDark,marginBottom:20}}>Order History</div>
+            <div style={{fontFamily:ds.font.display,fontWeight:600,fontSize:18,color:ds.color.textDark,marginBottom:20}}>Order History</div>
             {orders.length===0?(
               <div style={{textAlign:"center",padding:"48px 0",color:ds.color.textMuted}}>
                 <div style={{fontSize:36,marginBottom:12}}>📦</div>
@@ -2136,7 +2145,7 @@ function CustomerPortal({user,setPage,addToCart,wishlist,toggleWishlist}){
 
         {tab==="wishlist"&&(
           <div>
-            <div style={{fontFamily:ds.font.display,fontSize:18,color:ds.color.textDark,marginBottom:20}}>My Wishlist</div>
+            <div style={{fontFamily:ds.font.display,fontWeight:600,fontSize:18,color:ds.color.textDark,marginBottom:20}}>My Wishlist</div>
             {(!wishlist||wishlist.length===0)?(
               <div style={{textAlign:"center",padding:"60px 0",color:ds.color.textMuted}}>
                 <div style={{fontSize:32,marginBottom:12}}>🤍</div>
@@ -2157,7 +2166,7 @@ function CustomerPortal({user,setPage,addToCart,wishlist,toggleWishlist}){
         {tab==="address"&&(
           <div style={{maxWidth:560}}>
             <div style={{background:"#fff",border:`1px solid ${ds.color.border}`,borderRadius:ds.radius.lg,padding:"28px 32px",boxShadow:ds.shadow.xs}}>
-              <div style={{fontFamily:ds.font.display,fontSize:18,color:ds.color.textDark,marginBottom:6}}>Saved Delivery Address</div>
+              <div style={{fontFamily:ds.font.display,fontWeight:600,fontSize:18,color:ds.color.textDark,marginBottom:6}}>Saved Delivery Address</div>
               <div style={{fontSize:13,color:ds.color.textMuted,marginBottom:22}}>This address will pre-fill your checkout form.</div>
               <label style={{fontSize:12.5,fontWeight:600,color:ds.color.textDark,display:"block",marginBottom:8}}>Full Delivery Address</label>
               <textarea value={address} onChange={e=>setAddress(e.target.value)} rows={4} placeholder="Unit/House No., Street, Barangay, City, Province, ZIP" style={{...inp,resize:"vertical",lineHeight:1.65}} onFocus={e=>e.target.style.borderColor=ds.color.red} onBlur={e=>e.target.style.borderColor=ds.color.border}/>
@@ -2170,7 +2179,7 @@ function CustomerPortal({user,setPage,addToCart,wishlist,toggleWishlist}){
 
         {tab==="rx"&&(
           <div style={{background:"#fff",border:`1px solid ${ds.color.border}`,borderRadius:ds.radius.lg,padding:"24px 28px",boxShadow:ds.shadow.xs}}>
-            <div style={{fontFamily:ds.font.display,fontSize:18,color:ds.color.textDark,marginBottom:20}}>Prescription Upload History</div>
+            <div style={{fontFamily:ds.font.display,fontWeight:600,fontSize:18,color:ds.color.textDark,marginBottom:20}}>Prescription Upload History</div>
             {rxUps.length===0?<div style={{textAlign:"center",padding:"40px 0",color:ds.color.textMuted,fontSize:14}}>No prescription uploads yet.</div>:rxUps.map(r=>(
               <div key={r.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"14px 0",borderBottom:`1px solid ${ds.color.borderLight}`,flexWrap:"wrap",gap:10}}>
                 <div>
@@ -2188,7 +2197,7 @@ function CustomerPortal({user,setPage,addToCart,wishlist,toggleWishlist}){
             <div className="dm-grid-2" style={{marginBottom:24}}>
               <div style={{background:`linear-gradient(135deg,${ds.color.textDark},#3D3530)`,borderRadius:ds.radius.xl,padding:"28px 32px",color:"#fff"}}>
                 <div style={{fontSize:11,fontWeight:700,color:ds.color.goldBright,letterSpacing:"0.12em",textTransform:"uppercase",marginBottom:12}}>Your Points Balance</div>
-                <div style={{fontFamily:ds.font.display,fontSize:48,color:ds.color.goldBright,lineHeight:1}}>{points.toLocaleString()}</div>
+                <div style={{fontFamily:ds.font.display,fontWeight:600,fontSize:48,color:ds.color.goldBright,lineHeight:1}}>{points.toLocaleString()}</div>
                 <div style={{fontSize:13,color:"rgba(255,255,255,0.6)",marginTop:6}}>DMEAST Reward Points</div>
                 <div style={{marginTop:20,background:"rgba(255,255,255,0.08)",borderRadius:ds.radius.md,padding:"14px 18px"}}>
                   <div style={{fontSize:13,color:"rgba(255,255,255,0.7)"}}>Cash equivalent</div>
@@ -2196,7 +2205,7 @@ function CustomerPortal({user,setPage,addToCart,wishlist,toggleWishlist}){
                 </div>
               </div>
               <div style={{background:"#fff",border:`1px solid ${ds.color.border}`,borderRadius:ds.radius.xl,padding:"28px 32px",boxShadow:ds.shadow.xs}}>
-                <div style={{fontFamily:ds.font.display,fontSize:18,color:ds.color.textDark,marginBottom:18}}>How to Earn</div>
+                <div style={{fontFamily:ds.font.display,fontWeight:600,fontSize:18,color:ds.color.textDark,marginBottom:18}}>How to Earn</div>
                 {[{icon:"🛒",label:"Place an order",desc:`Earn 1 point for every ₱200 spent`},{icon:"💊",label:"Rx products",desc:"Points earned on all purchases including Rx items"},{icon:"💰",label:"Redeem points",desc:`₱${POINT_VALUE} value per point — ask us at checkout`}].map((e,i)=>(
                   <div key={i} style={{display:"flex",gap:14,marginBottom:16}}>
                     <div style={{width:36,height:36,borderRadius:ds.radius.md,background:ds.color.goldLight,display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,flexShrink:0}}>{e.icon}</div>
@@ -2206,7 +2215,7 @@ function CustomerPortal({user,setPage,addToCart,wishlist,toggleWishlist}){
               </div>
             </div>
             <div style={{background:"#fff",border:`1px solid ${ds.color.border}`,borderRadius:ds.radius.lg,padding:"24px 28px",boxShadow:ds.shadow.xs}}>
-              <div style={{fontFamily:ds.font.display,fontSize:18,color:ds.color.textDark,marginBottom:18}}>Points History</div>
+              <div style={{fontFamily:ds.font.display,fontWeight:600,fontSize:18,color:ds.color.textDark,marginBottom:18}}>Points History</div>
               {orders.length===0?<div style={{textAlign:"center",padding:"24px 0",color:ds.color.textMuted,fontSize:14}}>No points earned yet. Place your first order!</div>:orders.map(o=>(
                 <div key={o.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"12px 0",borderBottom:`1px solid ${ds.color.borderLight}`}}>
                   <div>
@@ -2280,7 +2289,7 @@ function ProductEditModal({ product, onSave, onClose }){
       <div style={{background:"#fff",borderRadius:ds.radius.xl,padding:"32px 36px",maxWidth:640,width:"100%",maxHeight:"90vh",overflowY:"auto",boxShadow:ds.shadow.lg,animation:"modalIn .25s ease"}} onClick={e=>e.stopPropagation()}>
 
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:24}}>
-          <div style={{fontFamily:ds.font.display,fontSize:22,color:ds.color.textDark}}>{isNew?"Add New Product":"Edit Product"}</div>
+          <div style={{fontFamily:ds.font.display,fontWeight:600,fontSize:22,color:ds.color.textDark}}>{isNew?"Add New Product":"Edit Product"}</div>
           <button onClick={onClose} style={{background:"none",border:"none",fontSize:22,color:ds.color.textMuted,cursor:"pointer",lineHeight:1}}>✕</button>
         </div>
 
@@ -3493,7 +3502,7 @@ function PDFGeneratorModal({ order, onClose }){
         {/* Header */}
         <div style={{padding:"18px 28px",borderBottom:`1px solid ${ds.color.border}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
           <div>
-            <div style={{fontFamily:ds.font.display,fontSize:20,color:ds.color.textDark}}>📄 Generate Document{isIntlOrder && <span style={{fontSize:13,color:"#92400e",background:"#fef3c7",padding:"2px 8px",borderRadius:8,marginLeft:10,fontWeight:600}}>🌍 International</span>}</div>
+            <div style={{fontFamily:ds.font.display,fontWeight:600,fontSize:20,color:ds.color.textDark}}>📄 Generate Document{isIntlOrder && <span style={{fontSize:13,color:"#92400e",background:"#fef3c7",padding:"2px 8px",borderRadius:8,marginLeft:10,fontWeight:600}}>🌍 International</span>}</div>
             <div style={{fontSize:12,color:ds.color.textMuted,marginTop:2}}>Order #{order.id.slice(-6).toUpperCase()} · {order.name} · {formatPHP(order.total||0)}{isIntlOrder && order.intlCountry && ` · ${order.intlCountry}`}</div>
           </div>
           <button onClick={onClose} style={{background:"none",border:"none",cursor:"pointer",fontSize:24,color:ds.color.textMuted,padding:4}}>✕</button>
@@ -3898,7 +3907,7 @@ function NewOrderModal({ onClose, onSaved, customers: existingCustomers, product
         {/* Header */}
         <div style={{padding:"20px 28px",borderBottom:`1px solid ${ds.color.border}`,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
           <div>
-            <div style={{fontFamily:ds.font.display,fontSize:20,color:ds.color.textDark}}>+ New Internal Order</div>
+            <div style={{fontFamily:ds.font.display,fontWeight:600,fontSize:20,color:ds.color.textDark}}>+ New Internal Order</div>
             <div style={{fontSize:12,color:ds.color.textMuted,marginTop:2}}>Manually create an order for phone/Messenger/walk-in customers</div>
           </div>
           <button onClick={onClose} style={{background:"none",border:"none",cursor:"pointer",fontSize:24,color:ds.color.textMuted,padding:4}}>✕</button>
@@ -4239,7 +4248,7 @@ function ReceivablesTab({ orders, onMarkPaid }){
     <div style={{background:"#fff",border:`1px solid ${ds.color.border}`,borderRadius:ds.radius.lg,padding:"24px 28px",boxShadow:ds.shadow.xs}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20,flexWrap:"wrap",gap:12}}>
         <div>
-          <div style={{fontFamily:ds.font.display,fontSize:18,color:ds.color.textDark}}>💰 Receivables ({filtered.length})</div>
+          <div style={{fontFamily:ds.font.display,fontWeight:600,fontSize:18,color:ds.color.textDark}}>💰 Receivables ({filtered.length})</div>
           <div style={{fontSize:12.5,color:ds.color.textMuted,marginTop:3}}>Outstanding balances from credit-term orders</div>
         </div>
         <Btn variant="outline" size="sm" onClick={exportReceivablesCSV}>⬇️ Export CSV</Btn>
@@ -4352,7 +4361,7 @@ function CustomerEditorModal({ customer, onClose, onSaved }){
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center",padding:20,overflowY:"auto"}}>
       <div style={{background:"#fff",borderRadius:ds.radius.xl,maxWidth:600,width:"100%",maxHeight:"90vh",display:"flex",flexDirection:"column",boxShadow:ds.shadow.xl}}>
         <div style={{padding:"20px 28px",borderBottom:`1px solid ${ds.color.border}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-          <div style={{fontFamily:ds.font.display,fontSize:18,color:ds.color.textDark}}>{customer?.id?"Edit Customer":"+ New Customer"}</div>
+          <div style={{fontFamily:ds.font.display,fontWeight:600,fontSize:18,color:ds.color.textDark}}>{customer?.id?"Edit Customer":"+ New Customer"}</div>
           <button onClick={onClose} style={{background:"none",border:"none",cursor:"pointer",fontSize:22,color:ds.color.textMuted}}>✕</button>
         </div>
         <div style={{flex:1,overflowY:"auto",padding:"24px 28px",display:"grid",gridTemplateColumns:"1fr 1fr",gap:"14px 18px"}}>
@@ -4602,7 +4611,7 @@ function ExpenseEditorModal({ expense, orders, onClose, onSaved }){
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center",padding:20,overflowY:"auto"}}>
       <div style={{background:"#fff",borderRadius:ds.radius.xl,maxWidth:720,width:"100%",maxHeight:"90vh",display:"flex",flexDirection:"column",boxShadow:ds.shadow.xl}}>
         <div style={{padding:"20px 28px",borderBottom:`1px solid ${ds.color.border}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-          <div style={{fontFamily:ds.font.display,fontSize:18,color:ds.color.textDark}}>{expense?.id?"Edit Expense":"+ New Expense"}</div>
+          <div style={{fontFamily:ds.font.display,fontWeight:600,fontSize:18,color:ds.color.textDark}}>{expense?.id?"Edit Expense":"+ New Expense"}</div>
           <button onClick={onClose} style={{background:"none",border:"none",cursor:"pointer",fontSize:22,color:ds.color.textMuted}}>✕</button>
         </div>
         <div style={{flex:1,overflowY:"auto",padding:"24px 28px"}}>
@@ -4781,7 +4790,7 @@ function ExpensesTab({ expenses, orders, onEdit, onNew, onRefresh }){
     <div style={{background:"#fff",border:`1px solid ${ds.color.border}`,borderRadius:ds.radius.lg,padding:"24px 28px",boxShadow:ds.shadow.xs}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20,flexWrap:"wrap",gap:12}}>
         <div>
-          <div style={{fontFamily:ds.font.display,fontSize:18,color:ds.color.textDark}}>🏢 Expenses ({filtered.length})</div>
+          <div style={{fontFamily:ds.font.display,fontWeight:600,fontSize:18,color:ds.color.textDark}}>🏢 Expenses ({filtered.length})</div>
           <div style={{fontSize:12.5,color:ds.color.textMuted,marginTop:3}}>Track DMEAST's costs — supplier bills, office, transport, utilities</div>
         </div>
         <div style={{display:"flex",gap:8}}>
@@ -4949,7 +4958,7 @@ function ManualBillingEditorModal({ billing, onClose, onSaved }){
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center",padding:20,overflowY:"auto"}}>
       <div style={{background:"#fff",borderRadius:ds.radius.xl,maxWidth:600,width:"100%",maxHeight:"90vh",display:"flex",flexDirection:"column",boxShadow:ds.shadow.xl}}>
         <div style={{padding:"20px 28px",borderBottom:`1px solid ${ds.color.border}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-          <div style={{fontFamily:ds.font.display,fontSize:18,color:ds.color.textDark}}>{billing?.id?"Edit Manual Billing":"+ New Manual Billing"}</div>
+          <div style={{fontFamily:ds.font.display,fontWeight:600,fontSize:18,color:ds.color.textDark}}>{billing?.id?"Edit Manual Billing":"+ New Manual Billing"}</div>
           <button onClick={onClose} style={{background:"none",border:"none",cursor:"pointer",fontSize:22,color:ds.color.textMuted}}>✕</button>
         </div>
         <div style={{flex:1,overflowY:"auto",padding:"24px 28px",display:"grid",gridTemplateColumns:"1fr 1fr",gap:"14px 18px"}}>
@@ -5027,7 +5036,7 @@ function ManualBillingsTab({ billings, onEdit, onNew }){
     <div style={{background:"#fff",border:`1px solid ${ds.color.border}`,borderRadius:ds.radius.lg,padding:"24px 28px",boxShadow:ds.shadow.xs}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20,flexWrap:"wrap",gap:12}}>
         <div>
-          <div style={{fontFamily:ds.font.display,fontSize:18,color:ds.color.textDark}}>📝 Manual Billings ({filtered.length})</div>
+          <div style={{fontFamily:ds.font.display,fontWeight:600,fontSize:18,color:ds.color.textDark}}>📝 Manual Billings ({filtered.length})</div>
           <div style={{fontSize:12.5,color:ds.color.textMuted,marginTop:3}}>Off-system invoices for special clients (verbal agreements, services, etc)</div>
         </div>
         <div style={{display:"flex",gap:8}}>
@@ -5190,7 +5199,7 @@ function MarginDashboardTab({ orders, expenses }){
     <div>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20,flexWrap:"wrap",gap:12}}>
         <div>
-          <div style={{fontFamily:ds.font.display,fontSize:20,color:ds.color.textDark}}>📈 Margin Dashboard</div>
+          <div style={{fontFamily:ds.font.display,fontWeight:600,fontSize:20,color:ds.color.textDark}}>📈 Margin Dashboard</div>
           <div style={{fontSize:12.5,color:ds.color.textMuted,marginTop:3}}>Profit analysis — revenue, COGS, operating expenses, and net margin</div>
         </div>
         <select value={dateRange} onChange={e=>setDateRange(e.target.value)} style={{padding:"8px 14px",borderRadius:ds.radius.md,border:`1px solid ${ds.color.border}`,fontSize:13,fontFamily:ds.font.body,outline:"none",cursor:"pointer",background:"#fff"}}>
@@ -5226,7 +5235,7 @@ function MarginDashboardTab({ orders, expenses }){
       
       {/* P&L summary */}
       <div style={{background:"#fff",border:`1px solid ${ds.color.border}`,borderRadius:ds.radius.lg,padding:"24px 28px",boxShadow:ds.shadow.xs,marginBottom:20}}>
-        <div style={{fontFamily:ds.font.display,fontSize:16,color:ds.color.textDark,marginBottom:16}}>Profit & Loss Summary</div>
+        <div style={{fontFamily:ds.font.display,fontWeight:600,fontSize:16,color:ds.color.textDark,marginBottom:16}}>Profit & Loss Summary</div>
         <div style={{display:"grid",gridTemplateColumns:"1fr auto",gap:"8px 16px"}}>
           <div style={{fontSize:13,color:ds.color.textBody}}>Revenue</div>
           <div style={{fontSize:13,fontWeight:700,color:ds.color.textDark,textAlign:"right"}}>{formatPHP(totalRevenue)}</div>
@@ -5249,7 +5258,7 @@ function MarginDashboardTab({ orders, expenses }){
       {/* Two-column: Top Customers + Top Products */}
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:18,marginBottom:20}}>
         <div style={{background:"#fff",border:`1px solid ${ds.color.border}`,borderRadius:ds.radius.lg,padding:"20px 22px",boxShadow:ds.shadow.xs}}>
-          <div style={{fontFamily:ds.font.display,fontSize:15,color:ds.color.textDark,marginBottom:14}}>👑 Top Customers</div>
+          <div style={{fontFamily:ds.font.display,fontWeight:600,fontSize:15,color:ds.color.textDark,marginBottom:14}}>👑 Top Customers</div>
           {topCustomers.length===0?(
             <div style={{textAlign:"center",padding:"20px 0",color:ds.color.textLight,fontSize:13}}>No data for this period</div>
           ):topCustomers.map((c,i)=>(
@@ -5263,7 +5272,7 @@ function MarginDashboardTab({ orders, expenses }){
           ))}
         </div>
         <div style={{background:"#fff",border:`1px solid ${ds.color.border}`,borderRadius:ds.radius.lg,padding:"20px 22px",boxShadow:ds.shadow.xs}}>
-          <div style={{fontFamily:ds.font.display,fontSize:15,color:ds.color.textDark,marginBottom:14}}>🥇 Top Products</div>
+          <div style={{fontFamily:ds.font.display,fontWeight:600,fontSize:15,color:ds.color.textDark,marginBottom:14}}>🥇 Top Products</div>
           {topProducts.length===0?(
             <div style={{textAlign:"center",padding:"20px 0",color:ds.color.textLight,fontSize:13}}>No data for this period</div>
           ):topProducts.map((p,i)=>(
@@ -5280,7 +5289,7 @@ function MarginDashboardTab({ orders, expenses }){
       
       {/* Source breakdown */}
       <div style={{background:"#fff",border:`1px solid ${ds.color.border}`,borderRadius:ds.radius.lg,padding:"20px 22px",boxShadow:ds.shadow.xs,marginBottom:20}}>
-        <div style={{fontFamily:ds.font.display,fontSize:15,color:ds.color.textDark,marginBottom:14}}>🌐 Revenue by Source Channel</div>
+        <div style={{fontFamily:ds.font.display,fontWeight:600,fontSize:15,color:ds.color.textDark,marginBottom:14}}>🌐 Revenue by Source Channel</div>
         {sourceBreakdown.length===0?(
           <div style={{textAlign:"center",padding:"20px 0",color:ds.color.textLight,fontSize:13}}>No data for this period</div>
         ):sourceBreakdown.map(s=>{
@@ -5302,7 +5311,7 @@ function MarginDashboardTab({ orders, expenses }){
       {/* Per-order margins (orders with COGS) */}
       {ordersWithMargin.length > 0 && (
         <div style={{background:"#fff",border:`1px solid ${ds.color.border}`,borderRadius:ds.radius.lg,padding:"20px 22px",boxShadow:ds.shadow.xs}}>
-          <div style={{fontFamily:ds.font.display,fontSize:15,color:ds.color.textDark,marginBottom:14}}>💼 Top Margin Orders ({ordersWithMargin.length} orders with COGS data)</div>
+          <div style={{fontFamily:ds.font.display,fontWeight:600,fontSize:15,color:ds.color.textDark,marginBottom:14}}>💼 Top Margin Orders ({ordersWithMargin.length} orders with COGS data)</div>
           <div style={{overflowX:"auto"}}>
             <table style={{width:"100%",borderCollapse:"collapse",fontSize:12.5}}>
               <thead><tr style={{borderBottom:`2px solid ${ds.color.border}`}}>
@@ -5529,7 +5538,7 @@ function OrderEditorModal({ order, products: existingProducts, onClose, onSaved,
         {/* Header */}
         <div style={{padding:"18px 28px",borderBottom:`1px solid ${ds.color.border}`,display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10}}>
           <div>
-            <div style={{fontFamily:ds.font.display,fontSize:20,color:ds.color.textDark}}>Edit Order #{order.id.slice(-6).toUpperCase()}</div>
+            <div style={{fontFamily:ds.font.display,fontWeight:600,fontSize:20,color:ds.color.textDark}}>Edit Order #{order.id.slice(-6).toUpperCase()}</div>
             <div style={{display:"flex",gap:14,marginTop:8,flexWrap:"wrap"}}>
               {[["Date Placed",editCreatedAt,setEditCreatedAt],
                 ["Date Shipped",editShippedAt,setEditShippedAt],
@@ -6065,7 +6074,7 @@ function PaymentMethodSettings(){
   return (
     <div style={{background:"#fff",border:`1px solid ${ds.color.border}`,borderRadius:ds.radius.lg,padding:"24px 28px",boxShadow:ds.shadow.xs,maxWidth:720}}>
       <div style={{marginBottom:20}}>
-        <div style={{fontFamily:ds.font.display,fontSize:20,color:ds.color.textDark}}>⚙️ Payment Method Settings</div>
+        <div style={{fontFamily:ds.font.display,fontWeight:600,fontSize:20,color:ds.color.textDark}}>⚙️ Payment Method Settings</div>
         <div style={{fontSize:13,color:ds.color.textMuted,marginTop:4}}>
           Control which payment methods appear on Proforma Invoices (PI). Changes take effect on the next generated PI.
         </div>
@@ -6335,7 +6344,7 @@ function SupplierCatalogTab(){
   if(view==="add_supplier"||view==="edit_supplier"){
     return(
       <div style={{background:"#fff",border:`1px solid ${ds.color.border}`,borderRadius:ds.radius.lg,padding:"28px 32px",maxWidth:700}}>
-        <div style={{fontFamily:ds.font.display,fontSize:20,color:ds.color.textDark,marginBottom:20}}>
+        <div style={{fontFamily:ds.font.display,fontWeight:600,fontSize:20,color:ds.color.textDark,marginBottom:20}}>
           {view==="add_supplier"?"➕ Add New Supplier":"✏️ Edit Supplier"}
         </div>
         <div style={fRow}>
@@ -6377,7 +6386,7 @@ function SupplierCatalogTab(){
   if(view==="add_product"||view==="edit_product"){
     return(
       <div style={{background:"#fff",border:`1px solid ${ds.color.border}`,borderRadius:ds.radius.lg,padding:"28px 32px",maxWidth:800}}>
-        <div style={{fontFamily:ds.font.display,fontSize:20,color:ds.color.textDark,marginBottom:20}}>
+        <div style={{fontFamily:ds.font.display,fontWeight:600,fontSize:20,color:ds.color.textDark,marginBottom:20}}>
           {view==="add_product"?"➕ Add New Product":"✏️ Edit Product"}
         </div>
         <div style={fRow}>
@@ -6448,7 +6457,7 @@ function SupplierCatalogTab(){
       {/* Header */}
       <div style={{background:"#fff",border:`1px solid ${ds.color.border}`,borderRadius:ds.radius.lg,padding:"20px 24px",marginBottom:16,display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:12}}>
         <div>
-          <div style={{fontFamily:ds.font.display,fontSize:22,color:ds.color.textDark}}>🏭 Supplier Catalog</div>
+          <div style={{fontFamily:ds.font.display,fontWeight:600,fontSize:22,color:ds.color.textDark}}>🏭 Supplier Catalog</div>
           <div style={{fontSize:13,color:ds.color.textMuted,marginTop:2}}>{suppliers.length} suppliers · {products.length} products</div>
         </div>
         <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
@@ -6940,7 +6949,7 @@ function RFQTab(){
   if(step==="upload") return(
     <div style={{maxWidth:680}}>
       <div style={{background:"#fff",border:`1px solid ${ds.color.border}`,borderRadius:ds.radius.lg,padding:"28px 32px",marginBottom:16}}>
-        <div style={{fontFamily:ds.font.display,fontSize:22,color:ds.color.textDark,marginBottom:4}}>📋 Auto-RFQ System</div>
+        <div style={{fontFamily:ds.font.display,fontWeight:600,fontSize:22,color:ds.color.textDark,marginBottom:4}}>📋 Auto-RFQ System</div>
         <div style={{fontSize:13,color:ds.color.textMuted,marginBottom:24}}>
           Upload a client RFQ file. AI will parse all line items, match them to your supplier catalog, and apply your margins automatically.
         </div>
@@ -7015,7 +7024,7 @@ function RFQTab(){
       {/* Summary bar */}
       <div style={{background:"#fff",border:`1px solid ${ds.color.border}`,borderRadius:ds.radius.lg,padding:"16px 20px",marginBottom:16,display:"flex",alignItems:"center",gap:20,flexWrap:"wrap"}}>
         <div style={{flex:1}}>
-          <div style={{fontFamily:ds.font.display,fontSize:18,color:ds.color.textDark}}>📋 Review Matched Items — {rfqName}</div>
+          <div style={{fontFamily:ds.font.display,fontWeight:600,fontSize:18,color:ds.color.textDark}}>📋 Review Matched Items — {rfqName}</div>
           {clientName&&<div style={{fontSize:13,color:ds.color.textMuted}}>Client: {clientName}</div>}
         </div>
         <div style={{display:"flex",gap:16,flexWrap:"wrap"}}>
@@ -7552,7 +7561,7 @@ function AdminDashboard({ user }){
         <div style={{maxWidth:1280,margin:"0 auto",padding:"0 28px",display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:16}}>
           <div>
             <div style={{fontSize:11,fontWeight:700,color:ds.color.goldBright,textTransform:"uppercase",letterSpacing:"0.12em",marginBottom:4}}>Admin Dashboard</div>
-            <div style={{fontFamily:ds.font.display,fontSize:22,color:"#fff"}}>DMEAST Control Panel ⚙️</div>
+            <div style={{fontFamily:ds.font.display,fontWeight:600,fontSize:22,color:"#fff"}}>DMEAST Control Panel ⚙️</div>
             {userPerms && (
               <div style={{display:"inline-flex",alignItems:"center",gap:8,marginTop:8,padding:"4px 12px",borderRadius:ds.radius.pill,background:userPerms.color+"33",border:`1px solid ${userPerms.color}66`}}>
                 <span style={{fontSize:13}}>{userPerms.icon}</span>
@@ -7594,7 +7603,7 @@ function AdminDashboard({ user }){
             </div>
             <div style={{background:"#fff",border:`1px solid ${ds.color.border}`,borderRadius:ds.radius.lg,padding:"24px 28px",boxShadow:ds.shadow.xs}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:18}}>
-                <div style={{fontFamily:ds.font.display,fontSize:18,color:ds.color.textDark}}>Recent Orders</div>
+                <div style={{fontFamily:ds.font.display,fontWeight:600,fontSize:18,color:ds.color.textDark}}>Recent Orders</div>
                 <Btn variant="outline" size="sm" onClick={exportCSV}>Export CSV</Btn>
               </div>
               <div style={{overflowX:"auto"}}>
@@ -7625,7 +7634,7 @@ function AdminDashboard({ user }){
         {tab==="orders"&&(
           <div style={{background:"#fff",border:`1px solid ${ds.color.border}`,borderRadius:ds.radius.lg,padding:"24px 28px",boxShadow:ds.shadow.xs}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16,flexWrap:"wrap",gap:10}}>
-              <div style={{fontFamily:ds.font.display,fontSize:18,color:ds.color.textDark}}>All Orders ({orders.length})</div>
+              <div style={{fontFamily:ds.font.display,fontWeight:600,fontSize:18,color:ds.color.textDark}}>All Orders ({orders.length})</div>
               <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
                 {userPerms?.canEditOrders !== false && <Btn variant="primary" size="sm" onClick={()=>setShowNewOrderModal(true)}>+ New Order</Btn>}
                 <Btn variant="outline" size="sm" onClick={exportCSV}>⬇️ CSV</Btn>
@@ -7761,7 +7770,7 @@ function AdminDashboard({ user }){
           <div>
             <div style={{background:"#fff",border:`1px solid ${ds.color.border}`,borderRadius:ds.radius.lg,padding:"20px 28px",boxShadow:ds.shadow.xs,marginBottom:18,display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:12}}>
               <div>
-                <div style={{fontFamily:ds.font.display,fontSize:18,color:ds.color.textDark}}>Product Catalog</div>
+                <div style={{fontFamily:ds.font.display,fontWeight:600,fontSize:18,color:ds.color.textDark}}>Product Catalog</div>
                 <div style={{fontSize:13,color:ds.color.textMuted,marginTop:2}}>{PRODUCTS.length} products live · Changes appear on the site instantly.</div>
               </div>
               <div style={{display:"flex",gap:10,alignItems:"center",flexWrap:"wrap"}}>
@@ -7847,7 +7856,7 @@ function AdminDashboard({ user }){
         {tab==="customers"&&(
           <div style={{background:"#fff",border:`1px solid ${ds.color.border}`,borderRadius:ds.radius.lg,padding:"24px 28px",boxShadow:ds.shadow.xs}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16,flexWrap:"wrap",gap:10}}>
-              <div style={{fontFamily:ds.font.display,fontSize:18,color:ds.color.textDark}}>Customers ({customers.length})</div>
+              <div style={{fontFamily:ds.font.display,fontWeight:600,fontSize:18,color:ds.color.textDark}}>Customers ({customers.length})</div>
               {userPerms?.canEditOrders !== false && <Btn variant="primary" size="sm" onClick={()=>setShowCustomerEditor({})}>+ New Customer</Btn>}
             </div>
             {/* v13.0a: Customer search + tag filter */}
@@ -7917,7 +7926,7 @@ function AdminDashboard({ user }){
 
         {tab==="rx"&&(
           <div style={{background:"#fff",border:`1px solid ${ds.color.border}`,borderRadius:ds.radius.lg,padding:"24px 28px",boxShadow:ds.shadow.xs}}>
-            <div style={{fontFamily:ds.font.display,fontSize:18,color:ds.color.textDark,marginBottom:20}}>Prescription Uploads ({rxUps.length})</div>
+            <div style={{fontFamily:ds.font.display,fontWeight:600,fontSize:18,color:ds.color.textDark,marginBottom:20}}>Prescription Uploads ({rxUps.length})</div>
             {rxUps.length===0?<div style={{textAlign:"center",padding:"40px 0",color:ds.color.textMuted}}>No prescription uploads yet.</div>:rxUps.map(r=>(
               <div key={r.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"14px 0",borderBottom:`1px solid ${ds.color.borderLight}`,flexWrap:"wrap",gap:10}}>
                 <div style={{display:"flex",alignItems:"center",gap:14,flex:1,minWidth:0}}>
@@ -8184,7 +8193,7 @@ function HeroSectionV16({setPage}){
                   borderTop:`3px solid ${s.accent}`,
                   boxShadow:ds.shadow.xs
                 }}>
-                  <div style={{fontFamily:ds.font.display,fontSize:"2rem",color:s.accent,lineHeight:1}}>{s.v}</div>
+                  <div style={{fontFamily:ds.font.display,fontWeight:600,fontSize:"2rem",color:s.accent,lineHeight:1}}>{s.v}</div>
                   <div style={{fontSize:11,color:ds.color.textMuted,marginTop:6,fontWeight:500,letterSpacing:"0.04em",textTransform:"uppercase"}}>{s.l}</div>
                 </div>
               ))}
@@ -8361,7 +8370,7 @@ function PromoCardsV16({setPage}){
               >
                 <div style={{position:"absolute",top:14,right:14,fontSize:9.5,fontWeight:700,color:s.accent,letterSpacing:"0.08em",background:"#fff",padding:"3px 9px",borderRadius:ds.radius.pill,border:`1px solid ${s.accent}44`}}>{s.badge}</div>
                 <div style={{fontSize:48,marginBottom:8,opacity:0.7}}>💊</div>
-                <div style={{fontFamily:ds.font.display,fontSize:18,color:ds.color.textDark,marginBottom:4,lineHeight:1.2,maxWidth:200}}>{p.name}</div>
+                <div style={{fontFamily:ds.font.display,fontWeight:600,fontSize:18,color:ds.color.textDark,marginBottom:4,lineHeight:1.2,maxWidth:200}}>{p.name}</div>
                 {p.price && <div style={{fontSize:14,color:s.accent,fontWeight:700,marginBottom:10}}>{formatPHP(p.price)}</div>}
                 <div style={{display:"inline-flex",alignItems:"center",gap:6,fontSize:12,fontWeight:700,color:s.accent}}>
                   Shop Now →
@@ -8647,7 +8656,7 @@ function HeroSection({setPage}){
             <div className="dm-grid-4" style={{gridTemplateColumns:"repeat(2,1fr)"}}>
               {[{v:"5+",l:"Years Serving PH",accent:ds.color.red},{v:"500+",l:"Clients Nationwide",accent:ds.color.goldBright},{v:"9",l:"Product Categories",accent:ds.color.red},{v:"24/7",l:"Order Support",accent:ds.color.goldBright}].map((s,i)=>(
                 <div key={i} style={{background:ds.color.white,border:`1px solid ${ds.color.border}`,borderRadius:ds.radius.lg,padding:"22px 18px",textAlign:"center",borderTop:`3px solid ${s.accent}`,boxShadow:ds.shadow.xs}}>
-                  <div style={{fontFamily:ds.font.display,fontSize:"2rem",color:s.accent,lineHeight:1}}>{s.v}</div>
+                  <div style={{fontFamily:ds.font.display,fontWeight:600,fontSize:"2rem",color:s.accent,lineHeight:1}}>{s.v}</div>
                   <div style={{fontSize:11,color:ds.color.textMuted,marginTop:6,fontWeight:500,letterSpacing:"0.04em",textTransform:"uppercase"}}>{s.l}</div>
                 </div>
               ))}
@@ -8691,7 +8700,7 @@ function HowItWorksSection(){
           {HOW_IT_WORKS.map((s,i)=>(
             <div key={i} style={{textAlign:"center",padding:"24px 18px"}}>
               <div style={{width:56,height:56,borderRadius:"50%",background:`linear-gradient(135deg,${ds.color.red},${ds.color.goldBright})`,display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 18px",boxShadow:ds.shadow.red}}>
-                <span style={{fontFamily:ds.font.display,fontSize:16,color:"#fff"}}>{s.step}</span>
+                <span style={{fontFamily:ds.font.display,fontWeight:600,fontSize:16,color:"#fff"}}>{s.step}</span>
               </div>
               <div style={{fontSize:15,fontWeight:700,color:ds.color.textDark,marginBottom:8}}>{s.title}</div>
               <div style={{fontSize:13.5,color:ds.color.textMuted,lineHeight:1.65}}>{s.desc}</div>
@@ -8741,7 +8750,7 @@ function CtaBanner({setPage}){
   return(
     <section style={{background:`linear-gradient(135deg,${ds.color.red} 0%,${ds.color.redDark} 100%)`,padding:"72px 28px"}}>
       <div style={{maxWidth:800,margin:"0 auto",textAlign:"center"}}>
-        <div style={{fontFamily:ds.font.display,fontSize:"clamp(1.8rem,3.5vw,2.6rem)",color:"#fff",lineHeight:1.2,marginBottom:16}}>Your health needs, delivered nationwide.</div>
+        <div style={{fontFamily:ds.font.display,fontWeight:600,fontSize:"clamp(1.8rem,3.5vw,2.6rem)",color:"#fff",lineHeight:1.2,marginBottom:16}}>Your health needs, delivered nationwide.</div>
         <p style={{fontSize:16,color:"rgba(255,255,255,0.8)",lineHeight:1.7,marginBottom:32}}>From everyday health essentials to professional clinic supplies — DMEAST has you covered with fast, reliable delivery across the Philippines.</p>
         <div style={{display:"flex",gap:12,justifyContent:"center",flexWrap:"wrap"}}>
           <Btn variant="dark" size="xl" onClick={()=>setPage("products")}>Shop Now →</Btn>
@@ -9089,7 +9098,7 @@ function InstitutionalOrdersPage({setPage}){
       <PageHero eyebrow="Institutional Orders" title="Specialized & Enterprise Healthcare Solutions" subtitle="For hospitals, diagnostic centers, and healthcare institutions requiring specialized equipment, bulk supplies, or complete facility setups."/>
       <div style={{maxWidth:1160,margin:"0 auto",padding:"72px 28px"}}>
         <div style={{background:ds.color.canvas,borderRadius:ds.radius.xl,border:`1px solid ${ds.color.border}`,padding:"32px 36px",marginBottom:56}}>
-          <div style={{fontFamily:ds.font.display,fontSize:20,color:ds.color.textDark,marginBottom:20}}>How Institutional Orders Work</div>
+          <div style={{fontFamily:ds.font.display,fontWeight:600,fontSize:20,color:ds.color.textDark,marginBottom:20}}>How Institutional Orders Work</div>
           <div className="dm-grid-4">
             {[{step:"01",icon:"📋",title:"Submit a Request",desc:"Fill out our quote request form with your requirements, quantities, and specifications."},
               {step:"02",icon:"💬",title:"We Review & Confirm",desc:"Our team reviews your request and follows up within 24–48 hours to confirm details."},
@@ -9134,13 +9143,13 @@ function InstitutionalOrdersPage({setPage}){
           {INSTITUTIONAL_SERVICES.map((s,i)=>(
             <div key={i} style={{background:ds.color.white,border:`1px solid ${ds.color.border}`,borderRadius:ds.radius.lg,padding:"28px 24px",boxShadow:ds.shadow.xs}}>
               <div style={{fontSize:32,marginBottom:14}}>{s.icon}</div>
-              <div style={{fontFamily:ds.font.display,fontSize:17,color:ds.color.textDark,marginBottom:10}}>{s.title}</div>
+              <div style={{fontFamily:ds.font.display,fontWeight:600,fontSize:17,color:ds.color.textDark,marginBottom:10}}>{s.title}</div>
               <div style={{fontSize:14,color:ds.color.textMuted,lineHeight:1.75}}>{s.body}</div>
             </div>
           ))}
         </div>
         <div style={{textAlign:"center",padding:"48px 0",background:ds.color.canvasWarm,borderRadius:ds.radius.xl,border:`1px solid ${ds.color.borderLight}`}}>
-          <div style={{fontFamily:ds.font.display,fontSize:22,color:ds.color.textDark,marginBottom:10}}>Ready to submit an institutional order?</div>
+          <div style={{fontFamily:ds.font.display,fontWeight:600,fontSize:22,color:ds.color.textDark,marginBottom:10}}>Ready to submit an institutional order?</div>
           <p style={{fontSize:15,color:ds.color.textMuted,marginBottom:8,maxWidth:520,margin:"0 auto 8px"}}>Tell us your requirements and we'll prepare a detailed formal quotation within 24–48 hours.</p>
           <p style={{fontSize:13,color:ds.color.textLight,marginBottom:28}}>Pricing and availability for institutional items are subject to confirmation.</p>
           <div style={{display:"flex",gap:12,justifyContent:"center",flexWrap:"wrap"}}>
@@ -9211,7 +9220,7 @@ function QuotePage(){
     <div style={{paddingTop:67,minHeight:"80vh",display:"flex",alignItems:"center",justifyContent:"center",background:ds.color.canvas}}>
       <div style={{textAlign:"center",maxWidth:460,padding:"0 24px"}}>
         <div style={{width:76,height:76,borderRadius:"50%",background:ds.color.successBg,border:`2px solid ${ds.color.successBorder}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:28,margin:"0 auto 24px"}}>✓</div>
-        <div style={{fontFamily:ds.font.display,fontSize:26,color:ds.color.textDark,marginBottom:10}}>Quote Request Sent!</div>
+        <div style={{fontFamily:ds.font.display,fontWeight:600,fontSize:26,color:ds.color.textDark,marginBottom:10}}>Quote Request Sent!</div>
         <p style={{fontSize:15,color:ds.color.textMuted,lineHeight:1.7,marginBottom:24}}>Thank you, <strong>{form.name}</strong>! Our team will respond to <strong>{form.email}</strong> within 24–48 hours.</p>
         <Btn variant="primary" size="md" onClick={()=>setStatus("idle")}>Submit Another</Btn>
       </div>
@@ -9261,7 +9270,7 @@ function ContactPage(){
       <div style={{maxWidth:1160,margin:"0 auto",padding:"64px 28px"}}>
         <div className="dm-grid-2" style={{gap:52}}>
           <div>
-            <div style={{fontFamily:ds.font.display,fontSize:21,color:ds.color.textDark,marginBottom:28}}>Office & Contact Information</div>
+            <div style={{fontFamily:ds.font.display,fontWeight:600,fontSize:21,color:ds.color.textDark,marginBottom:28}}>Office & Contact Information</div>
             {[{icon:"📍",title:"Address",lines:[CONTACT.address,CONTACT.address2]},{icon:"📞",title:"Telephone",lines:[CONTACT.phone2]},{icon:"📱",title:"Mobile",lines:[CONTACT.phone1]},{icon:"✉️",title:"Email",lines:[CONTACT.email]},{icon:"🕐",title:"Business Hours",lines:["Monday – Friday","8:00 AM – 6:00 PM"]}].filter(item=>item.lines.some(l=>l&&l.trim())).map(item=>(
               <div key={item.title} style={{display:"flex",gap:16,marginBottom:24,paddingBottom:24,borderBottom:`1px solid ${ds.color.borderLight}`}}>
                 <div style={{width:42,height:42,flexShrink:0,background:ds.color.redLight,borderRadius:ds.radius.md,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18}}>{item.icon}</div>
@@ -9283,13 +9292,13 @@ function ContactPage(){
             {sent?(
               <div style={{textAlign:"center",padding:"44px 0"}}>
                 <div style={{width:60,height:60,borderRadius:"50%",background:ds.color.successBg,display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,margin:"0 auto 18px"}}>✓</div>
-                <div style={{fontFamily:ds.font.display,fontSize:22,color:ds.color.textDark,marginBottom:8}}>Message Sent!</div>
+                <div style={{fontFamily:ds.font.display,fontWeight:600,fontSize:22,color:ds.color.textDark,marginBottom:8}}>Message Sent!</div>
                 <div style={{fontSize:14,color:ds.color.textMuted,marginBottom:22}}>We'll reply within 24 business hours.</div>
                 <Btn variant="secondary" size="sm" onClick={()=>setSent(false)}>Send Another</Btn>
               </div>
             ):(
               <>
-                <div style={{fontFamily:ds.font.display,fontSize:21,color:ds.color.textDark,marginBottom:24}}>Send Us a Message</div>
+                <div style={{fontFamily:ds.font.display,fontWeight:600,fontSize:21,color:ds.color.textDark,marginBottom:24}}>Send Us a Message</div>
                 {[["Full Name","name","text","Your full name"],["Email","email","email","your@email.com"]].map(([l,k,t,ph])=>(
                   <div key={k} style={{marginBottom:16}}>
                     <label style={{fontSize:12.5,fontWeight:600,color:ds.color.textDark,display:"block",marginBottom:6}}>{l}</label>
@@ -9508,7 +9517,7 @@ function PaymentReturnPage({ status, orderId, setPage }){
             fontSize:42,fontWeight:700,marginBottom:24,
           }}>{icon}</div>
           
-          <h1 style={{fontFamily:ds.font.display,fontSize:28,color:ds.color.textDark,marginBottom:12}}>{title}</h1>
+          <h1 style={{fontFamily:ds.font.display,fontWeight:600,fontSize:28,color:ds.color.textDark,marginBottom:12}}>{title}</h1>
           <p style={{fontSize:15,color:ds.color.textMuted,lineHeight:1.6,marginBottom:28}}>{subtitle}</p>
           
           {orderId && (
@@ -9926,7 +9935,7 @@ function CartPage({cart,removeFromCart,updateQty,setPage,user,onOrderComplete}){
 
         <div style={{textAlign:"center",marginBottom:24}}>
           <div style={{width:80,height:80,borderRadius:"50%",background:ds.color.successBg,border:`3px solid ${ds.color.successBorder}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:32,margin:"0 auto 20px"}}>✓</div>
-          <div style={{fontFamily:ds.font.display,fontSize:30,color:ds.color.textDark,marginBottom:8}}>Order Confirmed!</div>
+          <div style={{fontFamily:ds.font.display,fontWeight:600,fontSize:30,color:ds.color.textDark,marginBottom:8}}>Order Confirmed!</div>
           <p style={{fontSize:15,color:ds.color.textMuted,lineHeight:1.7}}>
             Thank you, <strong>{successOrder.details.name}</strong>! Your order has been received.<br/>
             A confirmation email has been sent to <strong>{successOrder.details.email}</strong>.
@@ -9940,7 +9949,7 @@ function CartPage({cart,removeFromCart,updateQty,setPage,user,onOrderComplete}){
         {isMayaMethod(successOrder.method) && (
           <div style={{background:"#05426A",borderRadius:ds.radius.xl,padding:"20px 24px",boxShadow:ds.shadow.md,marginBottom:20,textAlign:"center"}}>
             <div style={{fontSize:13,color:"rgba(255,255,255,0.8)",marginBottom:4}}>Complete your payment via Maya</div>
-            <div style={{fontFamily:ds.font.display,fontSize:22,color:"#fff",marginBottom:4}}>{formatPHP(successOrder.total)}</div>
+            <div style={{fontFamily:ds.font.display,fontWeight:600,fontSize:22,color:"#fff",marginBottom:4}}>{formatPHP(successOrder.total)}</div>
             <div style={{fontSize:12,color:"rgba(255,255,255,0.65)",marginBottom:16}}>Enter the exact amount on the payment page · {successOrder.method} accepted</div>
             <a
               href={DMEAST_MAYA_LINK}
@@ -9960,7 +9969,7 @@ function CartPage({cart,removeFromCart,updateQty,setPage,user,onOrderComplete}){
             <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:16}}>
               <div style={{width:44,height:44,borderRadius:"50%",background:ds.color.redLight,display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,flexShrink:0}}>📸</div>
               <div>
-                <div style={{fontFamily:ds.font.display,fontSize:18,color:ds.color.textDark}}>Upload Your Payment Proof</div>
+                <div style={{fontFamily:ds.font.display,fontWeight:600,fontSize:18,color:ds.color.textDark}}>Upload Your Payment Proof</div>
                 <div style={{fontSize:12.5,color:ds.color.textMuted,marginTop:2}}>Snap a screenshot of your GCash/Maya/bank transfer receipt and upload it here.</div>
               </div>
             </div>
@@ -9976,7 +9985,7 @@ function CartPage({cart,removeFromCart,updateQty,setPage,user,onOrderComplete}){
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:24,paddingBottom:20,borderBottom:`2px solid ${ds.color.border}`}}>
             <div>
               <div style={{fontSize:11,fontWeight:700,color:ds.color.textMuted,textTransform:"uppercase",letterSpacing:"0.12em",marginBottom:4}}>Order Reference</div>
-              <div style={{fontFamily:ds.font.display,fontSize:26,color:ds.color.red,letterSpacing:"0.04em"}}>#{successOrder.id.slice(-6).toUpperCase()}</div>
+              <div style={{fontFamily:ds.font.display,fontWeight:600,fontSize:26,color:ds.color.red,letterSpacing:"0.04em"}}>#{successOrder.id.slice(-6).toUpperCase()}</div>
             </div>
             <div style={{textAlign:"right"}}>
               <span style={{fontSize:12,fontWeight:700,padding:"5px 14px",borderRadius:ds.radius.pill,background:"#FEF9C3",color:"#A16207"}}>⏳ Awaiting Payment</span>
@@ -10102,7 +10111,7 @@ function CartPage({cart,removeFromCart,updateQty,setPage,user,onOrderComplete}){
           display:"flex",alignItems:"center",justifyContent:"center",
           fontSize:56,
         }}>🛒</div>
-        <div style={{fontFamily:ds.font.display,fontSize:26,color:ds.color.textDark,marginBottom:10}}>Your cart is empty</div>
+        <div style={{fontFamily:ds.font.display,fontWeight:600,fontSize:26,color:ds.color.textDark,marginBottom:10}}>Your cart is empty</div>
         <p style={{fontSize:14.5,color:ds.color.textMuted,lineHeight:1.7,marginBottom:28}}>Browse our catalog of medical equipment, devices, and healthcare essentials. We deliver nationwide.</p>
         <div style={{display:"flex",gap:10,justifyContent:"center",flexWrap:"wrap",marginBottom:32}}>
           <Btn variant="primary" size="lg" onClick={()=>setPage("products")}>Browse Products</Btn>
@@ -10125,7 +10134,7 @@ function CartPage({cart,removeFromCart,updateQty,setPage,user,onOrderComplete}){
     <div style={{paddingTop:67,minHeight:"80vh",background:ds.color.canvas,display:"flex",alignItems:"center",justifyContent:"center"}}>
       <div style={{maxWidth:620,width:"100%",padding:"0 24px"}}>
         <div style={{textAlign:"center",marginBottom:36}}>
-          <div style={{fontFamily:ds.font.display,fontSize:26,color:ds.color.textDark,marginBottom:10}}>Where are you ordering from?</div>
+          <div style={{fontFamily:ds.font.display,fontWeight:600,fontSize:26,color:ds.color.textDark,marginBottom:10}}>Where are you ordering from?</div>
           <p style={{fontSize:14,color:ds.color.textMuted,lineHeight:1.7}}>This helps us give you the right checkout process and accurate shipping options.</p>
         </div>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:20}}>
@@ -10153,7 +10162,7 @@ function CartPage({cart,removeFromCart,updateQty,setPage,user,onOrderComplete}){
       <div style={{paddingTop:67,minHeight:"80vh",display:"flex",alignItems:"center",justifyContent:"center",background:ds.color.canvas}}>
         <div style={{textAlign:"center",maxWidth:460,padding:"0 24px"}}>
           <div style={{width:76,height:76,borderRadius:"50%",background:"#FEF6E0",border:`2px solid ${ds.color.goldBorder}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:30,margin:"0 auto 24px"}}>🌍</div>
-          <div style={{fontFamily:ds.font.display,fontSize:26,color:ds.color.textDark,marginBottom:10}}>International Inquiry Received!</div>
+          <div style={{fontFamily:ds.font.display,fontWeight:600,fontSize:26,color:ds.color.textDark,marginBottom:10}}>International Inquiry Received!</div>
           <p style={{fontSize:15,color:ds.color.textMuted,lineHeight:1.7,marginBottom:24}}>Thank you, <strong>{intlForm.name}</strong>! Our team will respond to <strong>{intlForm.email}</strong> with a Proforma Invoice within 24–48 hours.</p>
           <Btn variant="primary" size="md" onClick={()=>{setOrderMode(null);setIntlDone(false);setPage("home");}}>Back to Home</Btn>
         </div>
@@ -10165,7 +10174,7 @@ function CartPage({cart,removeFromCart,updateQty,setPage,user,onOrderComplete}){
           <div style={{display:"flex",alignItems:"center",gap:14,marginBottom:28}}>
             <button onClick={()=>setOrderMode(null)} style={{background:"none",border:"none",cursor:"pointer",fontSize:20,color:ds.color.textMuted}}>←</button>
             <div>
-              <div style={{fontFamily:ds.font.display,fontSize:22,color:ds.color.textDark}}>🌍 International Order Inquiry</div>
+              <div style={{fontFamily:ds.font.display,fontWeight:600,fontSize:22,color:ds.color.textDark}}>🌍 International Order Inquiry</div>
               <div style={{fontSize:13,color:ds.color.textMuted,marginTop:2}}>We'll prepare a Proforma Invoice with full landed cost.</div>
             </div>
           </div>
@@ -10416,7 +10425,7 @@ function CartPage({cart,removeFromCart,updateQty,setPage,user,onOrderComplete}){
         {step===1&&(
           <div className="dm-cart-grid" style={{display:"grid",gridTemplateColumns:"1fr 320px",gap:24,alignItems:"start"}}>
             <div style={{background:"#fff",borderRadius:ds.radius.xl,padding:"28px 32px",boxShadow:ds.shadow.sm,border:`1px solid ${ds.color.borderLight}`}}>
-              <div style={{fontFamily:ds.font.display,fontSize:20,color:ds.color.textDark,marginBottom:20}}>🛒 Your Cart ({cart.length} item{cart.length!==1?"s":""})</div>
+              <div style={{fontFamily:ds.font.display,fontWeight:600,fontSize:20,color:ds.color.textDark,marginBottom:20}}>🛒 Your Cart ({cart.length} item{cart.length!==1?"s":""})</div>
               {cart.map(item=>(
                 <div key={item.id} style={{
                   display:"grid",
@@ -10461,7 +10470,7 @@ function CartPage({cart,removeFromCart,updateQty,setPage,user,onOrderComplete}){
               </div>
             </div>
             <div className="dm-cart-summary" style={{background:"#fff",borderRadius:ds.radius.xl,padding:"24px",border:`1px solid ${ds.color.border}`,boxShadow:ds.shadow.sm,position:"sticky",top:90}}>
-              <div style={{fontFamily:ds.font.display,fontSize:18,color:ds.color.textDark,marginBottom:16}}>Order Summary</div>
+              <div style={{fontFamily:ds.font.display,fontWeight:600,fontSize:18,color:ds.color.textDark,marginBottom:16}}>Order Summary</div>
               
               {/* v16.2: Show VAT breakdown */}
               {(()=>{ 
@@ -10511,7 +10520,7 @@ function CartPage({cart,removeFromCart,updateQty,setPage,user,onOrderComplete}){
         {step===2&&(
           <div style={{display:"grid",gridTemplateColumns:"1fr 300px",gap:24,alignItems:"start"}}>
             <div style={{background:"#fff",borderRadius:ds.radius.xl,padding:"32px 36px",boxShadow:ds.shadow.sm,border:`1px solid ${ds.color.borderLight}`}}>
-              <div style={{fontFamily:ds.font.display,fontSize:20,color:ds.color.textDark,marginBottom:8}}>📦 Delivery Details</div>
+              <div style={{fontFamily:ds.font.display,fontWeight:600,fontSize:20,color:ds.color.textDark,marginBottom:8}}>📦 Delivery Details</div>
 
               {/* V11: Radio question — Who is this order for? */}
               {user&&(
@@ -10649,7 +10658,7 @@ function CartPage({cart,removeFromCart,updateQty,setPage,user,onOrderComplete}){
         {step===3&&hasRx&&(
           <div style={{maxWidth:600,margin:"0 auto"}}>
             <div style={{background:"#fff",borderRadius:ds.radius.xl,padding:"36px 40px",boxShadow:ds.shadow.sm,border:`1px solid ${ds.color.borderLight}`}}>
-              <div style={{fontFamily:ds.font.display,fontSize:20,color:ds.color.textDark,marginBottom:8}}>💊 Prescription Upload</div>
+              <div style={{fontFamily:ds.font.display,fontWeight:600,fontSize:20,color:ds.color.textDark,marginBottom:8}}>💊 Prescription Upload</div>
               <p style={{fontSize:14,color:ds.color.textMuted,lineHeight:1.7,marginBottom:24}}>Your cart contains prescription-only items. A valid doctor's prescription is required to process your order.</p>
               <div style={{border:`2px dashed ${prescription?ds.color.success:ds.color.border}`,borderRadius:ds.radius.lg,padding:28,textAlign:"center",background:prescription?ds.color.successBg:ds.color.canvas,marginBottom:20,transition:"all 0.2s"}}>
                 {prescription?(
@@ -10695,7 +10704,7 @@ function CartPage({cart,removeFromCart,updateQty,setPage,user,onOrderComplete}){
         {step===4&&(
           <div style={{display:"grid",gridTemplateColumns:"1fr 300px",gap:24,alignItems:"start"}}>
             <div style={{background:"#fff",borderRadius:ds.radius.xl,padding:"32px 36px",boxShadow:ds.shadow.sm,border:`1px solid ${ds.color.borderLight}`}}>
-              <div style={{fontFamily:ds.font.display,fontSize:20,color:ds.color.textDark,marginBottom:6}}>Select Payment Method</div>
+              <div style={{fontFamily:ds.font.display,fontWeight:600,fontSize:20,color:ds.color.textDark,marginBottom:6}}>Select Payment Method</div>
               <p style={{fontSize:14,color:ds.color.textMuted,marginBottom:22}}>Payment instructions will be sent to <strong>{details.email}</strong> after placing your order. You can upload your payment proof immediately on the next screen.</p>
 
               <div style={{display:"flex",flexWrap:"wrap",gap:8,marginBottom:24,padding:"12px 14px",background:ds.color.canvas,borderRadius:ds.radius.md,border:`1px solid ${ds.color.borderLight}`,alignItems:"center"}}>
@@ -10792,7 +10801,7 @@ function TrackOrderPage(){
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:24,paddingBottom:18,borderBottom:"2px solid "+ds.color.border}}>
               <div>
                 <div style={{fontSize:11,fontWeight:700,color:ds.color.textMuted,textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:4}}>Order Reference</div>
-                <div style={{fontFamily:ds.font.display,fontSize:24,color:ds.color.red}}>#{order.id.slice(-6).toUpperCase()}</div>
+                <div style={{fontFamily:ds.font.display,fontWeight:600,fontSize:24,color:ds.color.red}}>#{order.id.slice(-6).toUpperCase()}</div>
               </div>
               <div style={{textAlign:"right"}}>
                 <span style={{fontSize:12,fontWeight:700,padding:"5px 14px",borderRadius:ds.radius.pill,background:orderStatusColor(order.status||"pending").bg,color:orderStatusColor(order.status||"pending").color}}>{ORDER_STATUS_LABELS[order.status]||"Pending"}</span>
@@ -11259,7 +11268,7 @@ function BlogPage({ setPage, setActivePost }) {
         {/* Bottom CTA */}
         {!loading && filtered.length > 0 && (
           <div style={{marginTop:60,padding:"32px",background:`linear-gradient(135deg, ${ds.color.canvasWarm} 0%, ${ds.color.canvasGold} 100%)`,borderRadius:ds.radius.xl,border:`1px solid ${ds.color.goldBorder}`,textAlign:"center"}}>
-            <div style={{fontFamily:ds.font.display,fontSize:22,color:ds.color.textDark,marginBottom:10}}>Have questions about medical procurement?</div>
+            <div style={{fontFamily:ds.font.display,fontWeight:600,fontSize:22,color:ds.color.textDark,marginBottom:10}}>Have questions about medical procurement?</div>
             <div style={{fontSize:14,color:ds.color.textMuted,marginBottom:18,maxWidth:520,margin:"0 auto 18px"}}>Our team responds to inquiries within 24-48 hours with formal quotations and BIR-compliant documentation.</div>
             <Btn variant="gold" size="md" onClick={()=>setPage("quote")}>Request a Quote →</Btn>
           </div>
@@ -11277,7 +11286,7 @@ function BlogPostPage({ post, setPage, setActivePost }) {
     return (
       <div style={{paddingTop:67,textAlign:"center",padding:"100px 28px"}}>
         <div style={{fontSize:48,marginBottom:16,opacity:0.6}}>📰</div>
-        <div style={{fontFamily:ds.font.display,fontSize:24,color:ds.color.textDark,marginBottom:12}}>Article not found</div>
+        <div style={{fontFamily:ds.font.display,fontWeight:600,fontSize:24,color:ds.color.textDark,marginBottom:12}}>Article not found</div>
         <p style={{fontSize:14,color:ds.color.textMuted,marginBottom:24}}>The article you're looking for might have been moved or removed.</p>
         <Btn variant="primary" size="md" onClick={()=>setPage("blog")}>← Back to Blog</Btn>
       </div>
@@ -11377,7 +11386,7 @@ function BlogPostPage({ post, setPage, setActivePost }) {
         
         {/* CTA */}
         <div style={{marginTop:48,padding:"28px 32px",background:`linear-gradient(135deg, ${ds.color.redLight} 0%, ${ds.color.canvasWarm} 100%)`,borderRadius:ds.radius.xl,border:`1px solid ${ds.color.redBorder}`,textAlign:"center"}}>
-          <div style={{fontFamily:ds.font.display,fontSize:20,color:ds.color.textDark,marginBottom:10}}>Need medical supplies for your institution?</div>
+          <div style={{fontFamily:ds.font.display,fontWeight:600,fontSize:20,color:ds.color.textDark,marginBottom:10}}>Need medical supplies for your institution?</div>
           <div style={{fontSize:13.5,color:ds.color.textMuted,marginBottom:18,maxWidth:520,margin:"0 auto 18px"}}>DMEAST sources from FDA-licensed suppliers and provides BIR-compliant documentation. Bulk pricing for hospitals, LGUs, and clinics.</div>
           <div style={{display:"flex",gap:10,justifyContent:"center",flexWrap:"wrap"}}>
             <Btn variant="primary" size="md" onClick={()=>setPage("products")}>Shop Products</Btn>
@@ -11402,7 +11411,7 @@ function BlogPostPage({ post, setPage, setActivePost }) {
                 onMouseLeave={e=>{e.currentTarget.style.boxShadow="none";e.currentTarget.style.borderColor=ds.color.border;}}
                 >
                   <div style={{fontSize:10,fontWeight:700,color:ds.color.gold,letterSpacing:"0.06em",textTransform:"uppercase",marginBottom:6}}>{p.category}</div>
-                  <div style={{fontFamily:ds.font.display,fontSize:15,color:ds.color.textDark,lineHeight:1.35,marginBottom:8}}>{p.title}</div>
+                  <div style={{fontFamily:ds.font.display,fontWeight:600,fontSize:15,color:ds.color.textDark,lineHeight:1.35,marginBottom:8}}>{p.title}</div>
                   <div style={{fontSize:11.5,color:ds.color.textMuted}}>{formatBlogDate(p.publishedAt)} · {p.readTime || estimateReadTime(p.content)}</div>
                 </button>
               ))}
@@ -11526,7 +11535,7 @@ function PostsTab({ posts, refreshPosts, userRole }) {
       {/* Header */}
       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:20,flexWrap:"wrap",gap:12}}>
         <div>
-          <div style={{fontFamily:ds.font.display,fontSize:22,color:ds.color.textDark}}>📝 Blog Articles ({posts.length})</div>
+          <div style={{fontFamily:ds.font.display,fontWeight:600,fontSize:22,color:ds.color.textDark}}>📝 Blog Articles ({posts.length})</div>
           <div style={{fontSize:12.5,color:ds.color.textMuted,marginTop:4}}>
             {posts.filter(p=>p.status==="published").length} published · {posts.filter(p=>p.status==="draft").length} drafts
           </div>
@@ -11688,7 +11697,7 @@ function PostEditorModal({ post, onClose, onSaved }) {
         {/* Header */}
         <div style={{padding:"22px 28px",borderBottom:`1px solid ${ds.color.borderLight}`,display:"flex",alignItems:"center",justifyContent:"space-between",gap:12}}>
           <div>
-            <div style={{fontFamily:ds.font.display,fontSize:20,color:ds.color.textDark}}>{post ? "✏️ Edit Article" : "📝 New Article"}</div>
+            <div style={{fontFamily:ds.font.display,fontWeight:600,fontSize:20,color:ds.color.textDark}}>{post ? "✏️ Edit Article" : "📝 New Article"}</div>
             <div style={{fontSize:12,color:ds.color.textMuted,marginTop:3}}>{post ? `Editing: ${post.title}` : "Create a new blog post"}</div>
           </div>
           <button onClick={onClose} style={{background:"none",border:"none",fontSize:22,cursor:"pointer",color:ds.color.textMuted,padding:6}}>✕</button>
@@ -12143,7 +12152,7 @@ export default function App(){
         {page==="quote"        &&<QuotePage/>}
         {page==="contact"      &&<ContactPage/>}
         {page==="cart"         &&<CartPage cart={cart} removeFromCart={removeFromCart} updateQty={updateQty} setPage={setPage} user={user} onOrderComplete={handleOrderComplete}/>}
-        {page==="portal"       &&(user?<CustomerPortal user={user} setPage={setPage} addToCart={addToCart} wishlist={wishlist} toggleWishlist={toggleWishlist}/>:<div style={{paddingTop:67,minHeight:"80vh",display:"flex",alignItems:"center",justifyContent:"center"}}><div style={{textAlign:"center"}}><div style={{fontSize:32,marginBottom:12}}>🔒</div><div style={{fontFamily:ds.font.display,fontSize:20,color:ds.color.textDark,marginBottom:12}}>Sign in to access your portal</div><Btn variant="primary" size="md" onClick={handleSignIn}>Sign In</Btn></div></div>)}
+        {page==="portal"       &&(user?<CustomerPortal user={user} setPage={setPage} addToCart={addToCart} wishlist={wishlist} toggleWishlist={toggleWishlist}/>:<div style={{paddingTop:67,minHeight:"80vh",display:"flex",alignItems:"center",justifyContent:"center"}}><div style={{textAlign:"center"}}><div style={{fontSize:32,marginBottom:12}}>🔒</div><div style={{fontFamily:ds.font.display,fontWeight:600,fontSize:20,color:ds.color.textDark,marginBottom:12}}>Sign in to access your portal</div><Btn variant="primary" size="md" onClick={handleSignIn}>Sign In</Btn></div></div>)}
         {page==="admin"        &&(isAdmin?<AdminDashboard user={user}/>:<div style={{paddingTop:67,minHeight:"80vh",display:"flex",alignItems:"center",justifyContent:"center"}}><div style={{textAlign:"center",color:ds.color.textMuted}}>⛔ Admin access only.</div></div>)}
         {page==="privacy"      &&<PrivacyPage/>}
         {page==="terms"        &&<TermsPage/>}

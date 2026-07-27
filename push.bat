@@ -20,7 +20,7 @@ echo [OK] Staged all changes.
 REM ── Commit if there is anything new ──────────────────────────
 git diff --cached --quiet
 if errorlevel 1 (
-    git commit -m "fix: edit the REAL components in App.jsx - remove date from track page, add editable date pickers to order editor"
+    git commit -m "feat: macOS UI - SF Pro typography, F5F5F7 surfaces, frosted glass navbar (ported into App.jsx)"
     echo [OK] Committed.
 ) else (
     echo [INFO] Nothing new to commit.
