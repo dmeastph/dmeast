@@ -2,7 +2,7 @@ import { useState } from "react";
 import { collection, query, where, getDocs } from "firebase/firestore";
 import { db } from "../lib/firebase";
 import { ds } from "../constants/design";
-import { formatDate, formatPHP } from "../utils/format";
+import { formatPHP } from "../utils/format";
 import { orderStatusColor, paymentStatusColor, ORDER_STATUS_LABELS, PAYMENT_STATUS_LABELS } from "../constants/status";
 import { Btn, Spinner, PageHero, Tag } from "../components/ui";
 import { CONTACT } from "../constants/contact";

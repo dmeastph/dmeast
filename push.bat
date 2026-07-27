@@ -1,53 +1,37 @@
 @echo off
-setlocal EnableDelayedExpansion
 cd /d "%~dp0"
 
-echo.
 echo ============================================================
-echo   Cowork Push Helper - dmeast
+echo   dmeast - Push to GitHub + Vercel
 echo ============================================================
 echo.
 
-REM Must be a git repo
-git rev-parse --is-inside-work-tree >nul 2>&1
+REM ── Delete ALL stale git lock files ──────────────────────────
+if exist ".git\index.lock"       del /f /q ".git\index.lock"
+if exist ".git\HEAD.lock"        del /f /q ".git\HEAD.lock"
+if exist ".git\MERGE_HEAD.lock"  del /f /q ".git\MERGE_HEAD.lock"
+if exist ".git\COMMIT_EDITMSG.lock" del /f /q ".git\COMMIT_EDITMSG.lock"
+echo [OK] Lock files cleared.
+
+REM ── Stage everything that changed ────────────────────────────
+git add -A
+echo [OK] Staged all changes.
+
+REM ── Commit if there is anything new ──────────────────────────
+git diff --cached --quiet
 if errorlevel 1 (
-    echo [ERROR] This folder is not a git repository.
-
+    git commit -m "fix: editable order dates + remove date from track page"
+    echo [OK] Committed.
+) else (
+    echo [INFO] Nothing new to commit.
 )
 
-REM Must have a pending instruction file
-if not exist ".cowork-pending.txt" (
-    echo [INFO] No .cowork-pending.txt found - nothing to push.
-    echo.
-    echo Cowork writes this file when there's a change ready.
-main
+REM ── Push ─────────────────────────────────────────────────────
+git push origin main
+if errorlevel 1 (
+    echo [ERROR] Push failed. Check above for details.
+) else (
+    echo [OK] Pushed! Vercel deploying now - wait ~2 min then refresh.
 )
-
-REM Read branch (line 1) and commit message (line 2)
-set "BRANCH="
-set "MSG="
-set "LINENUM=0"
-for /f "usebackq tokens=* delims=" %%L in (".cowork-pending.txt") do (
-    set /a LINENUM+=1
-    if !LINENUM!==1 set "BRANCH=%%L"
-    if !LINENUM!==2 set "MSG=%%L"
-)
-
-if "!BRANCH!"=="" (
-    echo [ERROR] First line of .cowork-pending.txt must be the branch name.
->>>>>> main
-)
-
-echo Branch:  !BRANCH!
-echo Message: !MSG!
 echo.
-
-
-git checkout main >nul 2>&1
-del .cowork-pending.txt >nul 2>&1
-
-echo.
-echo ============================================================
-echo   SUCCESS - !BRANCH! is on GitHub
-echo ============================================================
-echo.
+pause
