@@ -682,11 +682,14 @@ export function AdminDashboard({ user }){
                         </option>)}
                       </select>
                       <button onClick={()=>setShowOrderEditor(o)} style={{padding:"5px 12px",borderRadius:ds.radius.pill,border:`1px solid ${ds.color.border}`,background:"#fff",cursor:"pointer",fontSize:11.5,fontWeight:600,color:ds.color.textBody,fontFamily:ds.font.body}}>✏️ Edit</button>
-                      <button onClick={()=>setShowDateEditor(o)} style={{padding:"5px 12px",borderRadius:ds.radius.pill,border:`1px solid ${ds.color.border}`,background:"#fff",cursor:"pointer",fontSize:11.5,fontWeight:600,color:ds.color.textBody,fontFamily:ds.font.body}}>📅 Dates</button>
-                      <div style={{fontSize:11,color:ds.color.textMuted,textAlign:"right",lineHeight:1.7}}>
-                        <div>📦 {formatDate(o.createdAt)}</div>
-                        {o.shippedAt   && <div>🚚 {formatDate(o.shippedAt)}</div>}
-                        {o.deliveredAt && <div>✅ {formatDate(o.deliveredAt)}</div>}
+                      <div onClick={()=>setShowDateEditor(o)} title="Click to edit dates"
+                        style={{fontSize:11,color:ds.color.textMuted,textAlign:"right",lineHeight:1.8,cursor:"pointer",padding:"3px 8px",borderRadius:8,border:`1px solid transparent`,transition:"border-color 0.15s"}}
+                        onMouseEnter={e=>e.currentTarget.style.borderColor=ds.color.border}
+                        onMouseLeave={e=>e.currentTarget.style.borderColor="transparent"}>
+                        <div title="Placed">📦 {formatDate(o.createdAt)}</div>
+                        {o.shippedAt   && <div title="Shipped">🚚 {formatDate(o.shippedAt)}</div>}
+                        {o.deliveredAt && <div title="Delivered">✅ {formatDate(o.deliveredAt)}</div>}
+                        {!o.shippedAt && !o.deliveredAt && <div style={{fontSize:10,color:ds.color.textLight,marginTop:1}}>✏️ edit dates</div>}
                       </div>
                     </div>
                   </div>

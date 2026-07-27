@@ -51,6 +51,16 @@ export function OrderEditorModal({ order, products: existingProducts, onClose, o
   // v15.4: VAT treatment (defaults to vat_inclusive for legacy orders)
   const [vatTreatment, setVatTreatment]   = useState(order.vatTreatment || "vat_inclusive");
   
+  // Editable dates
+  const toDateStr = (ts) => {
+    if (!ts) return "";
+    const d = ts.toDate ? ts.toDate() : new Date(ts);
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+  };
+  const [editCreatedAt,   setEditCreatedAt]   = useState(toDateStr(order.createdAt));
+  const [editShippedAt,   setEditShippedAt]   = useState(toDateStr(order.shippedAt));
+  const [editDeliveredAt, setEditDeliveredAt] = useState(toDateStr(order.deliveredAt));
+
   const [saving, setSaving] = useState(false);
   const [errMsg, setErrMsg] = useState("");
   
@@ -126,6 +136,10 @@ export function OrderEditorModal({ order, products: existingProducts, onClose, o
         margin: margin,
         status: orderStatus,
         paymentStatus: paymentStatusValue,
+        // Editable dates
+        ...(editCreatedAt   && { createdAt:   new Date(editCreatedAt   + "T00:00:00") }),
+        shippedAt:   editShippedAt   ? new Date(editShippedAt   + "T00:00:00") : null,
+        deliveredAt: editDeliveredAt ? new Date(editDeliveredAt + "T00:00:00") : null,
         // Audit trail: track edit
         lastEditedAt: serverTimestamp(),
         lastEditedBy: "admin",
@@ -190,9 +204,19 @@ export function OrderEditorModal({ order, products: existingProducts, onClose, o
         <div style={{padding:"18px 28px",borderBottom:`1px solid ${ds.color.border}`,display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10}}>
           <div>
             <div style={{fontFamily:ds.font.display,fontSize:20,color:ds.color.textDark}}>Edit Order #{order.id.slice(-6).toUpperCase()}</div>
-            <div style={{fontSize:12,color:ds.color.textMuted,marginTop:2}}>
-              Created: {formatDate(order.createdAt)}
-              {order.lastEditedAt && <span> · Last edited: {formatDate(order.lastEditedAt)}</span>}
+            <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap",marginTop:4}}>
+              {[
+                {label:"📦 Placed",   val:editCreatedAt,   set:setEditCreatedAt},
+                {label:"🚚 Shipped",  val:editShippedAt,   set:setEditShippedAt},
+                {label:"✅ Delivered",val:editDeliveredAt, set:setEditDeliveredAt},
+              ].map(({label,val,set})=>(
+                <label key={label} style={{display:"flex",alignItems:"center",gap:4,fontSize:11,color:ds.color.textMuted,fontFamily:ds.font.body}}>
+                  <span style={{fontWeight:600,whiteSpace:"nowrap"}}>{label}:</span>
+                  <input type="date" value={val} onChange={e=>set(e.target.value)}
+                    style={{fontSize:11,border:`1px solid ${ds.color.border}`,borderRadius:6,padding:"2px 6px",fontFamily:ds.font.body,color:ds.color.textDark,background:"#fafafa"}}/>
+                </label>
+              ))}
+              {order.lastEditedAt && <span style={{fontSize:11,color:ds.color.textLight}}>· Last edited: {formatDate(order.lastEditedAt)}</span>}
             </div>
           </div>
           <button onClick={onClose} style={{background:"none",border:"none",cursor:"pointer",fontSize:24,color:ds.color.textMuted,padding:4}}>✕</button>
