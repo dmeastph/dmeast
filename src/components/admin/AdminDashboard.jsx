@@ -33,6 +33,57 @@ import { performFullBackup } from "./BackupReminder";
 import { sendSMS, orderStatusSMS } from "../../lib/sms";
 import { useProducts } from "../../context/ProductsContext";
 
+// ─── Date editor mini-modal ───────────────────────────────────────────────────
+function OrderDateEditorModal({ order, onSave, onClose }) {
+  const toDateInput = (ts) => {
+    if (!ts) return "";
+    const d = ts.toDate ? ts.toDate() : new Date(ts);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const dy = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${dy}`;
+  };
+  const [placed, setPlaced] = useState(toDateInput(order.createdAt));
+  const [shipped, setShipped] = useState(toDateInput(order.shippedAt));
+  const [delivered, setDelivered] = useState(toDateInput(order.deliveredAt));
+  const [saving, setSaving] = useState(false);
+  const rows = [
+    { label: "📦 Date Placed",   val: placed,    set: setPlaced },
+    { label: "🚚 Date Shipped",  val: shipped,   set: setShipped },
+    { label: "✅ Date Delivered", val: delivered, set: setDelivered },
+  ];
+  const handleSave = async () => {
+    setSaving(true);
+    await onSave(order.id, { placed, shipped, delivered });
+    setSaving(false);
+  };
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.45)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:9100}}>
+      <div style={{background:"#fff",borderRadius:14,padding:"28px 30px",minWidth:300,width:340,boxShadow:"0 12px 40px rgba(0,0,0,0.22)"}}>
+        <div style={{fontWeight:700,fontSize:15,marginBottom:4}}>📅 Edit Order Dates</div>
+        <div style={{fontSize:12,color:"#888",marginBottom:18}}>#{order.id.slice(-6).toUpperCase()} · {order.name||"Guest"}</div>
+        {rows.map(({ label, val, set }) => (
+          <div key={label} style={{marginBottom:13}}>
+            <label style={{fontSize:11.5,fontWeight:600,color:"#555",display:"block",marginBottom:4}}>{label}</label>
+            <input
+              type="date"
+              value={val}
+              onChange={e => set(e.target.value)}
+              style={{width:"100%",padding:"7px 10px",borderRadius:8,border:"1px solid #ddd",fontSize:13,fontFamily:"inherit",boxSizing:"border-box"}}
+            />
+          </div>
+        ))}
+        <div style={{display:"flex",gap:8,marginTop:20,justifyContent:"flex-end"}}>
+          <button onClick={onClose} style={{padding:"7px 16px",borderRadius:8,border:"1px solid #ddd",background:"#fff",cursor:"pointer",fontSize:13,fontFamily:"inherit"}}>Cancel</button>
+          <button onClick={handleSave} disabled={saving} style={{padding:"7px 16px",borderRadius:8,border:"none",background:"#2563EB",color:"#fff",cursor:saving?"not-allowed":"pointer",fontSize:13,fontWeight:700,fontFamily:"inherit"}}>
+            {saving ? "Saving…" : "Save Dates"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function AdminDashboard({ user }){
   const { products: PRODUCTS, refresh: refreshProducts } = useProducts();
   const [tab,setTab]=useState("overview");
@@ -59,6 +110,8 @@ export function AdminDashboard({ user }){
   const [posts,setPosts]=useState([]);
   // v13.0c: Order editor state
   const [showOrderEditor,setShowOrderEditor]=useState(null);
+  // Date editor modal
+  const [showDateEditor,setShowDateEditor]=useState(null);
   // v15: PDF modal + role
   const [showPDFModal,setShowPDFModal]=useState(null); // null or order obj
   const userRole = user ? getUserRole(user.email) : null;
@@ -328,6 +381,22 @@ export function AdminDashboard({ user }){
         bodyText: `Dear ${customerName},\n\nYour order #${orderRef} has been cancelled.\n\nIf you didn't request this cancellation or have questions, please contact us immediately:\n📱 ${CONTACT.phone1}\n💬 WhatsApp: ${CONTACT.whatsapp}\n✉️ ${CONTACT.email}\n\nIf any payment was made, our team will arrange a refund.\n\nThank you for your understanding.`
       });
     }
+  };
+
+  // Update placed / shipped / delivered dates for an order
+  const updateOrderDates = async (orderId, { placed, shipped, delivered }) => {
+    const updates = {};
+    if (placed)     updates.createdAt   = new Date(placed    + "T00:00:00");
+    if (shipped    !== undefined) updates.shippedAt   = shipped    ? new Date(shipped    + "T00:00:00") : null;
+    if (delivered  !== undefined) updates.deliveredAt = delivered  ? new Date(delivered  + "T00:00:00") : null;
+    await updateDoc(doc(db, "orders", orderId), updates);
+    setOrders(os => os.map(o => o.id === orderId ? {
+      ...o,
+      ...(placed    && { createdAt:   new Date(placed    + "T00:00:00") }),
+      ...(shipped   !== undefined && { shippedAt:   shipped   ? new Date(shipped   + "T00:00:00") : null }),
+      ...(delivered !== undefined && { deliveredAt: delivered ? new Date(delivered + "T00:00:00") : null }),
+    } : o));
+    setShowDateEditor(null);
   };
 
   // V11 NEW: Confirm payment manually
@@ -613,7 +682,12 @@ export function AdminDashboard({ user }){
                         </option>)}
                       </select>
                       <button onClick={()=>setShowOrderEditor(o)} style={{padding:"5px 12px",borderRadius:ds.radius.pill,border:`1px solid ${ds.color.border}`,background:"#fff",cursor:"pointer",fontSize:11.5,fontWeight:600,color:ds.color.textBody,fontFamily:ds.font.body}}>✏️ Edit</button>
-                      <span style={{fontSize:12,color:ds.color.textMuted}}>{formatDate(o.createdAt)}</span>
+                      <button onClick={()=>setShowDateEditor(o)} style={{padding:"5px 12px",borderRadius:ds.radius.pill,border:`1px solid ${ds.color.border}`,background:"#fff",cursor:"pointer",fontSize:11.5,fontWeight:600,color:ds.color.textBody,fontFamily:ds.font.body}}>📅 Dates</button>
+                      <div style={{fontSize:11,color:ds.color.textMuted,textAlign:"right",lineHeight:1.7}}>
+                        <div>📦 {formatDate(o.createdAt)}</div>
+                        {o.shippedAt   && <div>🚚 {formatDate(o.shippedAt)}</div>}
+                        {o.deliveredAt && <div>✅ {formatDate(o.deliveredAt)}</div>}
+                      </div>
                     </div>
                   </div>
                   {needsReview&&(
@@ -960,6 +1034,13 @@ export function AdminDashboard({ user }){
           order={showPDFModal}
           onClose={()=>setShowPDFModal(null)}
         /></Suspense>
+      )}
+      {showDateEditor !== null && (
+        <OrderDateEditorModal
+          order={showDateEditor}
+          onSave={updateOrderDates}
+          onClose={()=>setShowDateEditor(null)}
+        />
       )}
       <BackupReminder/>
     </div>
